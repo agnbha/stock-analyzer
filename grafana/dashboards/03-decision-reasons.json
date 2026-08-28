@@ -1,0 +1,353 @@
+{
+  "uid": "stockanalyzer-reasons",
+  "title": "Decision Reasons",
+  "description": "Why trades were taken, how often each reason recurs, and what each one earned.",
+  "tags": [
+    "stock-analyzer",
+    "review"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 10,
+      "title": "How often each reason was used",
+      "type": "barchart",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 14,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "legend": {
+          "showLegend": false
+        },
+        "xField": "Reason"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          }
+        },
+        "overrides": []
+      },
+      "description": "UNEXPLAINED is a real category: a fill with no note, event or alert behind it."
+    },
+    {
+      "id": 11,
+      "title": "Where the reason came from",
+      "type": "piechart",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 0,
+        "w": 10,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "pieType": "donut",
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "description": "MANUAL is what you typed; EVENT and ALERT are what the system had just told you."
+    },
+    {
+      "id": 12,
+      "title": "Buy reasons vs sell reasons",
+      "type": "barchart",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 14,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "xField": "Reason"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Reasons used per day",
+      "type": "timeseries",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 10,
+        "w": 10,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nGROUP BY session_date, reason_code\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nGROUP BY session_date, reason_code\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "showPoints": "auto",
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Did the reason pay?",
+      "type": "table",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Times used",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net P&L"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net per use"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bet amount"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Frequency alone says what you do most; this says whether it works. A reason used often with a negative net is the one worth arguing with."
+    }
+  ]
+}

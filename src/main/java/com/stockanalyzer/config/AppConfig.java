@@ -110,4 +110,195 @@ public final class AppConfig {
             throw new UncheckedIOException("Failed to read symbols file: " + symbolsFile, e);
         }
     }
+
+    // ---- Part 1: intraday analysis and the local store -------------------------------
+
+    /** Candle size used for intraday analysis; 1 = one-minute candles. */
+    public int intradayIntervalMinutes() {
+        return Integer.parseInt(get("intraday.candle.interval.minutes", "1"));
+    }
+
+    public int intradayTopN() {
+        return Integer.parseInt(get("intraday.top.n", "3"));
+    }
+
+    /** HIGH_LOW measures entry-low to exit-high; CLOSE_CLOSE is the conservative reading. */
+    public String intradayPriceBasis() {
+        return get("intraday.price.basis", "HIGH_LOW");
+    }
+
+    public int intradayMinHoldCandles() {
+        return Integer.parseInt(get("intraday.min.hold.candles", "1"));
+    }
+
+    public double intradayMinGainPct() {
+        return Double.parseDouble(get("intraday.min.gain.pct", "0.0"));
+    }
+
+    public boolean intradayStoreRawCandles() {
+        return Boolean.parseBoolean(get("intraday.store.raw.candles", "true"));
+    }
+
+    public String databaseUrl() {
+        return get("db.url", "jdbc:sqlite:data/stock-analyzer.db");
+    }
+
+    public int databaseBusyTimeoutMillis() {
+        return Integer.parseInt(get("db.busy.timeout.ms", "5000"));
+    }
+
+    public int rateLimitPerSecond() {
+        return Integer.parseInt(get("ingest.rate.limit.per.second", "15"));
+    }
+
+    public int rateLimitPerMinute() {
+        return Integer.parseInt(get("ingest.rate.limit.per.minute", "400"));
+    }
+
+    public int ingestMaxRetries() {
+        return Integer.parseInt(get("ingest.max.retries", "4"));
+    }
+
+    public long ingestRetryBackoffMillis() {
+        return Long.parseLong(get("ingest.retry.backoff.ms", "500"));
+    }
+
+    public int backfillMaxDaysPerRequest() {
+        return Integer.parseInt(get("backfill.max.days.per.request", "5"));
+    }
+
+    // ---- Part 2: the time-of-day prior and the model --------------------------------
+
+    /** False keeps the statistical baseline in charge until a model earns its place. */
+    public boolean modelEnabled() {
+        return Boolean.parseBoolean(get("model.enabled", "false"));
+    }
+
+    public String modelServiceUrl() {
+        return get("model.service.url", "http://localhost:8001/predict/intraday");
+    }
+
+    public int modelHorizonMinutes() {
+        return Integer.parseInt(get("model.horizon.minutes", "30"));
+    }
+
+    public int modelTimeoutSeconds() {
+        return Integer.parseInt(get("model.timeout.seconds", "20"));
+    }
+
+    public int hotWindowBucketMinutes() {
+        return Integer.parseInt(get("hotwindow.bucket.minutes", "5"));
+    }
+
+    public int hotWindowLookbackDays() {
+        return Integer.parseInt(get("hotwindow.lookback.days", "60"));
+    }
+
+    // ---- Part 3: alerts --------------------------------------------------------------
+
+    public boolean alertsEnabled() {
+        return Boolean.parseBoolean(get("alerts.enabled", "true"));
+    }
+
+    /** Comma-separated: console, macos, file. */
+    public List<String> alertSinks() {
+        return List.of(get("alerts.sinks", "console").split(",")).stream()
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+    }
+
+    public String alertFilePath() {
+        return get("alerts.file.path", "data/alerts.jsonl");
+    }
+
+    public int alertLeadTimeMinutes() {
+        return Integer.parseInt(get("alerts.lead.time.minutes", "2"));
+    }
+
+    public int alertHotWindowMinSessions() {
+        return Integer.parseInt(get("alerts.hotwindow.min-sessions", "30"));
+    }
+
+    public double alertHotWindowMinLowerBound() {
+        return Double.parseDouble(get("alerts.hotwindow.min-lcb", "0.10"));
+    }
+
+    public double alertModelMinProbability() {
+        return Double.parseDouble(get("alerts.model.min-probability", "0.65"));
+    }
+
+    public int alertCooldownMinutes() {
+        return Integer.parseInt(get("alerts.cooldown.minutes", "15"));
+    }
+
+    public int alertMaxPerSymbolPerDay() {
+        return Integer.parseInt(get("alerts.max.per.symbol.per.day", "3"));
+    }
+
+    public int alertMaxPerDay() {
+        return Integer.parseInt(get("alerts.max.per.day", "30"));
+    }
+
+    public String holidaysFile() {
+        return get("alerts.holidays.file", "nse-holidays-2026.txt");
+    }
+
+    // ---- Part 4: live monitoring -----------------------------------------------------
+
+    public int monitorPollIntervalSeconds() {
+        return Integer.parseInt(get("monitor.poll.interval.seconds", "150"));
+    }
+
+    public String monitorSessionOpen() {
+        return get("monitor.session.open", "09:15");
+    }
+
+    public String monitorSessionClose() {
+        return get("monitor.session.close", "15:30");
+    }
+
+    public String monitorTimezone() {
+        return get("monitor.timezone", "Asia/Kolkata");
+    }
+
+    public int monitorPostCloseGraceSeconds() {
+        return Integer.parseInt(get("monitor.post.close.grace.seconds", "120"));
+    }
+
+    public boolean monitorAnsi() {
+        return Boolean.parseBoolean(get("monitor.view.ansi", "true"));
+    }
+
+    // ---- Part 5: the trade journal ---------------------------------------------------
+
+    /** broker | csv | manual. */
+    public String tradesSource() {
+        return get("trades.source", "broker");
+    }
+
+    public String tradesCsvDateFormat() {
+        return get("trades.csv.date.format", "yyyy-MM-dd HH:mm:ss");
+    }
+
+    public String tradesDefaultProduct() {
+        return get("trades.default.product", "MIS");
+    }
+
+    public boolean preferBrokerCharges() {
+        return Boolean.parseBoolean(get("charges.prefer.broker.actuals", "true"));
+    }
+
+    /** How long before a fill an event or alert still counts as its reason. */
+    public int reasonLookbackMinutes() {
+        return Integer.parseInt(get("trades.reason.lookback.minutes", "15"));
+    }
+
+    public int financialYearStartMonth() {
+        return Integer.parseInt(get("report.fy.start.month", "4"));
+    }
+
+    public double chargeRate(String key, double fallback) {
+        return Double.parseDouble(get("charges." + key, String.valueOf(fallback)));
+    }
 }

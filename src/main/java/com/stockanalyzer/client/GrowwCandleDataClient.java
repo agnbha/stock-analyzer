@@ -67,7 +67,8 @@ public final class GrowwCandleDataClient implements CandleDataClient {
         if (response.statusCode() / 100 != 2) {
             throw new GrowwApiException(
                     "Groww candle request for " + symbol + " failed with status " + response.statusCode()
-                            + ": " + response.body());
+                            + ": " + response.body(),
+                    response.statusCode());
         }
 
         GrowwCandleResponse candleResponse;

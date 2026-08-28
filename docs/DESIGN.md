@@ -4,7 +4,7 @@ A personal stock analysis and alerting system, built as an incremental
 extension of the existing `com.stockanalyzer` codebase (Java 25, Maven, Groww
 Trading API, SOLID layering with a composition root in `Main`).
 
-Five parts, designed together so they share one data model and one process:
+Six parts, designed together so they share one data model and one process:
 
 | Part | What it does | Runs |
 |---|---|---|
@@ -13,6 +13,7 @@ Five parts, designed together so they share one data model and one process:
 | 3 | Alerts: session start/end, and moments when today's clock reaches a historically significant timestamp | during market hours |
 | 4 | Live monitoring every 2–3 minutes, projecting new candles and showing change as it happens | during market hours |
 | 5 | Trade journal and gain/loss statements per day, week and month | after the fact, on demand |
+| 6 | Grafana dashboards over the same database | on demand |
 
 Parts 3 and 4 are one long-running process (`MarketDayDaemon`): the monitor's
 poll tick is exactly what evaluates alert conditions, so they are designed as
@@ -285,9 +286,13 @@ CREATE TABLE hot_window (
 );
 ```
 
-Ranking by the Wilson lower confidence bound rather than raw hit rate is the
-detail that stops a 2-of-2 bucket outranking a 40-of-100 bucket. Without it the
-whole feature is noise.
+Ranking by the Wilson lower confidence bound rather than the raw hit rate
+discounts every estimate by how little evidence stands behind it: 2 hits out of
+2 falls from 1.00 to about 0.34, while 40 out of 100 falls only from 0.40 to
+0.31. Note what that does *not* do — 0.34 still outranks 0.31, so the bound
+alone will not bury a two-session bucket. The `min-sessions` floor in Part 3 is
+what excludes thin buckets; the bound is what orders the ones that clear it.
+Both are needed, and it is worth being precise about which does which.
 
 **(b) The supervised model — "which events".** Per-candle classification over
 the stored tape.
@@ -748,6 +753,85 @@ These land in `trade_attribution`, computed by a nightly job after Part 1's
 ingestion completes for the session, matching each trade to the nearest
 opportunity window for that symbol-day.
 
+# Part 6 — Dashboards
+
+## 6.1 Approach
+
+Grafana reads the SQLite file directly through the
+[SQLite datasource plugin](https://grafana.com/grafana/plugins/frser-sqlite-datasource/).
+No exporter, no metrics endpoint, no second copy of the data — the dashboards
+are a view over exactly the rows the CLI writes, mounted read-only so a panel
+can never modify the journal.
+
+The alternative — pushing metrics to Prometheus — was rejected: Prometheus is
+built for time series of measurements, not for a trade ledger you want to sort,
+join and total. Everything here is relational.
+
+## 6.2 Views, not panel SQL
+
+Every panel reads a database view rather than a hand-written join. Schema
+migration v4 adds them:
+
+| View | What it answers |
+|---|---|
+| `v_bet` | Per fill: bet amount (quantity x price), brokerage, taxes, fees |
+| `v_daily_pnl` | Per session: fills, bet amount, charges, gross and net P&L, closed lots |
+| `v_equity_curve` | Recorded cash, cumulative net P&L, and the two combined |
+| `v_daily_candles`, `v_weekly_candles` | OHLC per session and per ISO week |
+| `v_trade_markers` | Where your buys and sells sit on those candles |
+| `v_reason_frequency` | How often each reason recurs, and the P&L that followed |
+
+Two reasons this matters more than it looks. Reporting logic lives in one place
+instead of being retyped into a dozen panels; and the views are testable, so
+`DashboardViewsTest` asserts what each one returns and
+`GrafanaDashboardQueryTest` executes every query in every dashboard JSON against
+a real migrated database on each build. A typo in dashboard SQL fails the build
+rather than becoming an empty panel nobody investigates.
+
+## 6.3 The three tabs
+
+**Account Overview** — account value, total staked, gains and losses, and what it
+cost. Stat tiles, then the equity curve, per-day gains and bet amounts, taxes
+and charges stacked, and every fill sorted by bet amount descending.
+
+Account value needs a caveat built into the design rather than bolted on: this
+system sees fills, not funds. So `account_balance` records what you tell it
+(`trades balance --cash`), and the panel plots *recorded cash*, *cumulative net
+P&L* and their sum as three separate lines. A curve built only from P&L is a
+different claim from "this is what the account is worth", and conflating them
+would be the kind of number that looks authoritative and is not.
+
+**Candles and Calls** — daily and weekly candles for one symbol, marked with the
+buys and sells actually taken, at the average fill price for that session or
+week. Markers ride on the candlestick panel as extra fields rather than as
+Grafana annotations, so they work without depending on the plugin's annotation
+support.
+
+**Decision Reasons** — how often each reason recurs, where it came from, buy
+reasons versus sell reasons, and whether each reason actually paid. Frequency
+alone says what you do most; pairing it with net P&L says whether it works,
+which is the question worth asking.
+
+## 6.4 Where a reason comes from
+
+For Part 6's third tab to mean anything, a trade has to carry why it was taken.
+`ReasonAttributor` fills `trade_reason` from three sources, in order of
+authority:
+
+1. **What you typed** — `trades add --reason "VWAP reclaim"`, normalised into a
+   countable code.
+2. **What had just happened** — events detected for that symbol within
+   `trades.reason.lookback.minutes` (default 15) before the fill, and alerts
+   that fired for it. This is why Part 1's `event` table is stored rather than
+   recomputed: it is what lets a trade be explained after the fact.
+3. **Nothing** — recorded as `UNEXPLAINED` rather than left out. "I do not know
+   why I took this one" is itself a frequency worth seeing, and hiding it would
+   quietly flatter the chart.
+
+Attribution is a pure recompute from stored rows, so it re-runs safely
+(`trades reasons --month`) and improves retroactively as the event vocabulary
+grows.
+
 ---
 
 # Cross-cutting
@@ -944,6 +1028,9 @@ Fakes over mocks, matching the existing `StockGrowthAnalysisServiceTest` style.
 | 14 | `FifoLotMatcher` + `ChargeModel` + `realized_lot` + unit tests | 5 | 13 |
 | 15 | `PeriodAggregator` + `pnl` day/week/month/FY + `statement` export | 5 | 14 |
 | 16 | `CaptureAnalyzer` + `trade_attribution` + `capture` report | 5 | 5, 9, 15 |
+| 17 | Schema v4: `trade_reason`, `account_balance`, and the dashboard views | 6 | 15 |
+| 18 | `ReasonAttributor` + `trades reasons` / `trades balance` | 6 | 17 |
+| 19 | Grafana provisioning + the three dashboards, with their queries under test | 6 | 17 |
 
 Phases 1 and 2 are independent. Phase 2 is pure functions and is where the
 design risk actually sits, so it is the one worth building first if only one
@@ -973,6 +1060,8 @@ Decisions taken, each reversible by a config key:
    close.
 7. Trades imported from the broker trade book, FIFO matched, MIS and CNC kept
    separate, reported net of actual-or-modelled charges.
+8. Dashboards read SQLite directly from Grafana; account value comes from a
+   balance you record, not from a funds API.
 
 Worth settling before phase 3, and before phase 10:
 

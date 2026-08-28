@@ -1,20 +1,120 @@
-# Stock Growth Analyzer
+# Stock Analyzer
 
-Fetches the last month of daily candles for a configurable list of stocks from
-the [Groww Trading API](https://groww.in/trade-api/docs), sends each stock's
-candle series to an external ML service for growth-pattern analysis, and
-prints a ranked report.
+A personal intraday analysis, alerting and trade-journal system for NSE
+equities, built on the [Groww Trading API](https://groww.in/trade-api/docs).
+Six parts, sharing one local database and one market-hours process:
+
+| Part | What it does | Runs |
+|---|---|---|
+| 1 | Daily intraday analysis: the top 3 gain windows per symbol per session, appended to months of history | nightly, batch |
+| 2 | A time-of-day prior, and a hook for a trained model | offline, plus online scoring |
+| 3 | Alerts for the session lifecycle and for historically strong moments | during market hours |
+| 4 | Live monitoring every 2-3 minutes, projecting new candles as they arrive | during market hours |
+| 5 | Trade journal and gain/loss statements per day, week, month and financial year | on demand |
+| 6 | Grafana dashboards over the same database | on demand |
+
+The full design, including why each decision was made, is in
+[docs/DESIGN.md](docs/DESIGN.md).
+
+> This produces statistics, signals, notifications and record-keeping. It places
+> no orders and makes no buy/sell recommendation. Part 5's P&L is for your own
+> review, not a tax filing - your broker's contract note remains authoritative.
 
 ## Requirements
 
 - Java 25+
 - Maven 3.8+
 - A Groww Trading API key + secret ([generate one here](https://groww.in/trade-api/api-keys))
-- A running ML service that accepts the JSON contract in
-  [`GrowthAnalysisRequest`](src/main/java/com/stockanalyzer/ml/GrowthAnalysisRequest.java)
-  and returns the shape in
-  [`GrowthAnalysisResponse`](src/main/java/com/stockanalyzer/ml/GrowthAnalysisResponse.java)
-  (this repo does not include a model — bring your own model-serving endpoint)
+- Docker, for the Grafana dashboards (optional)
+- A model-serving endpoint, only if you turn Part 2's model on (optional - see
+  [docs/MODEL-CONTRACT.md](docs/MODEL-CONTRACT.md))
+
+## Build
+
+```bash
+mvn clean package
+```
+
+## Commands
+
+Everything writes to one SQLite file, `data/stock-analyzer.db` by default.
+
+### Part 1 - analysis
+
+```bash
+CP=target/stock-analyzer.jar
+
+# yesterday's session for every configured symbol
+java -cp $CP com.stockanalyzer.DailyAnalysisMain daily
+java -cp $CP com.stockanalyzer.DailyAnalysisMain daily --date 2026-08-27
+
+# seed the previous months (same code path, just a wider range)
+java -cp $CP com.stockanalyzer.DailyAnalysisMain backfill --from 2026-06-01 --to 2026-08-27
+
+# re-run a changed detector over stored candles, no API calls
+java -cp $CP com.stockanalyzer.DailyAnalysisMain recompute --from 2026-06-01
+
+# read the accumulated history back
+java -cp $CP com.stockanalyzer.DailyAnalysisMain report --symbol RELIANCE --months 6
+java -cp $CP com.stockanalyzer.DailyAnalysisMain export --from 2026-06-01 --out opportunities.csv
+```
+
+### Part 2 - the time-of-day prior
+
+```bash
+java -cp $CP com.stockanalyzer.DailyAnalysisMain hot-windows --lookback 60
+java -cp $CP com.stockanalyzer.DailyAnalysisMain evaluate --date 2026-08-27
+```
+
+### Parts 3 and 4 - alerts and live monitoring
+
+```bash
+java -cp $CP com.stockanalyzer.MarketDayDaemon            # run for today
+java -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only, no notifications
+java -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
+```
+
+### Part 5 - the trade journal
+
+```bash
+java -cp $CP com.stockanalyzer.TradeJournalMain trades import --broker --from 2026-08-01 --to 2026-08-28
+java -cp $CP com.stockanalyzer.TradeJournalMain trades import --csv contract-notes.csv
+java -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIANCE --side BUY \
+     --qty 10 --price 1418.20 --at 2026-08-28T09:47 --product MIS --reason "VWAP reclaim"
+java -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000 --invested 50000
+java -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
+
+java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28
+java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period week  --of    2026-08-28
+java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period month --month 2026-08
+java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period fy    --year  2026-27
+java -cp $CP com.stockanalyzer.TradeJournalMain pnl --rebuild
+java -cp $CP com.stockanalyzer.TradeJournalMain statement --from 2026-04-01 --out statement.csv
+java -cp $CP com.stockanalyzer.TradeJournalMain capture --month 2026-08
+```
+
+### Part 6 - dashboards
+
+```bash
+cd grafana && docker compose up -d    # http://localhost:3000
+```
+
+See [grafana/README.md](grafana/README.md).
+
+### The original ML growth report
+
+The pre-existing `Main` entry point is untouched and still works as before:
+
+```bash
+java -jar target/stock-analyzer.jar
+```
+
+## Scheduling
+
+Two `launchd` jobs (or cron entries) cover routine use: `MarketDayDaemon` at
+09:00 IST on weekdays - it exits itself after the close and reconciles - and
+`DailyAnalysisMain daily` at 18:30. A missed nightly run costs nothing: the
+planner works out what is missing by set difference, so the next run catches up.
 
 ## Configuration
 
@@ -32,59 +132,109 @@ environment variable (dots become underscores, uppercased — e.g.
 | `app.symbols.file` | Classpath file listing symbols, one per line (default `symbols.txt`, pre-populated with 50 NSE large-caps — edit freely) |
 | `app.fetch.concurrency` | Parallel fetch/analyze threads (default 5, keep modest — see rate limits below) |
 
-## Build & run
+Added by parts 1-6, grouped by prefix (see `application.properties` for the full
+annotated list):
+
+| Prefix | Controls |
+|---|---|
+| `intraday.*` | Candle interval, how many windows to find, `HIGH_LOW` vs `CLOSE_CLOSE`, minimum hold and minimum gain |
+| `db.*` | Where the SQLite file lives |
+| `ingest.*`, `backfill.*` | Rate limits, retries, and how many days one request may span |
+| `hotwindow.*`, `model.*` | The time-of-day prior, and the optional model service |
+| `alerts.*` | Sinks, lead time, evidence thresholds, cooldowns and caps, holiday file |
+| `monitor.*` | Poll interval, session hours, timezone |
+| `trades.*`, `charges.*`, `report.fy.start.month` | Trade import, the charge schedule, and the financial year |
+
+## How it fits together
+
+Package layout follows the existing SOLID conventions — every collaborator sits
+behind an interface, and all concrete wiring happens in one composition root
+(`AppContext`), so no service knows it is talking to Groww specifically or to
+SQLite specifically.
+
+- **`model`** — plain records. No behavior, no dependencies.
+- **`auth`**, **`client`** — Groww authentication and candle fetching.
+  `RateLimitedCandleDataClient`, `RetryingCandleDataClient` and
+  `ChunkedCandleDataClient` are decorators, so limits, backoff and request
+  splitting are each enforced in exactly one place.
+- **`intraday`** — `TopKNonOverlappingDetector` (the top-3 windows),
+  `TradingCalendar`, `BackfillPlanner`, `DailyIngestionService`,
+  `RecomputeService`. The detector is pure: same candles in, same windows out.
+- **`store`** — repository interfaces with SQLite implementations behind them,
+  plus `SchemaMigrator`. Moving to DuckDB or Postgres later means adding one
+  package, not editing services.
+- **`features`**, **`signal`** — event detection, the feature contract, the
+  time-of-day prior, and the optional model client.
+- **`alert`**, **`live`** — the alert engine and sinks, and the market-hours
+  monitor they share a tick with.
+- **`trade`** — FIFO lot matching, the charge model, period aggregation, reason
+  attribution and capture analysis.
+- **`report`** — console, CSV and dashboard-facing output.
+
+Three entry points (`DailyAnalysisMain`, `MarketDayDaemon`, `TradeJournalMain`)
+plus the original `Main`.
+
+## Design decisions worth knowing
+
+- **"Highest gain" is defined, not assumed.** A gain window is an entry and a
+  later exit, scored on the entry candle's low against the exit candle's high by
+  default, and the top 3 are forced not to overlap — so you get three genuinely
+  distinct opportunities, not three shifted views of one move. Switch to
+  `CLOSE_CLOSE` for the conservative reading.
+- **Every result carries a detector version.** Changing the rules writes a
+  parallel, comparable series instead of silently rewriting history.
+- **Ingestion is a set difference, not a cursor.** The nightly run and a
+  multi-month backfill are the same code path, and a symbol that failed three
+  days ago is simply still missing next time.
+- **Provisional data never reaches the canonical tables.** The still-forming
+  candle is shown in the live view and excluded from anything analysed or
+  stored; the session is reconciled against the authoritative tape at the close.
+- **Charges are modelled, never ignored.** On intraday equity they are a large
+  fraction of a small move, so every P&L figure is shown gross and net.
+- **The statistical baseline is the default.** Alerts and the monitor work with
+  no ML at all; a trained model has to beat the prior on a held-out month before
+  `model.enabled` is worth turning on.
+
+## Testing
 
 ```bash
-mvn clean package
-java -jar target/stock-analyzer.jar
+mvn test
 ```
 
-or during development:
-
-```bash
-mvn compile exec:java -Dexec.mainClass=com.stockanalyzer.Main
-```
-
-## Design
-
-Package layout follows SOLID:
-
-- **`model`** — plain data records (`Candle`, `StockCandleSeries`,
-  `GrowthAnalysisResult`, `StockAnalysisOutcome`). No behavior, no dependencies.
-- **`auth`** — `GrowwAuthenticator` interface; `ChecksumGrowwAuthenticator`
-  implements Groww's API-key+secret checksum token flow and caches the token
-  until expiry. A different auth strategy (e.g. TOTP) can be added as another
-  implementation without touching any caller.
-- **`client`** — `CandleDataClient` interface, with `GrowwCandleDataClient` as
-  the Groww-specific implementation. Swapping data providers means writing a
-  new implementation, not editing the service layer (**OCP**).
-- **`ml`** — `GrowthPatternAnalyzer` interface, with `RestGrowthPatternAnalyzer`
-  calling out to a configurable HTTP model-serving endpoint. Swap in a local
-  model, a different vendor, or a mock, all behind the same interface.
-- **`service`** — `StockGrowthAnalysisService` orchestrates fetch + analyze
-  across all symbols concurrently. It depends only on `CandleDataClient` and
-  `GrowthPatternAnalyzer` abstractions (**DIP**), is fully unit-testable with
-  fakes (see `StockGrowthAnalysisServiceTest`), and isolates per-symbol
-  failures so one bad stock doesn't abort the batch.
-- **`report`** — `AnalysisReporter` interface; `ConsoleAnalysisReporter` prints
-  a ranked table. New output formats (CSV, JSON, a web dashboard) plug in
-  without changing the service.
-- **`Main`** — the composition root. All concrete-to-interface wiring happens
-  here and nowhere else.
+Fakes over mocks, matching the existing style. Notable cases: the detector
+against hand-built sessions with known answers; ingesting the same day twice
+leaving exactly three windows; the backfill planner against gaps, weekends and
+holidays; FIFO matching through partial fills, short-then-cover and simultaneous
+MIS/CNC positions; alert cooldowns and restart dedup; and every Grafana
+dashboard query executed against a real migrated database.
 
 ## Important caveats
 
-- The historical candle endpoint used
-  (`GET /v1/historical/candle/range`) is marked **deprecated** in Groww's docs
-  in favor of a newer "Backtesting" data endpoint; it was used here because it
-  is the one with a fully documented request/response shape. If Groww removes
-  it, update `GrowwCandleDataClient` to target the replacement endpoint.
+- The historical candle endpoint used (`GET /v1/historical/candle/range`) is
+  marked **deprecated** in Groww's docs in favor of a newer "Backtesting" data
+  endpoint; it was used here because it is the one with a fully documented
+  request/response shape. If Groww removes it, update `GrowwCandleDataClient` to
+  target the replacement endpoint.
 - The checksum auth algorithm (`SHA-256(apiSecret + epochTimestamp)`, hex
-  encoded) was reconstructed from Groww's published cURL docs. If token
-  requests start failing with 4xx, re-check the exact concatenation
-  order/encoding against the latest docs at
-  https://groww.in/trade-api/docs/curl.
+  encoded) was reconstructed from Groww's published cURL docs. If token requests
+  start failing with 4xx, re-check the exact concatenation order/encoding
+  against the latest docs at https://groww.in/trade-api/docs/curl.
+- **The trade book response shape is not well documented.** `GrowwExecutionClient`
+  reads field names defensively with fallbacks and logs the raw response when it
+  cannot find a trade list. If an import comes back empty while your web trade
+  book shows fills, that log is the place to look; adjusting the field names
+  there is the only change needed.
+- **`nse-holidays-2026.txt` ships incomplete.** It has the fixed-date national
+  holidays only. Festival holidays move every year and must be copied from the
+  NSE's published circular, or the daemon will fire session alerts on days the
+  market is shut. History self-corrects (a day with no data for any symbol is
+  recorded as non-trading), but scheduled alerts look forward and cannot.
+- **The charge rates are as configured, not as billed.** Verify them once against
+  a real contract note; after that `charges.prefer.broker.actuals` means broker
+  figures win wherever they exist.
 - Respect Groww's rate limits (non-trading endpoints: 20 req/sec, 500 req/min).
-  `app.fetch.concurrency` defaults to 5 to stay well under that for 50 symbols.
-- This project does not include an ML model. `RestGrowthPatternAnalyzer` is a
-  thin client against whatever service you point `ml.service.url` at.
+  The shared token bucket defaults to 15/sec and 400/min across the whole
+  process, nightly batch and live monitor together.
+- This repo still does not include a model. Part 2 works without one; if you
+  want one, `docs/MODEL-CONTRACT.md` is the wire format and
+  `src/test/resources/feature-parity.json` is how you check your features match.

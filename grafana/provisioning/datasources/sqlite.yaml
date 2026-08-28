@@ -1,0 +1,15 @@
+# The dashboards read the same SQLite file the analyzer writes. Nothing else
+# needs to run: no exporter, no API, no second copy of the data.
+apiVersion: 1
+
+datasources:
+  - name: StockAnalyzer
+    uid: stock-analyzer-sqlite
+    type: frser-sqlite-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      # Inside the container this is where docker-compose mounts ../data.
+      # Running Grafana natively instead? Change it to the absolute path of
+      # data/stock-analyzer.db in this repo.
+      path: /var/lib/stock-analyzer/stock-analyzer.db

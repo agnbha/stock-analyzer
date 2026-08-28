@@ -1,0 +1,578 @@
+{
+  "uid": "stockanalyzer-overview",
+  "title": "Account Overview",
+  "description": "Money in the account, what was staked, what came back, and what it cost.",
+  "tags": [
+    "stock-analyzer",
+    "money"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 10,
+      "title": "Account value",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS value\nFROM v_equity_curve ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS value\nFROM v_equity_curve ORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Total bet amount",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet",
+          "queryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "Net gain / loss",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl",
+          "queryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "title": "Taxes and charges",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl",
+          "queryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 20,
+      "title": "Account value over time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS \"Account value\",\n       recorded_cash                                                     AS \"Recorded cash\",\n       realized_net_cumulative                                           AS \"Cumulative net P&L\"\nFROM v_equity_curve\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS \"Account value\",\n       recorded_cash                                                     AS \"Recorded cash\",\n       realized_net_cumulative                                           AS \"Cumulative net P&L\"\nFROM v_equity_curve\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "description": "Recorded cash is what you told the journal the account holds; cumulative net P&L is derived from closed lots. Account value adds the two, so it is only as accurate as the last balance you recorded."
+    },
+    {
+      "id": 21,
+      "title": "Gains and losses per day",
+      "type": "barchart",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       gross_pnl AS \"Gross P&L\",\n       net_pnl   AS \"Net P&L\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       gross_pnl AS \"Gross P&L\",\n       net_pnl   AS \"Net P&L\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "showValue": "never"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "title": "Bet amount per day",
+      "type": "barchart",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       bet_amount AS \"Bet amount\",\n       trades     AS \"Trades\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       bet_amount AS \"Bet amount\",\n       trades     AS \"Trades\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 23,
+      "title": "Taxes and charges over time",
+      "type": "timeseries",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       brokerage AS \"Brokerage\",\n       taxes     AS \"Taxes (STT, stamp, GST)\",\n       fees      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       brokerage AS \"Brokerage\",\n       taxes     AS \"Taxes (STT, stamp, GST)\",\n       fees      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "description": "Stacked, because what matters is the total drag on a small move - not which line is which."
+    },
+    {
+      "id": 24,
+      "title": "Every fill, biggest bet first",
+      "type": "table",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\"\nFROM v_bet\nORDER BY bet_amount DESC\nLIMIT 500",
+          "queryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\"\nFROM v_bet\nORDER BY bet_amount DESC\nLIMIT 500",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [
+            "Bet amount",
+            "Charges"
+          ],
+          "countRows": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bet amount"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Charges"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

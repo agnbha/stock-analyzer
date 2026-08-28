@@ -1,0 +1,353 @@
+{
+  "uid": "stockanalyzer-candles",
+  "title": "Candles and Calls",
+  "description": "Daily and weekly candles for one symbol, marked with the buys and sells you actually took.",
+  "tags": [
+    "stock-analyzer",
+    "trades"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "label": "Symbol",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": {
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol FROM instrument ORDER BY symbol",
+          "queryText": "SELECT symbol FROM instrument ORDER BY symbol",
+          "timeColumns": []
+        },
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {},
+        "definition": "SELECT symbol FROM instrument ORDER BY symbol"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 10,
+      "title": "$symbol - daily candles, with the calls you took",
+      "type": "candlestick",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', c.session_date) AS INTEGER) AS time,\n       c.open  AS open,\n       c.high  AS high,\n       c.low   AS low,\n       c.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_daily_candles c\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'BUY' GROUP BY session_date, symbol) b\n       ON b.session_date = c.session_date AND b.symbol = c.symbol\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'SELL' GROUP BY session_date, symbol) s\n       ON s.session_date = c.session_date AND s.symbol = c.symbol\nWHERE c.symbol = '$symbol'\nORDER BY c.session_date",
+          "queryText": "SELECT CAST(strftime('%s', c.session_date) AS INTEGER) AS time,\n       c.open  AS open,\n       c.high  AS high,\n       c.low   AS low,\n       c.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_daily_candles c\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'BUY' GROUP BY session_date, symbol) b\n       ON b.session_date = c.session_date AND b.symbol = c.symbol\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'SELL' GROUP BY session_date, symbol) s\n       ON s.session_date = c.session_date AND s.symbol = c.symbol\nWHERE c.symbol = '$symbol'\nORDER BY c.session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "down": "red",
+          "up": "green",
+          "flat": "gray"
+        },
+        "includeAllFields": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Blue points are buys, orange are sells, plotted at the average fill price for that session."
+    },
+    {
+      "id": 11,
+      "title": "$symbol - weekly candles, with the calls you took",
+      "type": "candlestick",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', w.session_date) AS INTEGER) AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
+          "queryText": "SELECT CAST(strftime('%s', w.session_date) AS INTEGER) AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "down": "red",
+          "up": "green",
+          "flat": "gray"
+        },
+        "includeAllFields": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "The same fills aggregated to the week the trade happened in."
+    },
+    {
+      "id": 12,
+      "title": "$symbol - every call, newest first",
+      "type": "table",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol'\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
+          "queryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol'\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Side"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "BUY": {
+                        "text": "BUY",
+                        "color": "blue",
+                        "index": 0
+                      },
+                      "SELL": {
+                        "text": "SELL",
+                        "color": "orange",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bet amount"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

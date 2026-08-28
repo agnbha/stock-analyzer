@@ -1,0 +1,19 @@
+# NSE trading holidays, one ISO date per line. Weekends are skipped
+# automatically and do not need to be listed.
+#
+# INCOMPLETE - this file ships with only the fixed-date national holidays.
+# The festival holidays (Holi, Ram Navami, Id, Muharram, Diwali Laxmi Pujan,
+# Guru Nanak Jayanti and so on) move every year and must be copied from the
+# NSE's published holiday circular for the calendar year:
+#   https://www.nseindia.com/resources/exchange-communication-holidays
+#
+# Until they are added, the daemon will treat those days as trading days and
+# fire session alerts on them. A run that returns no data for any symbol also
+# records the date as a non-trading day, so history self-corrects afterwards -
+# but scheduled alerts look forward and cannot.
+#
+# DefaultTradingCalendar warns at startup when the last date here is less than
+# 30 days away, which is the cue to add next year's list.
+
+2026-01-26   # Republic Day
+2026-10-02   # Gandhi Jayanti

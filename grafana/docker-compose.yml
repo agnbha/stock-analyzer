@@ -1,0 +1,27 @@
+# Brings up Grafana with the SQLite plugin, the datasource and all three
+# dashboards already provisioned:
+#
+#   cd grafana && docker compose up -d   ->   http://localhost:3000 (admin/admin)
+#
+# The database is mounted read-only: a dashboard can never modify the journal.
+services:
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: stock-analyzer-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_INSTALL_PLUGINS: frser-sqlite-datasource
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_DEFAULT_THEME: dark
+      # Personal instance on localhost; no sign-up flow needed.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ../data:/var/lib/stock-analyzer:ro
+      - ./provisioning:/etc/grafana/provisioning
+      - ./dashboards:/etc/grafana/dashboards
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  grafana-storage:
