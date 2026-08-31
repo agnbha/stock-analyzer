@@ -20,6 +20,30 @@ The full design, including why each decision was made, is in
 > no orders and makes no buy/sell recommendation. Part 5's P&L is for your own
 > review, not a tax filing - your broker's contract note remains authoritative.
 
+## Authentication
+
+Two flows, selected with `groww.auth.mode`:
+
+```properties
+# API key + secret, signed as SHA-256(secret + timestamp)
+groww.auth.mode=checksum
+groww.api.key=...
+groww.api.secret=...
+
+# API key + a current six-digit authenticator code
+groww.auth.mode=totp
+groww.api.key=...
+groww.totp.secret=JBSWY3DPEHPK3PXP     # the Base32 seed, not a code
+```
+
+`groww.totp.secret` is the seed shown when two-factor authentication was enabled
+— the string an authenticator app scans — not the six digits it displays. Codes
+are minted per request and never cached, so **the machine's clock has to be
+roughly right**: on a server, keep NTP running, or tokens will be rejected with
+what looks like a bad-credential error. Prefer environment variables
+(`GROWW_API_KEY`, `GROWW_API_SECRET`, `GROWW_TOTP_SECRET`) over the properties
+file for all three.
+
 ## Requirements
 
 - Java 25+
@@ -124,7 +148,10 @@ environment variable (dots become underscores, uppercased — e.g.
 
 | Key | Purpose |
 |---|---|
-| `groww.api.key` / `groww.api.secret` | Groww API credentials |
+| `groww.api.key` | Groww API key (needed by both auth flows) |
+| `groww.auth.mode` | `checksum` (API key + secret, the default) or `totp` (API key + authenticator code) |
+| `groww.api.secret` | Required when `groww.auth.mode=checksum` |
+| `groww.totp.secret` | Required when `groww.auth.mode=totp` — the Base32 seed from two-factor setup |
 | `groww.exchange`, `groww.segment` | Defaults to `NSE` / `CASH` |
 | `groww.candle.interval.minutes` | `1440` = daily candles |
 | `groww.lookback.days` | How far back to fetch (default 30) |
@@ -153,7 +180,14 @@ behind an interface, and all concrete wiring happens in one composition root
 SQLite specifically.
 
 - **`model`** — plain records. No behavior, no dependencies.
-- **`auth`**, **`client`** — Groww authentication and candle fetching.
+- **`auth`** — two token flows behind one `GrowwAuthenticator` interface:
+  `ChecksumGrowwAuthenticator` (API key + secret) and `TotpGrowwAuthenticator`
+  (API key + a current authenticator code, the pairing the Python SDK exposes as
+  `get_access_token(api_key=..., totp=...)`). `GrowwAuthenticators.create` picks
+  one from `groww.auth.mode`; caching and refresh are shared, so a third flow is
+  one method. TOTP codes are RFC 6238, generated in-process from the seed with
+  no third-party dependency.
+- **`client`** — candle fetching.
   `RateLimitedCandleDataClient`, `RetryingCandleDataClient` and
   `ChunkedCandleDataClient` are decorators, so limits, backoff and request
   splitting are each enforced in exactly one place.

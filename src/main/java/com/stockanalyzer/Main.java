@@ -1,7 +1,7 @@
 package com.stockanalyzer;
 
-import com.stockanalyzer.auth.ChecksumGrowwAuthenticator;
 import com.stockanalyzer.auth.GrowwAuthenticator;
+import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.GrowwCandleDataClient;
 import com.stockanalyzer.config.AppConfig;
@@ -30,8 +30,9 @@ public final class Main {
         AppConfig config = AppConfig.load();
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-        GrowwAuthenticator authenticator = new ChecksumGrowwAuthenticator(
-                httpClient, config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecret());
+        GrowwAuthenticator authenticator = GrowwAuthenticators.create(config.growwAuthMode(),
+                httpClient, config.growwBaseUrl(), config.growwApiKey(),
+                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull());
 
         CandleDataClient candleDataClient = new GrowwCandleDataClient(httpClient, authenticator, config.growwBaseUrl());
 

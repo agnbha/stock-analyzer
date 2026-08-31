@@ -8,8 +8,8 @@ import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.alert.FileAlertSink;
 import com.stockanalyzer.alert.MacNotificationSink;
 import com.stockanalyzer.alert.SessionAlertPlanner;
-import com.stockanalyzer.auth.ChecksumGrowwAuthenticator;
 import com.stockanalyzer.auth.GrowwAuthenticator;
+import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.CandleRangeChunker;
 import com.stockanalyzer.client.ChunkedCandleDataClient;
@@ -175,8 +175,9 @@ public final class AppContext implements AutoCloseable {
         this.tradeReasonRepository = new SqliteTradeReasonRepository(database);
         this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
 
-        this.authenticator = memoize(() -> new ChecksumGrowwAuthenticator(httpClient,
-                config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecret()));
+        this.authenticator = memoize(() -> GrowwAuthenticators.create(config.growwAuthMode(), httpClient,
+                config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
+                config.growwTotpSecretOrNull()));
 
         // Chunk outermost so a retry only repeats the one chunk that failed; the rate
         // limiter sits innermost so every real request passes through it exactly once.

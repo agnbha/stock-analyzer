@@ -844,7 +844,9 @@ com.stockanalyzer
 ├── DailyAnalysisMain             # NEW: daily | backfill | recompute | report | export
 ├── MarketDayDaemon               # NEW: Parts 3+4 long-running process
 ├── TradeJournalMain              # NEW: trades | pnl | statement | capture
-├── auth/       (existing, unchanged)
+├── auth/       GrowwAuthenticator with two flows behind it: checksum
+│               (key + secret) and TOTP (key + authenticator code), chosen by
+│               groww.auth.mode. Caching and refresh are shared.
 ├── client/     + RateLimitedCandleDataClient, CandleRangeChunker, RetryingCandleDataClient
 ├── config/     AppConfig + intraday.* / db.* / ingest.* / model.* / alerts.* / monitor.*
 ├── model/      + TradingSession, GainOpportunity, DailyGainSummary,

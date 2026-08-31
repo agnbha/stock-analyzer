@@ -58,6 +58,25 @@ public final class AppConfig {
         return require("groww.api.secret");
     }
 
+    /** {@code checksum} (API key + secret) or {@code totp} (API key + authenticator code). */
+    public String growwAuthMode() {
+        return get("groww.auth.mode", "checksum");
+    }
+
+    /**
+     * Only the credential the chosen flow needs is required, so these return
+     * null rather than throwing; the authenticator factory reports whichever
+     * one is actually missing.
+     */
+    public String growwApiSecretOrNull() {
+        return get("groww.api.secret", null);
+    }
+
+    /** Base32 seed from the broker's two-factor setup screen. */
+    public String growwTotpSecretOrNull() {
+        return get("groww.totp.secret", null);
+    }
+
     public String growwBaseUrl() {
         return get("groww.base.url", "https://api.groww.in/v1");
     }
