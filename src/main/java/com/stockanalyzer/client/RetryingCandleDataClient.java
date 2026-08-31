@@ -56,12 +56,23 @@ public final class RetryingCandleDataClient implements CandleDataClient {
                 last = e;
             }
             if (attempt < maxRetries) {
-                long backoff = baseBackoffMillis * (1L << attempt);
-                long jitter = ThreadLocalRandom.current().nextLong(baseBackoffMillis / 2 + 1);
-                log.debug("Retrying {} after {} ms (attempt {}/{})", symbol, backoff + jitter, attempt + 1, maxRetries);
-                sleeper.sleepMillis(backoff + jitter);
+                sleeper.sleepMillis(backoffMillis(last, attempt));
             }
         }
         throw last;
+    }
+
+    /**
+     * The server's own {@code Retry-After} beats anything we would invent;
+     * otherwise back off exponentially with jitter so several workers that were
+     * refused together do not all return at the same instant.
+     */
+    private long backoffMillis(RuntimeException failure, int attempt) {
+        if (failure instanceof GrowwApiException api && api.retryAfterMillis() > 0) {
+            log.debug("Honouring the server's Retry-After of {} ms", api.retryAfterMillis());
+            return api.retryAfterMillis();
+        }
+        long backoff = baseBackoffMillis * (1L << attempt);
+        return backoff + ThreadLocalRandom.current().nextLong(baseBackoffMillis / 2 + 1);
     }
 }

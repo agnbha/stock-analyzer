@@ -28,6 +28,9 @@ public final class GrowwCandleDataClient implements CandleDataClient {
     private static final Logger log = LoggerFactory.getLogger(GrowwCandleDataClient.class);
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** A server asking us to wait an hour is more likely a bad header than a real instruction. */
+    private static final long MAX_RETRY_AFTER_MILLIS = 5 * 60 * 1000L;
+
     private final HttpClient httpClient;
     private final GrowwAuthenticator authenticator;
     private final String baseUrl;
@@ -68,7 +71,8 @@ public final class GrowwCandleDataClient implements CandleDataClient {
             throw new GrowwApiException(
                     "Groww candle request for " + symbol + " failed with status " + response.statusCode()
                             + ": " + response.body(),
-                    response.statusCode());
+                    response.statusCode(),
+                    retryAfterMillis(response));
         }
 
         GrowwCandleResponse candleResponse;
@@ -88,6 +92,30 @@ public final class GrowwCandleDataClient implements CandleDataClient {
 
         log.debug("Fetched {} candles for {}", candles.size(), symbol);
         return new StockCandleSeries(symbol, exchange, segment, candles);
+    }
+
+    /**
+     * How long the server told us to wait. {@code Retry-After} is seconds by
+     * the HTTP spec; some gateways send milliseconds or an HTTP date instead,
+     * so anything unparseable is treated as "did not say" rather than guessed
+     * at.
+     */
+    private static long retryAfterMillis(HttpResponse<String> response) {
+        for (String header : List.of("Retry-After", "retry-after", "X-RateLimit-Reset-After")) {
+            String value = response.headers().firstValue(header).orElse(null);
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                double seconds = Double.parseDouble(value.trim());
+                if (seconds > 0) {
+                    return Math.min((long) (seconds * 1000), MAX_RETRY_AFTER_MILLIS);
+                }
+            } catch (NumberFormatException e) {
+                log.debug("Unparseable {} header: {}", header, value);
+            }
+        }
+        return 0;
     }
 
     private static Candle toCandle(List<Double> row) {

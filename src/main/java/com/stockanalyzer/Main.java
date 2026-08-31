@@ -3,7 +3,8 @@ package com.stockanalyzer;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
-import com.stockanalyzer.client.GrowwCandleDataClient;
+import com.stockanalyzer.client.CandleDataClients;
+import com.stockanalyzer.client.TokenBucketRateLimiter;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.ml.GrowthPatternAnalyzer;
 import com.stockanalyzer.ml.RestGrowthPatternAnalyzer;
@@ -34,7 +35,12 @@ public final class Main {
                 httpClient, config.growwBaseUrl(), config.growwApiKey(),
                 config.growwApiSecretOrNull(), config.growwTotpSecretOrNull());
 
-        CandleDataClient candleDataClient = new GrowwCandleDataClient(httpClient, authenticator, config.growwBaseUrl());
+        CandleDataClient candleDataClient = CandleDataClients.rateLimited(httpClient, authenticator,
+                config.growwBaseUrl(),
+                new TokenBucketRateLimiter(config.rateLimitPerSecond(), config.rateLimitPerMinute(),
+                        config.rateLimitPerDay()),
+                config.ingestMaxRetries(), config.ingestRetryBackoffMillis(),
+                config.backfillMaxDaysPerRequest());
 
         GrowthPatternAnalyzer growthPatternAnalyzer = new RestGrowthPatternAnalyzer(
                 httpClient, config.mlServiceUrl(), Duration.ofSeconds(config.mlServiceTimeoutSeconds()));

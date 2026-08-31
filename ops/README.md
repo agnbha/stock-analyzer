@@ -93,8 +93,12 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 
 The rate limiter is shared *within* a process, not across processes. The daemon
 and a second JVM running `backfill` each get their own token bucket, so together
-they can exceed Groww's 20/sec and 500/min ceilings and get everything throttled
-— including the live monitor. They would also contend for the SQLite write lock.
+they can exceed the provider's ceilings and get everything throttled — including
+the live monitor. They would also contend for the SQLite write lock.
+
+A 429 now pauses every worker in that process for as long as the server's
+`Retry-After` says, so one throttled request no longer leaves the other four
+threads hammering. That helps within a process; it does nothing across two.
 
 Run backfills in the evening, or on a weekend. The Saturday job already covers a
 rolling 14-day window for anything that slipped through.

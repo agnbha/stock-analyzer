@@ -167,11 +167,16 @@ public final class AppConfig {
     }
 
     public int rateLimitPerSecond() {
-        return Integer.parseInt(get("ingest.rate.limit.per.second", "15"));
+        return Integer.parseInt(get("ingest.rate.limit.per.second", "5"));
     }
 
     public int rateLimitPerMinute() {
-        return Integer.parseInt(get("ingest.rate.limit.per.minute", "400"));
+        return Integer.parseInt(get("ingest.rate.limit.per.minute", "120"));
+    }
+
+    /** Per-process daily ceiling; 0 disables it. */
+    public int rateLimitPerDay() {
+        return Integer.parseInt(get("ingest.rate.limit.per.day", "20000"));
     }
 
     public int ingestMaxRetries() {

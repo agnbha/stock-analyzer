@@ -7,36 +7,14 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class RateLimitAndChunkingTest {
+class ChunkingAndRetryTest {
 
     private static final LocalDateTime START = LocalDateTime.of(2026, 8, 1, 9, 15);
-
-    @Test
-    @DisplayName("the token bucket spaces requests once the per-second ceiling is reached")
-    void spacesRequestsOverASecond() {
-        AtomicLong nanos = new AtomicLong();
-        List<Long> sleeps = new ArrayList<>();
-        // A fake clock that only moves when the limiter sleeps, so the test never really waits.
-        TokenBucketRateLimiter limiter = new TokenBucketRateLimiter(2, 100, nanos::get, millis -> {
-            sleeps.add(millis);
-            nanos.addAndGet(millis * 1_000_000L);
-        });
-
-        for (int i = 0; i < 5; i++) {
-            limiter.acquire();
-        }
-
-        // Two per second means two go straight through, then a wait, then two
-        // more, then a wait for the fifth.
-        assertEquals(2, sleeps.size(), "two waits for five requests at two per second");
-        assertTrue(sleeps.stream().allMatch(millis -> millis > 0 && millis <= 1000), "waits were " + sleeps);
-    }
 
     @Test
     @DisplayName("a long range is split into provider-legal chunks that tile it exactly")
@@ -89,6 +67,72 @@ class RateLimitAndChunkingTest {
         assertTrue(backoffs.get(1) > backoffs.get(0), "backoff grows: " + backoffs);
     }
 
+    @Test
+    @DisplayName("the server's Retry-After beats our own backoff")
+    void honoursRetryAfter() {
+        FailingClient failing = new FailingClient(429, 4_000);
+        List<Long> backoffs = new ArrayList<>();
+        RetryingCandleDataClient client = new RetryingCandleDataClient(failing, 2, 100, backoffs::add);
+
+        assertThrows(GrowwApiException.class,
+                () -> client.fetchCandles("X", "NSE", "CASH", START, START.plusDays(1), 1));
+
+        assertEquals(List.of(4_000L, 4_000L), backoffs, "waited exactly as long as the server asked");
+    }
+
+    @Test
+    @DisplayName("a 429 holds back every worker, not just the one that was refused")
+    void throttlingPenalisesTheSharedLimiter() {
+        FailingClient failing = new FailingClient(429, 3_000);
+        RecordingRateLimiter limiter = new RecordingRateLimiter();
+        RateLimitedCandleDataClient client = new RateLimitedCandleDataClient(failing, limiter);
+
+        assertThrows(GrowwApiException.class,
+                () -> client.fetchCandles("X", "NSE", "CASH", START, START.plusDays(1), 1));
+
+        assertEquals(1, limiter.acquired);
+        assertEquals(3_000L, limiter.penalty, "the server's wait was applied to the whole limiter");
+    }
+
+    @Test
+    @DisplayName("a throttle with no Retry-After still pauses everyone briefly")
+    void throttlingWithoutAHeaderStillPenalises() {
+        RecordingRateLimiter limiter = new RecordingRateLimiter();
+        RateLimitedCandleDataClient client = new RateLimitedCandleDataClient(new FailingClient(429, 0), limiter);
+
+        assertThrows(GrowwApiException.class,
+                () -> client.fetchCandles("X", "NSE", "CASH", START, START.plusDays(1), 1));
+
+        assertTrue(limiter.penalty > 0, "a 429 always slows the process down");
+    }
+
+    @Test
+    @DisplayName("an ordinary failure does not penalise the limiter")
+    void nonThrottleErrorsDoNotPenalise() {
+        RecordingRateLimiter limiter = new RecordingRateLimiter();
+        RateLimitedCandleDataClient client = new RateLimitedCandleDataClient(new FailingClient(500, 0), limiter);
+
+        assertThrows(GrowwApiException.class,
+                () -> client.fetchCandles("X", "NSE", "CASH", START, START.plusDays(1), 1));
+
+        assertEquals(0, limiter.penalty);
+    }
+
+    private static final class RecordingRateLimiter implements RateLimiter {
+        private int acquired;
+        private long penalty;
+
+        @Override
+        public void acquire() {
+            acquired++;
+        }
+
+        @Override
+        public void penalise(long millis) {
+            penalty += millis;
+        }
+    }
+
     private static final class CountingClient implements CandleDataClient {
         private int calls;
 
@@ -102,17 +146,23 @@ class RateLimitAndChunkingTest {
 
     private static final class FailingClient implements CandleDataClient {
         private final int status;
+        private final long retryAfterMillis;
         private int calls;
 
         private FailingClient(int status) {
+            this(status, 0);
+        }
+
+        private FailingClient(int status, long retryAfterMillis) {
             this.status = status;
+            this.retryAfterMillis = retryAfterMillis;
         }
 
         @Override
         public StockCandleSeries fetchCandles(String symbol, String exchange, String segment,
                                                LocalDateTime start, LocalDateTime end, int intervalMinutes) {
             calls++;
-            throw new GrowwApiException("failing with " + status, status);
+            throw new GrowwApiException("failing with " + status, status, retryAfterMillis);
         }
     }
 }

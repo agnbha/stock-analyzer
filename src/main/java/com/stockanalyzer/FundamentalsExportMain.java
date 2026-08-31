@@ -4,7 +4,8 @@ import com.stockanalyzer.auth.ChecksumGrowwAuthenticator;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.FundamentalsClient;
-import com.stockanalyzer.client.GrowwCandleDataClient;
+import com.stockanalyzer.client.CandleDataClients;
+import com.stockanalyzer.client.TokenBucketRateLimiter;
 import com.stockanalyzer.client.HistoricalFundamentalsClient;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.model.FundamentalsOutcome;
@@ -44,7 +45,12 @@ public final class FundamentalsExportMain {
         // once "Live Data" is enabled on this key at groww.in/trade-api/api-keys — that gives
         // richer fields (market_cap, circuit limits) via GET /v1/live-data/quote, which currently
         // 403s ("Access forbidden for this request") on this account.
-        CandleDataClient candleDataClient = new GrowwCandleDataClient(httpClient, authenticator, config.growwBaseUrl());
+        CandleDataClient candleDataClient = CandleDataClients.rateLimited(httpClient, authenticator,
+                config.growwBaseUrl(),
+                new TokenBucketRateLimiter(config.rateLimitPerSecond(), config.rateLimitPerMinute(),
+                        config.rateLimitPerDay()),
+                config.ingestMaxRetries(), config.ingestRetryBackoffMillis(),
+                config.backfillMaxDaysPerRequest());
         FundamentalsClient fundamentalsClient = new HistoricalFundamentalsClient(candleDataClient, config.fundamentalsLookbackDays());
 
         ExecutorService executor = Executors.newFixedThreadPool(config.fetchConcurrency());

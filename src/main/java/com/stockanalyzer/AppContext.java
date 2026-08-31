@@ -11,12 +11,8 @@ import com.stockanalyzer.alert.SessionAlertPlanner;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
-import com.stockanalyzer.client.CandleRangeChunker;
-import com.stockanalyzer.client.ChunkedCandleDataClient;
-import com.stockanalyzer.client.GrowwCandleDataClient;
-import com.stockanalyzer.client.RateLimitedCandleDataClient;
+import com.stockanalyzer.client.CandleDataClients;
 import com.stockanalyzer.client.RateLimiter;
-import com.stockanalyzer.client.RetryingCandleDataClient;
 import com.stockanalyzer.client.TokenBucketRateLimiter;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.features.EventDetector;
@@ -179,19 +175,11 @@ public final class AppContext implements AutoCloseable {
                 config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
                 config.growwTotpSecretOrNull()));
 
-        // Chunk outermost so a retry only repeats the one chunk that failed; the rate
-        // limiter sits innermost so every real request passes through it exactly once.
-        RateLimiter rateLimiter = new TokenBucketRateLimiter(
-                config.rateLimitPerSecond(), config.rateLimitPerMinute());
-        this.candleDataClient = memoize(() -> {
-            CandleDataClient raw = new GrowwCandleDataClient(httpClient, authenticator.get(),
-                    config.growwBaseUrl());
-            return new ChunkedCandleDataClient(
-                    new RetryingCandleDataClient(
-                            new RateLimitedCandleDataClient(raw, rateLimiter),
-                            config.ingestMaxRetries(), config.ingestRetryBackoffMillis()),
-                    new CandleRangeChunker(config.backfillMaxDaysPerRequest()));
-        });
+        RateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
+                config.rateLimitPerMinute(), config.rateLimitPerDay());
+        this.candleDataClient = memoize(() -> CandleDataClients.rateLimited(httpClient, authenticator.get(),
+                config.growwBaseUrl(), rateLimiter, config.ingestMaxRetries(),
+                config.ingestRetryBackoffMillis(), config.backfillMaxDaysPerRequest()));
 
         this.detector = new TopKNonOverlappingDetector(config.intradayTopN(),
                 PriceBasis.valueOf(config.intradayPriceBasis()), config.intradayMinHoldCandles(),

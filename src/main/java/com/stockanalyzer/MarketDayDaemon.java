@@ -9,6 +9,8 @@ import com.stockanalyzer.live.SessionReconciler;
 import com.stockanalyzer.live.TerminalLiveView;
 import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.util.Args;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.channels.FileLock;
@@ -32,6 +34,7 @@ import java.time.LocalDate;
  */
 public final class MarketDayDaemon {
 
+    private static final Logger log = LoggerFactory.getLogger(MarketDayDaemon.class);
     private static final Path LOCK_FILE = Path.of("data", "market-day-daemon.lock");
 
     public static void main(String[] args) {
@@ -91,9 +94,36 @@ public final class MarketDayDaemon {
                             config.monitorPostCloseGraceSeconds(), config.modelHorizonMinutes(),
                             config.alertModelMinProbability()));
 
+            warnIfSessionExceedsDailyBudget(context, config);
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
             monitor.run(sessionDate);
         }
+    }
+
+    /**
+     * A full session costs (ticks x symbols) requests. If that does not fit in
+     * the daily budget the limiter will simply stop fetching part-way through
+     * the afternoon - quietly, because sleeping is what a limiter is supposed to
+     * do. Better to say so before the open than to find a flat line at 13:00.
+     */
+    private static void warnIfSessionExceedsDailyBudget(AppContext context, AppConfig config) {
+        int dailyLimit = config.rateLimitPerDay();
+        if (dailyLimit <= 0) {
+            return;
+        }
+        long sessionSeconds = context.clock().sessionLengthMinutes() * 60L;
+        long ticks = sessionSeconds / Math.max(config.monitorPollIntervalSeconds(), 1);
+        long projected = ticks * config.stockSymbols().size();
+        if (projected <= dailyLimit) {
+            log.info("Projected {} requests this session ({} ticks x {} symbols), within the daily budget of {}",
+                    projected, ticks, config.stockSymbols().size(), dailyLimit);
+            return;
+        }
+        log.warn("This session needs about {} requests ({} ticks x {} symbols) but "
+                        + "ingest.rate.limit.per.day is {}. The monitor will stall part-way through the "
+                        + "afternoon. Raise the limit, lengthen monitor.poll.interval.seconds, or watch "
+                        + "fewer symbols.",
+                projected, ticks, config.stockSymbols().size(), dailyLimit);
     }
 
     private static void status() {

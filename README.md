@@ -271,9 +271,19 @@ dashboard query executed against a real migrated database.
 - **The charge rates are as configured, not as billed.** Verify them once against
   a real contract note; after that `charges.prefer.broker.actuals` means broker
   figures win wherever they exist.
-- Respect Groww's rate limits (non-trading endpoints: 20 req/sec, 500 req/min).
-  The shared token bucket defaults to 15/sec and 400/min across the whole
-  process, nightly batch and live monitor together.
+- **Rate limits.** One shared token bucket enforces per-second, per-minute and
+  per-day ceilings across every thread in the process, and every entry point
+  goes through it (`RateLimiterCoverageTest` fails the build if one stops
+  doing so). Defaults are deliberately conservative — 5/sec, 120/min, 5000/day —
+  because being throttled mid-session costs far more than a backfill taking a
+  few extra minutes. The figures published for general non-trading endpoints are
+  higher, but historical-data endpoints are usually capped lower, so confirm
+  against the current docs before raising them.
+  A 429 pauses *every* worker for the server's `Retry-After`, not just the
+  thread that was refused. The daily counter is per-process and in-memory: a
+  guardrail against one runaway job, not an account-wide ledger. And separate
+  JVMs get separate buckets, which is why a backfill should not run while the
+  daemon is live.
 - This repo still does not include a model. Part 2 works without one; if you
   want one, `docs/MODEL-CONTRACT.md` is the wire format and
   `src/test/resources/feature-parity.json` is how you check your features match.
