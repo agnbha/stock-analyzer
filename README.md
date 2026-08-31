@@ -135,10 +135,15 @@ java -jar target/stock-analyzer.jar
 
 ## Scheduling
 
-Two `launchd` jobs (or cron entries) cover routine use: `MarketDayDaemon` at
-09:00 IST on weekdays - it exits itself after the close and reconciles - and
-`DailyAnalysisMain daily` at 18:30. A missed nightly run costs nothing: the
-planner works out what is missing by set difference, so the next run catches up.
+Four `launchd` jobs cover routine use — the daemon at 08:58 on weekdays, a
+nightly batch at 18:30, a weekly refresh of the statistical prior on Saturday,
+and a monthly close. Scripts and plists are in [ops/](ops/), and
+[ops/README.md](ops/README.md) is the runbook: what runs when, why the evening
+order is what it is, what to do when a job fails, and why you should never run a
+backfill while the daemon is live.
+
+A missed run costs nothing: the planner works out what is missing by set
+difference, so the next run catches up.
 
 ## Configuration
 

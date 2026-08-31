@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stockanalyzer.monthly</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/agnibhanath/projects/stock-analyzer/ops/bin/monthly.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/agnibhanath/projects/stock-analyzer</string>
+
+  <!-- Times are wall clock. If this machine is not on IST, either set the
+       machine's timezone or shift these hours to match 09:15-15:30 IST. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Day</key><integer>1</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <!-- Missed while the machine was asleep? Run once on wake rather than skip. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/agnibhanath/projects/stock-analyzer/logs/monthly.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/agnibhanath/projects/stock-analyzer/logs/monthly.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin</string>
+  </dict>
+</dict>
+</plist>

@@ -64,6 +64,7 @@ public final class DailyAnalysisMain {
         List<OpportunityRow> opportunities = context.gainOpportunityRepository()
                 .findRange(sessionDate, sessionDate, context.detector().version(), null);
         new DailyOpportunityReporter(context.clock()).report(sessionDate, report, opportunities);
+        exitNonZeroOnTotalFailure(report);
     }
 
     private static void backfill(AppContext context, Args args) {
@@ -78,6 +79,23 @@ public final class DailyAnalysisMain {
         System.out.printf("Wrote %d sessions across %d symbols; %d failed%n",
                 report.sessionsWritten(), report.succeeded(), report.failures().size());
         report.failures().forEach(f -> System.out.printf("  %-12s %s%n", f.symbol(), f.error()));
+        exitNonZeroOnTotalFailure(report);
+    }
+
+    /**
+     * A scheduled run has to be able to tell a bad night from a broken setup.
+     * Some symbols failing is routine and self-heals; nothing succeeding is a
+     * problem that needs a person, so it leaves a non-zero status behind.
+     */
+    private static void exitNonZeroOnTotalFailure(IngestionReport report) {
+        if (!report.totalFailure()) {
+            return;
+        }
+        System.err.printf("%nEvery one of the %d symbols failed. This is not a quiet market day - "
+                + "check credentials, connectivity and API entitlements.%n", report.symbolsRequested());
+        report.failures().stream().findFirst()
+                .ifPresent(first -> System.err.println("First error: " + first.error()));
+        System.exit(1);
     }
 
     private static void recompute(AppContext context, Args args) {

@@ -21,6 +21,19 @@ public record IngestionReport(long runId,
         return (int) results.stream().filter(r -> r.error() == null).count();
     }
 
+    /**
+     * Every symbol that was attempted failed.
+     *
+     * <p>Worth separating from a partial failure: some symbols failing is
+     * routine and self-heals, because the next run simply finds them still
+     * missing. Nothing succeeding means credentials, connectivity or an
+     * entitlement is broken, and a scheduled job should exit non-zero so it is
+     * actually noticed rather than logged into the void.
+     */
+    public boolean totalFailure() {
+        return !results.isEmpty() && succeeded() == 0;
+    }
+
     public record SymbolResult(String symbol,
                                int sessionsWritten,
                                int candlesWritten,
