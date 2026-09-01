@@ -6,23 +6,68 @@ through the [SQLite datasource plugin](https://grafana.com/grafana/plugins/frser
 
 ## Run it
 
-```bash
-cd grafana
-docker compose up -d      # http://localhost:3000, admin/admin
-```
-
-That installs the plugin, provisions the datasource, and loads all three
-dashboards into a "Stock Analyzer" folder. The database is mounted read-only, so
-a dashboard can never modify the journal.
-
-Running Grafana natively instead:
+**Without Docker** (nothing installed system-wide):
 
 ```bash
-grafana cli plugins install frser-sqlite-datasource
-# then point provisioning/datasources/sqlite.yaml at the absolute path of
-# data/stock-analyzer.db and copy provisioning/ + dashboards/ into your
-# Grafana config directory
+./grafana/run-local.sh      # http://localhost:3000, admin/admin
 ```
+
+Downloads the standalone Grafana build into `grafana/.runtime/` the first time
+(about 100 MB), installs the SQLite plugin there, rewrites the datasource path
+to point at this repo's database, and starts it. Delete `grafana/.runtime/` to
+undo everything. Ctrl-C stops it.
+
+**With Docker**, if you have it:
+
+```bash
+cd grafana && docker compose up -d
+```
+
+Either way you get the plugin, the datasource and all three dashboards in a
+"Stock Analyzer" folder. Under Docker the database is mounted read-only, so a
+dashboard can never modify the journal; running locally, open it read-only if
+the daemon is live.
+
+## Troubleshooting
+
+**`Grafana-server Init Failed: Could not find config defaults, make sure
+homepath command line parameter is set or working directory is homepath`**
+
+The `grafana cli` command shares the server's startup path, so it needs
+`--homepath` too — not just `grafana server`. Every invocation wants it:
+
+```bash
+RUNTIME=grafana/.runtime
+HOME_PATH=$RUNTIME/grafana-v11.6.0
+$HOME_PATH/bin/grafana cli --homepath "$HOME_PATH" \
+    --pluginsDir "$RUNTIME/plugins" plugins install frser-sqlite-datasource
+```
+
+`run-local.sh` passes it. If you hit this after a failed first run, the script
+had aborted before writing `custom.ini`, leaving a half-built runtime — delete
+`grafana/.runtime/` and run it again.
+
+**Port 3000 already in use:** `lsof -ti:3000 | xargs kill`, or set
+`GF_SERVER_HTTP_PORT`.
+
+**Panels say "no data":** check the datasource first —
+Connections → Data sources → StockAnalyzer → Save & test should say *Data source
+is working*. If it does, the tables are simply empty; see below.
+
+## The dashboards need data before they show anything
+
+They are views over the tables, so an empty table is an empty panel — not a bug.
+What each tab needs:
+
+| Tab | Needs | Command |
+|---|---|---|
+| Candles and Calls | sessions (weeks of them, for the weekly panel) | `DailyAnalysisMain backfill --from ... --to ...` |
+| Candles and Calls, markers | trades | `TradeJournalMain trades import` or `trades add` |
+| Account Overview | trades, and a balance for a true account value | `trades import`, `trades balance --cash ...` |
+| Decision Reasons | trades with reasons attached | `trades reasons --month ...` |
+
+With a single session ingested and no trades, expect one candle in the daily
+panel, one bar in the weekly panel, and two empty tabs.
 
 ## The three tabs
 
