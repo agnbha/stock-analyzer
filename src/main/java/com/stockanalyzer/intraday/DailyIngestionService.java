@@ -154,11 +154,31 @@ public final class DailyIngestionService {
             return new IngestionReport.SymbolResult(symbol, sessionsWritten, candlesWritten,
                     Set.copyOf(datesWithData), null);
         } catch (Exception e) {
-            log.warn("Failed to ingest {} for {}..{}: {}", symbol, first, last, e.getMessage());
+            // Always name the exception type: some carry no message at all, and
+            // "Failed to ingest TCS: null" tells nobody anything.
+            String description = describe(e);
+            log.warn("Failed to ingest {} for {}..{}: {}", symbol, first, last, description, e);
             ingestionRunRepository.recordFailure(runId, symbol, last,
-                    e.getClass().getSimpleName(), String.valueOf(e.getMessage()), 1);
-            return new IngestionReport.SymbolResult(symbol, 0, 0, Set.of(), e.getMessage());
+                    e.getClass().getSimpleName(), description, 1);
+            return new IngestionReport.SymbolResult(symbol, 0, 0, Set.of(), description);
         }
+    }
+
+    /** Type plus message, plus the cause when the message alone would not locate it. */
+    private static String describe(Throwable failure) {
+        StringBuilder text = new StringBuilder(failure.getClass().getSimpleName());
+        if (failure.getMessage() != null && !failure.getMessage().isBlank()) {
+            text.append(": ").append(failure.getMessage());
+        }
+        Throwable cause = failure.getCause();
+        if (cause != null && cause != failure) {
+            text.append(" (caused by ").append(cause.getClass().getSimpleName());
+            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
+                text.append(": ").append(cause.getMessage());
+            }
+            text.append(')');
+        }
+        return text.toString();
     }
 
     /**
