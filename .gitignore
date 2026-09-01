@@ -10,3 +10,4 @@ nohup.out
 
 # Local Grafana runtime (downloaded binary, plugins, generated config)
 grafana/.runtime/
+data/stock-analyzer.db
