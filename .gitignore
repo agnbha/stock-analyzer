@@ -3,5 +3,9 @@ target/
 .idea/
 *.iml
 .vscode/
+logs/*
 .DS_Store
-data/stock-analyzer.db
+data/stock-analyzer.db*
+
+# Local Grafana runtime (downloaded binary, plugins, generated config)
+grafana/.runtime/
