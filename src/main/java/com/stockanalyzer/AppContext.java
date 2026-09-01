@@ -46,6 +46,7 @@ import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.store.HotWindowRepository;
 import com.stockanalyzer.store.IngestionRunRepository;
 import com.stockanalyzer.store.InstrumentRepository;
+import com.stockanalyzer.store.LiveCandleRepository;
 import com.stockanalyzer.store.MarketEventRepository;
 import com.stockanalyzer.store.PnlPeriodRepository;
 import com.stockanalyzer.store.PredictionRepository;
@@ -64,6 +65,7 @@ import com.stockanalyzer.store.jdbc.SqliteHeartbeatRepository;
 import com.stockanalyzer.store.jdbc.SqliteHotWindowRepository;
 import com.stockanalyzer.store.jdbc.SqliteIngestionRunRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
+import com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository;
 import com.stockanalyzer.store.jdbc.SqliteMarketEventRepository;
 import com.stockanalyzer.store.jdbc.SqlitePnlPeriodRepository;
 import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
@@ -117,6 +119,7 @@ public final class AppContext implements AutoCloseable {
     private final TradingDayRepository tradingDayRepository;
     private final GainOpportunityRepository gainOpportunityRepository;
     private final CandleRepository candleRepository;
+    private final LiveCandleRepository liveCandleRepository;
     private final CalendarRepository calendarRepository;
     private final IngestionRunRepository ingestionRunRepository;
     private final HotWindowRepository hotWindowRepository;
@@ -158,6 +161,7 @@ public final class AppContext implements AutoCloseable {
         this.tradingDayRepository = new SqliteTradingDayRepository(database);
         this.gainOpportunityRepository = new SqliteGainOpportunityRepository(database);
         this.candleRepository = new SqliteCandleRepository(database);
+        this.liveCandleRepository = new SqliteLiveCandleRepository(database);
         this.calendarRepository = new SqliteCalendarRepository(database);
         this.ingestionRunRepository = new SqliteIngestionRunRepository(database);
         this.hotWindowRepository = new SqliteHotWindowRepository(database);
@@ -336,6 +340,10 @@ public final class AppContext implements AutoCloseable {
 
     public TradeJournalService tradeJournalService() {
         return tradeJournalService;
+    }
+
+    public LiveCandleRepository liveCandleRepository() {
+        return liveCandleRepository;
     }
 
     public InstrumentRepository instrumentRepository() {

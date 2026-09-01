@@ -28,6 +28,7 @@ import java.util.Locale;
  *   export --from D --to D --out F   write the opportunities to CSV
  *   hot-windows [--lookback N]       recompute the time-of-day prior
  *   evaluate [--date D]              score yesterday's predictions against what happened
+ *   consolidate [--date D]           re-fetch the session authoritatively and clear its staging
  * </pre>
  */
 public final class DailyAnalysisMain {
@@ -45,10 +46,11 @@ public final class DailyAnalysisMain {
                 case "export" -> export(context, parsed);
                 case "hot-windows" -> hotWindows(context, parsed);
                 case "evaluate" -> evaluate(context, parsed);
+                case "consolidate" -> consolidate(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
                     System.err.println("Try: daily | backfill | recompute | report | export "
-                            + "| hot-windows | evaluate");
+                            + "| hot-windows | evaluate | consolidate");
                     System.exit(2);
                 }
             }
@@ -151,6 +153,32 @@ public final class DailyAnalysisMain {
                 context.clock().sessionOpen().plusMinutes(w.bucketStartMinute()),
                 w.hits(), w.sessions(), w.hitRate() * 100, w.hitRateLcb()));
         System.out.println();
+    }
+
+    /**
+     * Turns a staged session into the canonical record: re-fetch the day now
+     * that it is complete, then drop the staging rows it supersedes.
+     *
+     * <p>The monitor stages every tick so the dashboards can follow a session
+     * live, but staged rows may be provisional. This is where the day stops
+     * being provisional - and it is safe to run whether or not the monitor ran
+     * at all.
+     */
+    private static void consolidate(AppContext context, Args args) {
+        LocalDate sessionDate = args.date("date", LocalDate.now(context.clock().zone()));
+        AppConfig config = context.config();
+
+        int staged = context.liveCandleRepository().countForSession(sessionDate);
+        IngestionReport report = context.ingestionService().ingest(config.stockSymbols(),
+                config.exchange(), config.segment(), sessionDate, sessionDate,
+                config.intradayIntervalMinutes(), "consolidate", true);
+        int cleared = context.liveCandleRepository().deleteConsolidated();
+
+        System.out.printf("Consolidated %s: %d sessions written, %d staged rows cleared "
+                        + "(%d were staged)%n",
+                sessionDate, report.sessionsWritten(), cleared, staged);
+        report.failures().forEach(f -> System.out.printf("  %-12s %s%n", f.symbol(), f.error()));
+        exitNonZeroOnTotalFailure(report);
     }
 
     private static void evaluate(AppContext context, Args args) {

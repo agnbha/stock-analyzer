@@ -73,6 +73,7 @@ public final class SchemaMigrator {
         all.put(5, v5());
         all.put(6, v6());
         all.put(7, v7());
+        all.put(8, v8());
         return all;
     }
 
@@ -603,6 +604,62 @@ public final class SchemaMigrator {
                 FROM v_daily_change c
                 JOIN v_market_breadth m ON m.session_date = c.session_date
                 GROUP BY c.symbol""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v8: staging for the live session.
+     *
+     * <p>The monitor writes what it has seen so far here on every tick, so the
+     * dashboards can follow a session in progress instead of showing whatever
+     * snapshot happened to be taken last. This is deliberately a separate table
+     * from {@code candle}: rows here may be provisional - the newest candle is
+     * still forming and its high, low and close will change - and provisional
+     * data must never become the canonical record.
+     *
+     * <p>Consolidation at the close re-fetches the authoritative day into
+     * {@code candle} and empties the staging rows it supersedes.
+     */
+    private List<String> v8() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE live_candle (
+                  instrument_id    INTEGER NOT NULL REFERENCES instrument(id),
+                  interval_minutes INTEGER NOT NULL,
+                  ts_epoch         INTEGER NOT NULL,
+                  session_date     TEXT NOT NULL,
+                  open REAL, high REAL, low REAL, close REAL, volume INTEGER,
+                  provisional      INTEGER NOT NULL DEFAULT 0,
+                  updated_at       INTEGER NOT NULL,
+                  PRIMARY KEY (instrument_id, interval_minutes, ts_epoch)
+                ) WITHOUT ROWID""");
+        ddl.add("CREATE INDEX ix_live_candle_session ON live_candle (session_date)");
+
+        /*
+         * What the intraday panel reads: the settled tape, plus anything the
+         * monitor has staged that has not been consolidated yet. Canonical rows
+         * always win, so a consolidated session never shows two versions of the
+         * same minute. `source` distinguishes them, and a still-forming candle
+         * is labelled rather than quietly presented as settled.
+         */
+        ddl.add("""
+                CREATE VIEW v_intraday_merged AS
+                SELECT symbol, ts_epoch, session_date, interval_minutes,
+                       open, high, low, close, volume, 'final' AS source
+                FROM v_intraday_candles
+                UNION ALL
+                SELECT i.symbol, l.ts_epoch, l.session_date, l.interval_minutes,
+                       l.open, l.high, l.low, l.close, l.volume,
+                       CASE WHEN l.provisional = 1 THEN 'forming' ELSE 'live' END AS source
+                FROM live_candle l
+                JOIN instrument i ON i.id = l.instrument_id
+                WHERE NOT EXISTS (
+                      SELECT 1 FROM candle c
+                      WHERE c.instrument_id = l.instrument_id
+                        AND c.interval_minutes = l.interval_minutes
+                        AND c.ts_epoch = l.ts_epoch)""");
         return ddl;
     }
 

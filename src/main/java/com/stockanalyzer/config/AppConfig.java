@@ -290,6 +290,11 @@ public final class AppConfig {
         return Integer.parseInt(get("monitor.post.close.grace.seconds", "120"));
     }
 
+    /** Stage each tick so the dashboards can follow a session in progress. */
+    public boolean monitorPersistLiveCandles() {
+        return Boolean.parseBoolean(get("monitor.persist.live.candles", "true"));
+    }
+
     public boolean monitorAnsi() {
         return Boolean.parseBoolean(get("monitor.view.ansi", "true"));
     }

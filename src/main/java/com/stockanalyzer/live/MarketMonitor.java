@@ -26,6 +26,7 @@ import com.stockanalyzer.signal.SignalRequest;
 import com.stockanalyzer.store.AlertRepository;
 import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.store.InstrumentRepository;
+import com.stockanalyzer.store.LiveCandleRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
@@ -69,6 +70,7 @@ public final class MarketMonitor {
     private final HeartbeatRepository heartbeatRepository;
     private final SessionAlertPlanner alertPlanner;
     private final InstrumentRepository instrumentRepository;
+    private final LiveCandleRepository liveCandleRepository;
     private final TradingDayRepository tradingDayRepository;
     private final TradingCalendar calendar;
     private final SessionReconciler reconciler;
@@ -93,6 +95,7 @@ public final class MarketMonitor {
                          HeartbeatRepository heartbeatRepository,
                          SessionAlertPlanner alertPlanner,
                          InstrumentRepository instrumentRepository,
+                         LiveCandleRepository liveCandleRepository,
                          TradingDayRepository tradingDayRepository,
                          TradingCalendar calendar,
                          SessionReconciler reconciler,
@@ -110,6 +113,7 @@ public final class MarketMonitor {
         this.heartbeatRepository = heartbeatRepository;
         this.alertPlanner = alertPlanner;
         this.instrumentRepository = instrumentRepository;
+        this.liveCandleRepository = liveCandleRepository;
         this.tradingDayRepository = tradingDayRepository;
         this.calendar = calendar;
         this.reconciler = reconciler;
@@ -231,9 +235,39 @@ public final class MarketMonitor {
             dayChangePct = (state.lastPrice() - context.priorClose()) / context.priorClose() * 100.0;
         }
 
+        stage(symbol, sessionDate, state, now);
+
         return new LiveSymbolState(symbol, state.allCandles(), state.lastCandleProvisional(now), state.lastPrice(),
                 dayChangePct, volumeRatio(state.allCandles()), topSoFar, events, latest,
                 projectedReturnPct(latest, completed), state.watermark());
+    }
+
+    /**
+     * Writes the session so far to staging so the dashboards can follow it live.
+     * The newest candle is flagged provisional when its interval has not closed,
+     * so nothing downstream mistakes a forming candle for a settled one - and
+     * none of this reaches the canonical tables, which only the close-time
+     * reconciliation writes.
+     */
+    private void stage(String symbol, LocalDate sessionDate, LiveSessionState state, long now) {
+        if (!settings.persistLiveCandles()) {
+            return;
+        }
+        List<Candle> all = state.allCandles();
+        if (all.isEmpty()) {
+            return;
+        }
+        long provisionalFrom = state.lastCandleProvisional(now) ? all.getLast().epochSeconds() : 0;
+        try {
+            long instrumentId = instrumentRepository.findOrCreate(symbol, settings.exchange(),
+                    settings.segment());
+            liveCandleRepository.upsertAll(instrumentId, sessionDate, settings.intervalMinutes(),
+                    all, provisionalFrom);
+        } catch (RuntimeException e) {
+            // Staging is a convenience for the dashboards; losing a tick of it
+            // must never take the monitor down.
+            log.warn("Could not stage live candles for {}: {}", symbol, e.getMessage());
+        }
     }
 
     /**
@@ -350,6 +384,7 @@ public final class MarketMonitor {
                                   int pollIntervalSeconds,
                                   int postCloseGraceSeconds,
                                   int horizonMinutes,
-                                  double modelMinProbability) {
+                                  double modelMinProbability,
+                                  boolean persistLiveCandles) {
     }
 }

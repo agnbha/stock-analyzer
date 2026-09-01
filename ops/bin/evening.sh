@@ -2,6 +2,7 @@
 # 18:30 IST, weekdays. The nightly batch.
 #
 # Order matters, and it is the whole point of this script:
+#   0. consolidate             - re-fetch the now-complete day and clear staging
 #   1. ingest the session      - writes trading_day + the top-3 windows
 #   2. score yesterday's calls - needs the completed tape from step 1
 #   3. import fills            - matches lots and attributes reasons
@@ -19,6 +20,11 @@ MONTH="${SESSION_DATE:0:7}"
 
 log "evening batch for $SESSION_DATE"
 
+# The monitor stages each tick so the dashboards can follow the session live.
+# Those rows may be provisional, so the day is re-fetched authoritatively here
+# and the staging it supersedes is dropped. Safe whether or not the monitor ran.
+run_step "consolidate live session" com.stockanalyzer.DailyAnalysisMain consolidate \
+    --date "$SESSION_DATE"
 run_step "ingest session" com.stockanalyzer.DailyAnalysisMain daily --date "$SESSION_DATE"
 run_step "score predictions" com.stockanalyzer.DailyAnalysisMain evaluate --date "$SESSION_DATE"
 run_step "import fills" com.stockanalyzer.TradeJournalMain trades import --broker \

@@ -82,6 +82,7 @@ public final class MarketDayDaemon {
                     context.heartbeatRepository(),
                     context.alertPlanner(),
                     context.instrumentRepository(),
+                    context.liveCandleRepository(),
                     context.tradingDayRepository(),
                     context.tradingCalendar(),
                     new SessionReconciler(context.ingestionService()),
@@ -92,7 +93,7 @@ public final class MarketDayDaemon {
                             config.stockSymbols(), config.exchange(), config.segment(),
                             config.intradayIntervalMinutes(), config.monitorPollIntervalSeconds(),
                             config.monitorPostCloseGraceSeconds(), config.modelHorizonMinutes(),
-                            config.alertModelMinProbability()));
+                            config.alertModelMinProbability(), config.monitorPersistLiveCandles()));
 
             warnIfSessionExceedsDailyBudget(context, config);
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
