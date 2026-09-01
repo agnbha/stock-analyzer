@@ -1,0 +1,985 @@
+{
+  "uid": "stockanalyzer-trend",
+  "title": "Stock Trend",
+  "description": "Day-to-day price action with the indicators that describe it, and how much of the market is moving the same way.",
+  "tags": [
+    "stock-analyzer",
+    "trend"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-3M",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "label": "Symbol",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT symbol FROM instrument ORDER BY symbol",
+        "definition": "SELECT symbol FROM instrument ORDER BY symbol",
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "selected": false,
+          "text": "RELIANCE",
+          "value": "RELIANCE"
+        }
+      },
+      {
+        "name": "detector",
+        "label": "Detector",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT DISTINCT detector_version FROM gain_opportunity ORDER BY detector_version",
+        "definition": "SELECT DISTINCT detector_version FROM gain_opportunity ORDER BY detector_version",
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Trend - $symbol",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT trend_score AS \"Trend\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND trend_score IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT trend_score AS \"Trend\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND trend_score IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Bearish",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Neutral",
+                  "color": "yellow",
+                  "index": 1
+                },
+                "2": {
+                  "text": "Bullish",
+                  "color": "green",
+                  "index": 2
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Close and the 5-day average both above the 20-day average is bullish, both below is bearish, anything else neutral. A description of where price sits, not a forecast."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "RSI (14) - $symbol",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 30
+              },
+              {
+                "color": "orange",
+                "value": 70
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Simple-average (Cutler) RSI, not Wilder's smoothing - a view cannot express the recursion. Below 30 is conventionally oversold, above 70 overbought."
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Beta - $symbol",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(beta, 2) AS \"Beta\" FROM v_symbol_beta WHERE symbol = '$symbol'",
+          "queryText": "SELECT ROUND(beta, 2) AS \"Beta\" FROM v_symbol_beta WHERE symbol = '$symbol'",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0.8
+              },
+              {
+                "color": "orange",
+                "value": 1.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Against an equal-weighted basket of the tracked symbols, because no index series is stored. Comparable between these symbols, but not with a published NIFTY beta."
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Market breadth today",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(advancing_pct, 1) AS \"Advancing\"\nFROM v_market_breadth ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT ROUND(advancing_pct, 1) AS \"Advancing\"\nFROM v_market_breadth ORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "green",
+                "value": 55
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Share of the tracked universe that closed up. Above 55% is broad strength, below 40% broad weakness."
+    },
+    {
+      "id": 10,
+      "type": "candlestick",
+      "title": "$symbol - daily candles, moving averages, and the best window each day",
+      "description": "Green and red points are the entry and exit of that session's single best window. Averages only appear once their window is full, so a 50-day line starts 50 sessions in.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\",\n       o.entry_price    AS \"Best entry\",\n       o.exit_price     AS \"Best exit\"\nFROM v_symbol_trend t\nLEFT JOIN v_opportunity_markers o\n       ON o.symbol = t.symbol AND o.session_date = t.session_date\n      AND o.detector_version = '$detector' AND o.rank = 1\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
+          "queryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\",\n       o.entry_price    AS \"Best entry\",\n       o.exit_price     AS \"Best exit\"\nFROM v_symbol_trend t\nLEFT JOIN v_opportunity_markers o\n       ON o.symbol = t.symbol AND o.session_date = t.session_date\n      AND o.detector_version = '$detector' AND o.rank = 1\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "down": "red",
+          "up": "green",
+          "flat": "gray"
+        },
+        "includeAllFields": true,
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none",
+          "hideZeros": false
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 5"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-blue"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 20"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 50"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Best entry"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 10
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Best exit"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 10
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "$symbol - RSI (14)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM v_symbol_trend WHERE symbol = '$symbol' AND rsi14 IS NOT NULL ORDER BY ts_epoch",
+          "queryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM v_symbol_trend WHERE symbol = '$symbol' AND rsi14 IS NOT NULL ORDER BY ts_epoch",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 30
+              },
+              {
+                "color": "transparent",
+                "value": 31
+              },
+              {
+                "color": "orange",
+                "value": 70
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Market breadth - how much of the universe rose",
+      "description": "Not symbol specific: the whole tracked universe. 50% is the line between a broad advance and a broad decline.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       advancing_pct   AS \"Advancing %\",\n       mean_change_pct AS \"Mean change %\"\nFROM v_market_breadth ORDER BY ts_epoch",
+          "queryText": "SELECT ts_epoch AS time,\n       advancing_pct   AS \"Advancing %\",\n       mean_change_pct AS \"Mean change %\"\nFROM v_market_breadth ORDER BY ts_epoch",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Advancing %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mean change %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "$symbol - supports and resistances",
+      "description": "Classic floor-trader pivots computed from the previous session's high, low and close, plus the rolling 20-day extremes price has actually had to get through.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       close   AS \"Close\",\n       r2      AS \"R2\", r1 AS \"R1\", pivot AS \"Pivot\", s1 AS \"S1\", s2 AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM v_support_resistance WHERE symbol = '$symbol' ORDER BY ts_epoch",
+          "queryText": "SELECT ts_epoch AS time,\n       close   AS \"Close\",\n       r2      AS \"R2\", r1 AS \"R1\", pivot AS \"Pivot\", s1 AS \"S1\", s2 AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM v_support_resistance WHERE symbol = '$symbol' ORDER BY ts_epoch",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "R2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "R1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pivot"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "S1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-green"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "S2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "20-day high"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-red"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "20-day low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-green"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot",
+                  "dash": [
+                    8,
+                    6
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,5 @@
 package com.stockanalyzer.trade;
 
-import com.stockanalyzer.model.OpenPosition;
 import com.stockanalyzer.model.Product;
 import com.stockanalyzer.model.RealizedLot;
 import com.stockanalyzer.model.Side;

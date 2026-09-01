@@ -99,6 +99,56 @@ class DailyIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("a forced run re-fetches a day that is already stored")
+    void forcedRunRefetchesStoredDays() {
+        FakeCandleClient client = new FakeCandleClient();
+        DailyIngestionService service = service(client);
+
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "daily");
+        int callsAfterFirstRun = client.calls;
+
+        IngestionReport forced =
+                service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "daily", true);
+
+        assertTrue(client.calls > callsAfterFirstRun, "force means fetch it again");
+        assertEquals(1, forced.sessionsWritten());
+        assertEquals(3, opportunities.findRange(DAY, DAY, DETECTOR, "GOOD").size(),
+                "and the day still holds exactly three windows afterwards");
+    }
+
+    @Test
+    @DisplayName("reconciliation replaces a session ingested while the market was open")
+    void reconciliationOverwritesAPartialDay() {
+        PartialThenFullClient client = new PartialThenFullClient();
+        DailyIngestionService service = service(client);
+
+        // Mid-session run stores a partial day.
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "daily");
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        assertEquals(4, tradingDays.find(instrumentId, DAY, 1).orElseThrow().candleCount());
+
+        // What SessionReconciler does at the close.
+        client.marketClosed = true;
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "live-reconcile", true);
+
+        assertEquals(9, tradingDays.find(instrumentId, DAY, 1).orElseThrow().candleCount(),
+                "the complete session replaced the partial one");
+    }
+
+    /** Returns half a session first, then the whole thing once the market has closed. */
+    private static final class PartialThenFullClient implements CandleDataClient {
+        private boolean marketClosed;
+
+        @Override
+        public StockCandleSeries fetchCandles(String symbol, String exchange, String segment,
+                                               LocalDateTime start, LocalDateTime end, int intervalMinutes) {
+            List<Candle> full = Candles.ofCloses(0, 100, 90, 130, 120, 100, 125, 124, 110, 118);
+            return new StockCandleSeries(symbol, exchange, segment,
+                    marketClosed ? full : full.subList(0, 4));
+        }
+    }
+
+    @Test
     @DisplayName("a day with no data for any symbol is recorded as non-trading")
     void infersHolidays() {
         // GOOD returns data for DAY only; the planner also wants the day before.

@@ -5,7 +5,7 @@ target/
 .vscode/
 logs/*
 .DS_Store
-data/stock-analyzer.db*
+data/*
 nohup.out
 
 # Local Grafana runtime (downloaded binary, plugins, generated config)

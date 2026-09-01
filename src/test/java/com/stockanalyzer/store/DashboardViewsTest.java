@@ -1,10 +1,14 @@
 package com.stockanalyzer.store;
 
+import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.DailyGainSummary;
+import com.stockanalyzer.model.GainOpportunity;
 import com.stockanalyzer.model.Product;
 import com.stockanalyzer.model.Side;
 import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.store.jdbc.SqliteAccountBalanceRepository;
+import com.stockanalyzer.store.jdbc.SqliteCandleRepository;
+import com.stockanalyzer.store.jdbc.SqliteGainOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeReasonRepository;
@@ -21,6 +25,7 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +36,7 @@ class DashboardViewsTest {
 
     private static final LocalDate MONDAY = LocalDate.of(2026, 8, 24);
     private static final long NINE_FIFTEEN = 1787362500L;
+    private static final String DETECTOR = "topk-nonoverlap/highlow/v1";
 
     @TempDir
     Path directory;
@@ -42,7 +48,7 @@ class DashboardViewsTest {
     void setUp() {
         database = TestDatabase.open(directory);
         InstrumentRepository instruments = new SqliteInstrumentRepository(database);
-        TradingDayRepository tradingDays = new SqliteTradingDayRepository(database);
+        SqliteTradingDayRepository tradingDays = new SqliteTradingDayRepository(database);
         trades = new SqliteTradeRepository(database);
 
         long instrumentId = instruments.findOrCreate("RELIANCE", "NSE", "CASH");
@@ -71,6 +77,19 @@ class DashboardViewsTest {
                         TradeReasonRepository.TradeReason.Source.MANUAL, "took the money")));
 
         new SqliteAccountBalanceRepository(database).record(MONDAY, 250_000, 50_000.0, "manual");
+
+        // A session at minute resolution, with a known top-3 window inside it.
+        List<Candle> minutes = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            double close = 100 + i;
+            minutes.add(new Candle(NINE_FIFTEEN + i * 60L, close, close + 0.5, close - 0.5, close, 500));
+        }
+        new SqliteCandleRepository(database).saveAll(instrumentId, 1, minutes);
+
+        long tradingDayId = tradingDays.findId(instrumentId, MONDAY, 1).orElseThrow();
+        new SqliteGainOpportunityRepository(database).replace(tradingDayId, DETECTOR, List.of(
+                new GainOpportunity(1, NINE_FIFTEEN + 60L, NINE_FIFTEEN + 5 * 60L, 100.5, 105.5, 4.98, 4),
+                new GainOpportunity(2, NINE_FIFTEEN + 7 * 60L, NINE_FIFTEEN + 9 * 60L, 106.5, 109.5, 2.82, 2)));
     }
 
     @AfterEach
@@ -147,6 +166,37 @@ class DashboardViewsTest {
     void tradeMarkers() {
         assertEquals(3, queryInt("SELECT COUNT(*) FROM v_trade_markers"));
         assertEquals(2, queryInt("SELECT COUNT(*) FROM v_trade_markers WHERE side = 'BUY'"));
+    }
+
+    @Test
+    @DisplayName("minute candles carry the day's top-3 windows as entry and exit markers")
+    void intradayCandlesCarryOpportunityMarkers() {
+        assertEquals(10, queryInt("SELECT COUNT(*) FROM v_intraday_candles WHERE symbol='RELIANCE'"));
+        assertEquals(2, queryInt("SELECT COUNT(*) FROM v_opportunity_markers WHERE symbol='RELIANCE'"));
+
+        // The join the intraday panel makes: a candle row gains an entry price
+        // on the minute a window opens, and an exit price on the minute it closes.
+        String panelJoin = """
+                SELECT COUNT(*) FROM v_intraday_candles c
+                LEFT JOIN v_opportunity_markers e
+                       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch
+                LEFT JOIN v_opportunity_markers x
+                       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch
+                WHERE c.symbol = 'RELIANCE' AND (e.entry_price IS NOT NULL OR x.exit_price IS NOT NULL)""";
+        assertEquals(4, queryInt(panelJoin), "two windows, each contributing an entry and an exit");
+
+        assertEquals(100.5, queryDouble("SELECT e.entry_price FROM v_intraday_candles c "
+                + "JOIN v_opportunity_markers e ON e.symbol=c.symbol AND e.entry_ts=c.ts_epoch "
+                + "WHERE e.rank = 1"), 0.001);
+    }
+
+    @Test
+    @DisplayName("markers stay separated by detector version")
+    void markersAreKeyedByDetectorVersion() {
+        assertEquals(2, queryInt("SELECT COUNT(*) FROM v_opportunity_markers "
+                + "WHERE detector_version = '" + DETECTOR + "'"));
+        assertEquals(0, queryInt("SELECT COUNT(*) FROM v_opportunity_markers "
+                + "WHERE detector_version = 'some-other/v9'"));
     }
 
     @Test

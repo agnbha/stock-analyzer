@@ -35,11 +35,26 @@ public final class BackfillPlanner {
     /** Missing sessions per symbol, in symbol order, each list ordered oldest first. */
     public Map<String, List<LocalDate>> plan(List<String> symbols, String exchange, String segment,
                                              LocalDate from, LocalDate to, int intervalMinutes) {
+        return plan(symbols, exchange, segment, from, to, intervalMinutes, false);
+    }
+
+    /**
+     * @param refetchStored when true, every trading day in the range is planned
+     *                      even if it is already stored. A session ingested
+     *                      while the market was still open holds a partial day,
+     *                      and the set difference would leave it partial for
+     *                      ever - so re-fetching has to be expressible.
+     */
+    public Map<String, List<LocalDate>> plan(List<String> symbols, String exchange, String segment,
+                                             LocalDate from, LocalDate to, int intervalMinutes,
+                                             boolean refetchStored) {
         List<LocalDate> wanted = calendar.tradingDaysBetween(from, to);
         Map<String, List<LocalDate>> missingBySymbol = new LinkedHashMap<>();
         for (String symbol : symbols) {
             long instrumentId = instrumentRepository.findOrCreate(symbol, exchange, segment);
-            Set<LocalDate> have = tradingDayRepository.storedSessionDates(instrumentId, intervalMinutes, from, to);
+            Set<LocalDate> have = refetchStored
+                    ? Set.of()
+                    : tradingDayRepository.storedSessionDates(instrumentId, intervalMinutes, from, to);
             List<LocalDate> missing = new ArrayList<>();
             for (LocalDate date : wanted) {
                 if (!have.contains(date)) {

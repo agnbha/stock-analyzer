@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -86,7 +85,20 @@ public final class DailyIngestionService {
 
     public IngestionReport ingest(List<String> symbols, String exchange, String segment,
                                   LocalDate from, LocalDate to, int intervalMinutes, String mode) {
-        Map<String, List<LocalDate>> missing = planner.plan(symbols, exchange, segment, from, to, intervalMinutes);
+        return ingest(symbols, exchange, segment, from, to, intervalMinutes, mode, false);
+    }
+
+    /**
+     * @param refetchStored re-fetch sessions already stored. Reconciliation at
+     *                      the close needs this: the day may well have been
+     *                      ingested mid-session, and gap-filling would then skip
+     *                      it and leave the partial version standing.
+     */
+    public IngestionReport ingest(List<String> symbols, String exchange, String segment,
+                                  LocalDate from, LocalDate to, int intervalMinutes, String mode,
+                                  boolean refetchStored) {
+        Map<String, List<LocalDate>> missing =
+                planner.plan(symbols, exchange, segment, from, to, intervalMinutes, refetchStored);
         long runId = ingestionRunRepository.start(to, mode, missing.size());
 
         if (missing.isEmpty()) {

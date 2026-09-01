@@ -6,7 +6,6 @@ import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.store.AlertRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.MarketEventRepository;
-import com.stockanalyzer.store.TradeReasonRepository;
 import com.stockanalyzer.store.TradeReasonRepository.TradeReason;
 
 import java.util.ArrayList;

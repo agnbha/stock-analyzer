@@ -70,6 +70,9 @@ public final class SchemaMigrator {
         all.put(2, v2());
         all.put(3, v3());
         all.put(4, v4());
+        all.put(5, v5());
+        all.put(6, v6());
+        all.put(7, v7());
         return all;
     }
 
@@ -377,6 +380,229 @@ public final class SchemaMigrator {
                          WHERE l.buy_trade_id = t.id OR l.sell_trade_id = t.id) AS net_pnl
                 FROM trade_reason r JOIN trade t ON t.id = r.trade_id
                 GROUP BY r.reason_code, r.reason_source, t.side, t.session_date""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v5: the intraday view the dashboards need to show a session at the
+     * resolution it was actually analysed at.
+     *
+     * <p>Daily bars cannot show a window that opened at 09:16 and closed at
+     * 09:33 - the top-3 windows only exist at minute resolution, so marking
+     * them needs the minute candles.
+     */
+    private List<String> v5() {
+        List<String> ddl = new ArrayList<>();
+
+        // The exchange's local date for each candle. Timestamps are stored UTC;
+        // IST is UTC+5:30, matching the session_date written by ingestion.
+        ddl.add("""
+                CREATE VIEW v_intraday_candles AS
+                SELECT i.symbol            AS symbol,
+                       c.ts_epoch          AS ts_epoch,
+                       c.interval_minutes  AS interval_minutes,
+                       date(c.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS session_date,
+                       c.open, c.high, c.low, c.close, c.volume
+                FROM candle c JOIN instrument i ON i.id = c.instrument_id""");
+
+        // The Part 1 deliverable, in a shape a chart can plot: one row per
+        // window, carrying both ends so entry and exit can be marked separately.
+        ddl.add("""
+                CREATE VIEW v_opportunity_markers AS
+                SELECT i.symbol             AS symbol,
+                       t.session_date       AS session_date,
+                       o.detector_version   AS detector_version,
+                       o.rank               AS rank,
+                       o.entry_ts, o.exit_ts,
+                       o.entry_price, o.exit_price,
+                       o.gain_pct, o.duration_minutes
+                FROM gain_opportunity o
+                JOIN trading_day t ON t.id = o.trading_day_id
+                JOIN instrument i  ON i.id = t.instrument_id""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v6: the day-to-day trend indicators.
+     *
+     * <p>Each is a genuine indicator with a stated definition, not a label. Two
+     * caveats live in the SQL rather than in a comment somewhere else: averages
+     * are null until their window is actually full, so a 50-day average never
+     * shows a 12-day one wearing its name; and RSI is the simple-average
+     * (Cutler) variant rather than Wilder's recursive smoothing, which a view
+     * cannot express.
+     */
+    private List<String> v6() {
+        List<String> ddl = new ArrayList<>();
+
+        ddl.add("""
+                CREATE VIEW v_symbol_trend AS
+                SELECT symbol, session_date, ts_epoch, open, high, low, close, volume,
+                       day_change_pct, sma5, sma20, sma50, rsi14,
+                       CASE WHEN sma20 IS NULL THEN NULL
+                            WHEN close > sma20 AND sma5 > sma20 THEN 2
+                            WHEN close < sma20 AND sma5 < sma20 THEN 0
+                            ELSE 1 END AS trend_score
+                FROM (
+                  SELECT symbol, session_date, ts_epoch, open, high, low, close, volume,
+                         day_change_pct,
+                         CASE WHEN COUNT(close) OVER w5  < 5  THEN NULL
+                              ELSE AVG(close) OVER w5  END AS sma5,
+                         CASE WHEN COUNT(close) OVER w20 < 20 THEN NULL
+                              ELSE AVG(close) OVER w20 END AS sma20,
+                         CASE WHEN COUNT(close) OVER w50 < 50 THEN NULL
+                              ELSE AVG(close) OVER w50 END AS sma50,
+                         CASE WHEN COUNT(gain) OVER w14 < 14 THEN NULL
+                              WHEN AVG(loss) OVER w14 = 0 THEN 100.0
+                              ELSE 100.0 - 100.0 / (1 + (AVG(gain) OVER w14) / (AVG(loss) OVER w14))
+                         END AS rsi14
+                  FROM (
+                    SELECT i.symbol AS symbol, t.session_date AS session_date,
+                           t.first_candle_ts AS ts_epoch,
+                           t.open, t.high, t.low, t.close, t.volume, t.day_change_pct,
+                           MAX(t.close - LAG(t.close) OVER p, 0) AS gain,
+                           MAX(LAG(t.close) OVER p - t.close, 0) AS loss
+                    FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                    WINDOW p AS (PARTITION BY i.symbol ORDER BY t.session_date)
+                  )
+                  WINDOW w5  AS (PARTITION BY symbol ORDER BY session_date
+                                 ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),
+                         w14 AS (PARTITION BY symbol ORDER BY session_date
+                                 ROWS BETWEEN 13 PRECEDING AND CURRENT ROW),
+                         w20 AS (PARTITION BY symbol ORDER BY session_date
+                                 ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),
+                         w50 AS (PARTITION BY symbol ORDER BY session_date
+                                 ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)
+                )""");
+
+        // Classic floor-trader pivots from the previous session, plus the
+        // rolling extremes price has actually had to fight through.
+        ddl.add("""
+                CREATE VIEW v_support_resistance AS
+                SELECT symbol, session_date, ts_epoch, close,
+                       pivot,
+                       2 * pivot - prev_low                AS r1,
+                       pivot + (prev_high - prev_low)      AS r2,
+                       2 * pivot - prev_high               AS s1,
+                       pivot - (prev_high - prev_low)      AS s2,
+                       high_20, low_20, high_60, low_60
+                FROM (
+                  SELECT i.symbol AS symbol, t.session_date AS session_date,
+                         t.first_candle_ts AS ts_epoch, t.close,
+                         (LAG(t.high) OVER p + LAG(t.low) OVER p + LAG(t.close) OVER p) / 3.0 AS pivot,
+                         LAG(t.high) OVER p AS prev_high,
+                         LAG(t.low)  OVER p AS prev_low,
+                         MAX(t.high) OVER w20 AS high_20,
+                         MIN(t.low)  OVER w20 AS low_20,
+                         MAX(t.high) OVER w60 AS high_60,
+                         MIN(t.low)  OVER w60 AS low_60
+                  FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                  WINDOW p   AS (PARTITION BY i.symbol ORDER BY t.session_date),
+                         w20 AS (PARTITION BY i.symbol ORDER BY t.session_date
+                                 ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),
+                         w60 AS (PARTITION BY i.symbol ORDER BY t.session_date
+                                 ROWS BETWEEN 59 PRECEDING AND CURRENT ROW)
+                )""");
+
+        // Breadth: how much of the tracked universe rose. The oldest session has
+        // no prior close, so it contributes nothing and is excluded.
+        ddl.add("""
+                CREATE VIEW v_market_breadth AS
+                SELECT session_date,
+                       MIN(first_candle_ts)                                        AS ts_epoch,
+                       COUNT(*)                                                    AS symbols,
+                       SUM(CASE WHEN day_change_pct > 0 THEN 1 ELSE 0 END)         AS advancing,
+                       SUM(CASE WHEN day_change_pct < 0 THEN 1 ELSE 0 END)         AS declining,
+                       100.0 * SUM(CASE WHEN day_change_pct > 0 THEN 1 ELSE 0 END)
+                             / COUNT(*)                                            AS advancing_pct,
+                       AVG(day_change_pct)                                         AS mean_change_pct
+                FROM trading_day
+                WHERE day_change_pct IS NOT NULL
+                GROUP BY session_date""");
+
+        /*
+         * Beta against an equal-weighted basket of the tracked symbols, because
+         * no index series is stored. That is a proxy for the market, not NIFTY -
+         * the number is comparable between these symbols but not with a
+         * published beta.
+         */
+        ddl.add("""
+                CREATE VIEW v_symbol_beta AS
+                SELECT s.symbol                                                       AS symbol,
+                       COUNT(*)                                                       AS sessions,
+                       (COUNT(*) * SUM(s.sret * m.mean_change_pct)
+                          - SUM(s.sret) * SUM(m.mean_change_pct))
+                       / NULLIF(COUNT(*) * SUM(m.mean_change_pct * m.mean_change_pct)
+                          - SUM(m.mean_change_pct) * SUM(m.mean_change_pct), 0)       AS beta
+                FROM (SELECT i.symbol AS symbol, t.session_date AS session_date,
+                             t.day_change_pct AS sret
+                      FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                      WHERE t.day_change_pct IS NOT NULL) s
+                JOIN v_market_breadth m ON m.session_date = s.session_date
+                GROUP BY s.symbol""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v7: derive the daily change from the close series instead of reading the
+     * stored column.
+     *
+     * <p>{@code trading_day.day_change_pct} is filled at ingest time from
+     * whatever previous close was already in the database, so it is null when a
+     * session was written before the one preceding it - an artefact of backfill
+     * order. Breadth and beta describe the market and must not depend on the
+     * order rows happened to arrive in, so they now compute the change with
+     * LAG over the stored closes.
+     */
+    private List<String> v7() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("DROP VIEW IF EXISTS v_symbol_beta");
+        ddl.add("DROP VIEW IF EXISTS v_market_breadth");
+
+        ddl.add("""
+                CREATE VIEW v_daily_change AS
+                SELECT symbol, session_date, ts_epoch, close, change_pct
+                FROM (
+                  SELECT i.symbol AS symbol, t.session_date AS session_date,
+                         t.first_candle_ts AS ts_epoch, t.close AS close,
+                         CASE WHEN LAG(t.close) OVER p IS NULL OR LAG(t.close) OVER p = 0 THEN NULL
+                              ELSE (t.close - LAG(t.close) OVER p) / LAG(t.close) OVER p * 100.0
+                         END AS change_pct
+                  FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                  WINDOW p AS (PARTITION BY i.symbol ORDER BY t.session_date)
+                )
+                WHERE change_pct IS NOT NULL""");
+
+        ddl.add("""
+                CREATE VIEW v_market_breadth AS
+                SELECT session_date,
+                       MIN(ts_epoch)                                        AS ts_epoch,
+                       COUNT(*)                                             AS symbols,
+                       SUM(CASE WHEN change_pct > 0 THEN 1 ELSE 0 END)      AS advancing,
+                       SUM(CASE WHEN change_pct < 0 THEN 1 ELSE 0 END)      AS declining,
+                       100.0 * SUM(CASE WHEN change_pct > 0 THEN 1 ELSE 0 END)
+                             / COUNT(*)                                     AS advancing_pct,
+                       AVG(change_pct)                                      AS mean_change_pct
+                FROM v_daily_change
+                GROUP BY session_date""");
+
+        ddl.add("""
+                CREATE VIEW v_symbol_beta AS
+                SELECT c.symbol                                                        AS symbol,
+                       COUNT(*)                                                        AS sessions,
+                       (COUNT(*) * SUM(c.change_pct * m.mean_change_pct)
+                          - SUM(c.change_pct) * SUM(m.mean_change_pct))
+                       / NULLIF(COUNT(*) * SUM(m.mean_change_pct * m.mean_change_pct)
+                          - SUM(m.mean_change_pct) * SUM(m.mean_change_pct), 0)        AS beta
+                FROM v_daily_change c
+                JOIN v_market_breadth m ON m.session_date = c.session_date
+                GROUP BY c.symbol""");
         return ddl;
     }
 

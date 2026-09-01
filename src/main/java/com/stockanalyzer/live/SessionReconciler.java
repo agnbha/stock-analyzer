@@ -33,8 +33,11 @@ public final class SessionReconciler {
     public IngestionReport reconcile(LocalDate sessionDate, List<String> symbols, String exchange, String segment,
                                      int intervalMinutes, Map<String, List<GainOpportunity>> liveTopBySymbol) {
         log.info("Reconciling {} against the authoritative tape", sessionDate);
+        // Always re-fetch: the session was very likely ingested while the market
+        // was open, and gap-filling would skip it and leave that partial day as
+        // the canonical record.
         IngestionReport report = ingestionService.ingest(symbols, exchange, segment,
-                sessionDate, sessionDate, intervalMinutes, "live-reconcile");
+                sessionDate, sessionDate, intervalMinutes, "live-reconcile", true);
 
         liveTopBySymbol.forEach((symbol, liveTop) -> {
             if (liveTop.isEmpty()) {

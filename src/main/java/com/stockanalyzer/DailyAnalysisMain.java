@@ -21,6 +21,8 @@ import java.util.Locale;
  * <pre>
  *   daily [--date YYYY-MM-DD]        yesterday's session, or a specific one
  *   backfill --from D --to D         seed the previous months
+ *   ... --force                      re-fetch days already stored, for a session
+ *                                    that was ingested while the market was open
  *   recompute --from D [--to D]      re-run the detector on stored candles, no API calls
  *   report [--symbol S] [--months N] read the accumulated history back
  *   export --from D --to D --out F   write the opportunities to CSV
@@ -59,7 +61,8 @@ public final class DailyAnalysisMain {
         AppConfig config = context.config();
 
         IngestionReport report = context.ingestionService().ingest(config.stockSymbols(), config.exchange(),
-                config.segment(), sessionDate, sessionDate, config.intradayIntervalMinutes(), "daily");
+                config.segment(), sessionDate, sessionDate, config.intradayIntervalMinutes(), "daily",
+                args.flag("force"));
 
         List<OpportunityRow> opportunities = context.gainOpportunityRepository()
                 .findRange(sessionDate, sessionDate, context.detector().version(), null);
@@ -74,7 +77,8 @@ public final class DailyAnalysisMain {
 
         System.out.printf("Backfilling %s to %s for %d symbols%n", from, to, config.stockSymbols().size());
         IngestionReport report = context.ingestionService().ingest(config.stockSymbols(), config.exchange(),
-                config.segment(), from, to, config.intradayIntervalMinutes(), "backfill");
+                config.segment(), from, to, config.intradayIntervalMinutes(), "backfill",
+                args.flag("force"));
 
         System.out.printf("Wrote %d sessions across %d symbols; %d failed%n",
                 report.sessionsWritten(), report.succeeded(), report.failures().size());

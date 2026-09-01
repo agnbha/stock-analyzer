@@ -1,7 +1,7 @@
 {
   "uid": "stockanalyzer-candles",
   "title": "Candles and Calls",
-  "description": "Daily and weekly candles for one symbol, marked with the buys and sells you actually took.",
+  "description": "Minute candles with the day's top 3 gain windows marked, plus the daily and weekly view and the calls you actually took.",
   "tags": [
     "stock-analyzer",
     "trades"
@@ -13,7 +13,7 @@
   "version": 1,
   "refresh": "5m",
   "time": {
-    "from": "now-6M",
+    "from": "now-3M",
     "to": "now"
   },
   "templating": {
@@ -37,14 +37,57 @@
         },
         "definition": "SELECT symbol FROM instrument ORDER BY symbol",
         "sort": 1
+      },
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT DISTINCT session_date FROM trading_day WHERE session_date BETWEEN date($__from/1000,'unixepoch','+5 hours','+30 minutes') AND date($__to/1000,'unixepoch','+5 hours','+30 minutes') ORDER BY session_date DESC",
+        "definition": "SELECT DISTINCT session_date FROM trading_day WHERE session_date BETWEEN date($__from/1000,'unixepoch','+5 hours','+30 minutes') AND date($__to/1000,'unixepoch','+5 hours','+30 minutes') ORDER BY session_date DESC",
+        "refresh": 2,
+        "sort": 0,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Only sessions inside the dashboard time range. Pick one for the full top 3, or several to compare best windows."
+      },
+      {
+        "name": "detector",
+        "label": "Detector",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT DISTINCT detector_version FROM gain_opportunity ORDER BY detector_version",
+        "definition": "SELECT DISTINCT detector_version FROM gain_opportunity ORDER BY detector_version",
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Results are keyed by detector version, so changed rules produce a parallel series rather than overwriting history."
       }
     ]
   },
   "panels": [
     {
-      "id": 10,
-      "title": "$symbol - daily candles, with the calls you took",
+      "id": 20,
       "type": "candlestick",
+      "title": "$symbol - trading hours only, gaps between sessions removed",
+      "description": "The x-axis is trading time, not wall-clock: overnight and weekend gaps are collapsed so sessions sit side by side. The true timestamp is in the tooltip as IST. One session selected marks all three windows; several marks only the best of each.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -63,8 +106,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', c.session_date) AS INTEGER) AS time,\n       c.open  AS open,\n       c.high  AS high,\n       c.low   AS low,\n       c.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_daily_candles c\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'BUY' GROUP BY session_date, symbol) b\n       ON b.session_date = c.session_date AND b.symbol = c.symbol\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'SELL' GROUP BY session_date, symbol) s\n       ON s.session_date = c.session_date AND s.symbol = c.symbol\nWHERE c.symbol = '$symbol'\nORDER BY c.session_date",
-          "queryText": "SELECT CAST(strftime('%s', c.session_date) AS INTEGER) AS time,\n       c.open  AS open,\n       c.high  AS high,\n       c.low   AS low,\n       c.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_daily_candles c\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'BUY' GROUP BY session_date, symbol) b\n       ON b.session_date = c.session_date AND b.symbol = c.symbol\nLEFT JOIN (SELECT session_date, symbol, AVG(price) AS price FROM v_trade_markers\n            WHERE side = 'SELL' GROUP BY session_date, symbol) s\n       ON s.session_date = c.session_date AND s.symbol = c.symbol\nWHERE c.symbol = '$symbol'\nORDER BY c.session_date",
+          "rawQueryText": "WITH picked AS (\n  SELECT DISTINCT session_date FROM v_intraday_candles\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\nordered AS (\n  SELECT session_date,\n         ROW_NUMBER() OVER (ORDER BY session_date) - 1              AS idx,\n         strftime('%s', session_date || ' 09:15:00') - 19800        AS open_epoch\n  FROM picked\n),\nscope AS (SELECT MIN(open_epoch) AS base, COUNT(*) AS sessions FROM ordered),\n-- One session: show all three windows. Several: only the best of each, or the\n-- chart becomes unreadable.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT (SELECT base FROM scope) + (o.idx * 376 + (c.ts_epoch - o.open_epoch) / 60) * 60 AS time,\n       c.open, c.high, c.low, c.close,\n       datetime(c.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"IST\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_candles c\nJOIN ordered o ON o.session_date = c.session_date\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY time",
+          "queryText": "WITH picked AS (\n  SELECT DISTINCT session_date FROM v_intraday_candles\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\nordered AS (\n  SELECT session_date,\n         ROW_NUMBER() OVER (ORDER BY session_date) - 1              AS idx,\n         strftime('%s', session_date || ' 09:15:00') - 19800        AS open_epoch\n  FROM picked\n),\nscope AS (SELECT MIN(open_epoch) AS base, COUNT(*) AS sessions FROM ordered),\n-- One session: show all three windows. Several: only the best of each, or the\n-- chart becomes unreadable.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT (SELECT base FROM scope) + (o.idx * 376 + (c.ts_epoch - o.open_epoch) / 60) * 60 AS time,\n       c.open, c.high, c.low, c.close,\n       datetime(c.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"IST\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_candles c\nJOIN ordered o ON o.session_date = c.session_date\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY time",
           "timeColumns": [
             "time"
           ]
@@ -80,6 +123,11 @@
           "flat": "gray"
         },
         "includeAllFields": true,
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none",
+          "hideZeros": false
+        },
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
@@ -98,7 +146,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Buy"
+              "options": "Window entry"
             },
             "properties": [
               {
@@ -107,7 +155,53 @@
               },
               {
                 "id": "custom.pointSize",
-                "value": 9
+                "value": 11
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Window exit"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 11
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Your buy"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 8
               },
               {
                 "id": "color",
@@ -121,7 +215,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Sell"
+              "options": "Your sell"
             },
             "properties": [
               {
@@ -130,7 +224,7 @@
               },
               {
                 "id": "custom.pointSize",
-                "value": 9
+                "value": 8
               },
               {
                 "id": "color",
@@ -140,15 +234,31 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IST"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
-      },
-      "description": "Blue points are buys, orange are sells, plotted at the average fill price for that session."
+      }
     },
     {
-      "id": 11,
-      "title": "$symbol - weekly candles, with the calls you took",
-      "type": "candlestick",
+      "id": 21,
+      "type": "table",
+      "title": "$symbol - windows found in the selected sessions",
+      "description": "What was available, not what you took. Ranked by gain; the windows never overlap, so these are three distinct opportunities.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -156,8 +266,8 @@
       "gridPos": {
         "x": 0,
         "y": 11,
-        "w": 24,
-        "h": 10
+        "w": 11,
+        "h": 7
       },
       "targets": [
         {
@@ -167,57 +277,52 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', w.session_date) AS INTEGER) AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
-          "queryText": "SELECT CAST(strftime('%s', w.session_date) AS INTEGER) AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
-          "timeColumns": [
-            "time"
-          ]
+          "rawQueryText": "SELECT session_date                             AS \"Session\",\n       rank                                     AS \"#\",\n       time(entry_ts,'unixepoch','+5 hours','+30 minutes')                     AS \"Entry\",\n       time(exit_ts,'unixepoch','+5 hours','+30 minutes')                      AS \"Exit\",\n       entry_price                              AS \"Buy at\",\n       exit_price                               AS \"Sell at\",\n       ROUND(gain_pct, 2)                       AS \"Gain %\",\n       duration_minutes                         AS \"Held (min)\"\nFROM v_opportunity_markers\nWHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n  AND detector_version = '$detector'\nORDER BY session_date DESC, rank",
+          "queryText": "SELECT session_date                             AS \"Session\",\n       rank                                     AS \"#\",\n       time(entry_ts,'unixepoch','+5 hours','+30 minutes')                     AS \"Entry\",\n       time(exit_ts,'unixepoch','+5 hours','+30 minutes')                      AS \"Exit\",\n       entry_price                              AS \"Buy at\",\n       exit_price                               AS \"Sell at\",\n       ROUND(gain_pct, 2)                       AS \"Gain %\",\n       duration_minutes                         AS \"Held (min)\"\nFROM v_opportunity_markers\nWHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n  AND detector_version = '$detector'\nORDER BY session_date DESC, rank",
+          "timeColumns": []
         }
       ],
       "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "down": "red",
-          "up": "green",
-          "flat": "gray"
-        },
-        "includeAllFields": true,
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": []
-        }
+        "showHeader": true,
+        "cellHeight": "sm"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
           "custom": {
-            "lineWidth": 1
+            "align": "auto"
           }
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "Buy"
+              "options": "Gain %"
             },
             "properties": [
               {
-                "id": "custom.drawStyle",
-                "value": "points"
+                "id": "unit",
+                "value": "percent"
               },
               {
-                "id": "custom.pointSize",
-                "value": 9
-              },
-              {
-                "id": "color",
+                "id": "custom.cellOptions",
                 "value": {
-                  "mode": "fixed",
-                  "fixedColor": "super-light-blue"
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
                 }
               }
             ]
@@ -225,29 +330,29 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Sell"
+              "options": "Buy at"
             },
             "properties": [
               {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell at"
+            },
+            "properties": [
               {
-                "id": "custom.pointSize",
-                "value": 9
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
+                "id": "unit",
+                "value": "currencyINR"
               }
             ]
           }
         ]
-      },
-      "description": "The same fills aggregated to the week the trade happened in."
+      }
     },
     {
       "id": 12,
@@ -258,10 +363,10 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 0,
-        "y": 21,
-        "w": 24,
-        "h": 11
+        "x": 11,
+        "y": 11,
+        "w": 13,
+        "h": 7
       },
       "targets": [
         {
@@ -271,8 +376,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol'\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
-          "queryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol'\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
+          "rawQueryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol' AND m.session_date IN (${session:sqlstring})\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
+          "queryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol' AND m.session_date IN (${session:sqlstring})\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
           "timeColumns": []
         }
       ],
@@ -348,6 +453,115 @@
           }
         ]
       }
+    },
+    {
+      "id": 11,
+      "title": "$symbol - weekly candles, with the calls you took",
+      "type": "candlestick",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
+          "queryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "down": "red",
+          "up": "green",
+          "flat": "gray"
+        },
+        "includeAllFields": true,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none",
+          "hideZeros": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 9
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "The same fills aggregated to the week the trade happened in."
     }
   ]
 }

@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 class GrafanaDashboardQueryTest {
 
     private static final Path DASHBOARDS = Path.of("grafana", "dashboards");
+    private static final long FROM_EPOCH_SECONDS = 1787000000L;
+    private static final long TO_EPOCH_SECONDS = 1788300000L;
 
     @TempDir
     Path directory;
@@ -54,8 +56,20 @@ class GrafanaDashboardQueryTest {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
             for (String sql : queriesIn(root)) {
                 checked++;
-                // Template variables are substituted by Grafana before the query runs.
-                String executable = sql.replace("$symbol", "RELIANCE");
+                // Template variables are substituted by Grafana before the query
+                // runs. Substitute all of them, or a query referencing an unknown
+                // one still parses and silently proves nothing.
+                String executable = sql
+                        // Multi-value variables are interpolated by Grafana with a
+                        // format suffix; the SQL form yields a quoted list.
+                        .replace("${session:sqlstring}", "'2026-08-27','2026-08-28'")
+                        .replace("$__from/1000", String.valueOf(FROM_EPOCH_SECONDS))
+                        .replace("$__to/1000", String.valueOf(TO_EPOCH_SECONDS))
+                        .replace("$symbol", "RELIANCE")
+                        .replace("$session", "2026-08-27")
+                        .replace("$detector", "topk-nonoverlap/highlow/v1");
+                assertFalse(executable.contains("$"),
+                        "unsubstituted variable in " + file.getFileName() + ": " + sql);
                 try {
                     database.read(connection -> {
                         try (Statement statement = connection.createStatement();
