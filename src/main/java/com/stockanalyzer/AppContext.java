@@ -111,6 +111,7 @@ public final class AppContext implements AutoCloseable {
     private final Database database;
     private final ExecutorService executor;
     private final HttpClient httpClient;
+    private final RateLimiter rateLimiter;
 
     private final InstrumentRepository instrumentRepository;
     private final TradingDayRepository tradingDayRepository;
@@ -175,7 +176,7 @@ public final class AppContext implements AutoCloseable {
                 config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
                 config.growwTotpSecretOrNull()));
 
-        RateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
+        this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
         this.candleDataClient = memoize(() -> CandleDataClients.rateLimited(httpClient, authenticator.get(),
                 config.growwBaseUrl(), rateLimiter, config.ingestMaxRetries(),
@@ -283,6 +284,10 @@ public final class AppContext implements AutoCloseable {
 
     public MarketClock clock() {
         return clock;
+    }
+
+    public RateLimiter rateLimiter() {
+        return rateLimiter;
     }
 
     public HttpClient httpClient() {

@@ -258,11 +258,15 @@ dashboard query executed against a real migrated database.
   encoded) was reconstructed from Groww's published cURL docs. If token requests
   start failing with 4xx, re-check the exact concatenation order/encoding
   against the latest docs at https://groww.in/trade-api/docs/curl.
-- **The trade book response shape is not well documented.** `GrowwExecutionClient`
-  reads field names defensively with fallbacks and logs the raw response when it
-  cannot find a trade list. If an import comes back empty while your web trade
-  book shows fills, that log is the place to look; adjusting the field names
-  there is the only change needed.
+- **The broker's order list only serves the current day.** There is no date
+  parameter and no page of older orders, so `trades import --broker` can only
+  ever fetch today's fills — asking for a wider range logs a warning and returns
+  what today has. That is why the journal is built up by importing every
+  evening, and why anything older has to come from a contract note through
+  `trades import --csv`.
+- Fetching fills takes two calls: `GET /v1/order/list` for the order book, then
+  `GET /v1/order/trades/{growwOrderId}` per filled order. `groww_trade_id` is the
+  natural key, so re-importing the same day is a no-op.
 - **`nse-holidays-2026.txt` ships incomplete.** It has the fixed-date national
   holidays only. Festival holidays move every year and must be copied from the
   NSE's published circular, or the daemon will fire session alerts on days the

@@ -26,17 +26,17 @@
           "type": "frser-sqlite-datasource",
           "uid": "stock-analyzer-sqlite"
         },
-        "query": {
-          "queryType": "table",
-          "rawQueryText": "SELECT symbol FROM instrument ORDER BY symbol",
-          "queryText": "SELECT symbol FROM instrument ORDER BY symbol",
-          "timeColumns": []
-        },
+        "query": "SELECT symbol FROM instrument ORDER BY symbol",
         "refresh": 1,
         "includeAll": false,
         "multi": false,
-        "current": {},
-        "definition": "SELECT symbol FROM instrument ORDER BY symbol"
+        "current": {
+          "selected": false,
+          "text": "RELIANCE",
+          "value": "RELIANCE"
+        },
+        "definition": "SELECT symbol FROM instrument ORDER BY symbol",
+        "sort": 1
       }
     ]
   },

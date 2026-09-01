@@ -91,7 +91,8 @@ public final class TradeJournalMain {
                     context.defaultProduct(), context.clock());
         } else {
             client = new GrowwExecutionClient(context.httpClient(), context.authenticator(),
-                    config.growwBaseUrl(), context.clock(), context.defaultProduct());
+                    config.growwBaseUrl(), context.clock(), context.defaultProduct(),
+                    config.segment(), context.rateLimiter());
         }
 
         int inserted = context.tradeJournalService().importTrades(client, from, to);

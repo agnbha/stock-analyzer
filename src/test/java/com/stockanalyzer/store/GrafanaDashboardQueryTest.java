@@ -90,6 +90,28 @@ class GrafanaDashboardQueryTest {
         }
     }
 
+    @Test
+    @DisplayName("template variable queries are plain strings, not query objects")
+    void variableQueriesAreStrings() throws Exception {
+        // The datasource's metricFindQuery assigns this value straight into its
+        // queryText field, which Go declares as a string. An object there fails
+        // with "cannot unmarshal object into Go struct field
+        // queryModel.queryText of type string" and the dropdown stays empty -
+        // while every panel still works, because panels read rawQueryText.
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            for (JsonNode variable : root.path("templating").path("list")) {
+                if (!"query".equals(variable.path("type").asText())) {
+                    continue;
+                }
+                assertTrue(variable.path("query").isTextual(),
+                        file.getFileName() + ": variable '" + variable.path("name").asText()
+                                + "' must define its query as a string, was "
+                                + variable.path("query").getNodeType());
+            }
+        }
+    }
+
     private static List<Path> dashboardFiles() throws Exception {
         assertTrue(Files.isDirectory(DASHBOARDS), "grafana/dashboards is missing");
         try (Stream<Path> files = Files.list(DASHBOARDS)) {
@@ -109,10 +131,11 @@ class GrafanaDashboardQueryTest {
                 }
             }
         }
-        JsonNode templating = root.path("templating").path("list");
-        for (JsonNode variable : templating) {
+        for (JsonNode variable : root.path("templating").path("list")) {
             JsonNode query = variable.path("query");
-            if (query.hasNonNull("rawQueryText")) {
+            if (query.isTextual()) {
+                queries.add(query.asText());
+            } else if (query.hasNonNull("rawQueryText")) {
                 queries.add(query.get("rawQueryText").asText());
             }
         }

@@ -6,6 +6,7 @@ target/
 logs/*
 .DS_Store
 data/stock-analyzer.db*
+nohup.out
 
 # Local Grafana runtime (downloaded binary, plugins, generated config)
 grafana/.runtime/

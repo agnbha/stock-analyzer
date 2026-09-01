@@ -24,6 +24,8 @@ It is dependency-driven, not arbitrary:
    so it needs step 1 to have finished.
 3. **`trades import`** brings in fills, matches lots, and attributes reasons —
    reasons come from the events and alerts the daemon recorded during the day.
+   This step is why the evening job matters most: the broker's order list only
+   serves the current day, so a session missed here cannot be fetched later.
 4. **`capture`** compares step 3 against step 1. It has to be last, or it has
    nothing to compare against.
 5. **`pnl`** prints the day.
