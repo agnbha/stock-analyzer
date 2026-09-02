@@ -74,6 +74,7 @@ public final class SchemaMigrator {
         all.put(6, v6());
         all.put(7, v7());
         all.put(8, v8());
+        all.put(9, v9());
         return all;
     }
 
@@ -660,6 +661,51 @@ public final class SchemaMigrator {
                       WHERE c.instrument_id = l.instrument_id
                         AND c.interval_minutes = l.interval_minutes
                         AND c.ts_epoch = l.ts_epoch)""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v9: carry VWAP on the intraday view.
+     *
+     * <p>Volume-weighted average price is a running total within one session -
+     * cumulative (typical price x volume) over cumulative volume, restarting
+     * each morning. It is the benchmark a fill gets judged against, and the
+     * event detector already keys VWAP_RECLAIM and VWAP_LOSS off it, so the
+     * chart should be able to show the same line those events refer to.
+     *
+     * <p>Computed here rather than in panel SQL so there is one definition, and
+     * partitioned by session so yesterday's volume never leaks into today's
+     * average.
+     */
+    private List<String> v9() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("DROP VIEW IF EXISTS v_intraday_merged");
+        ddl.add("""
+                CREATE VIEW v_intraday_merged AS
+                SELECT symbol, ts_epoch, session_date, interval_minutes,
+                       open, high, low, close, volume, source,
+                       SUM(((high + low + close) / 3.0) * volume) OVER w
+                         / NULLIF(SUM(volume) OVER w, 0) AS vwap
+                FROM (
+                  SELECT symbol, ts_epoch, session_date, interval_minutes,
+                         open, high, low, close, volume, 'final' AS source
+                  FROM v_intraday_candles
+                  UNION ALL
+                  SELECT i.symbol, l.ts_epoch, l.session_date, l.interval_minutes,
+                         l.open, l.high, l.low, l.close, l.volume,
+                         CASE WHEN l.provisional = 1 THEN 'forming' ELSE 'live' END
+                  FROM live_candle l
+                  JOIN instrument i ON i.id = l.instrument_id
+                  WHERE NOT EXISTS (
+                        SELECT 1 FROM candle c
+                        WHERE c.instrument_id = l.instrument_id
+                          AND c.interval_minutes = l.interval_minutes
+                          AND c.ts_epoch = l.ts_epoch)
+                )
+                WINDOW w AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
+                             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)""");
         return ddl;
     }
 

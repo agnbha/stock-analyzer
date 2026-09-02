@@ -83,6 +83,7 @@ public final class MarketDayDaemon {
                     context.alertPlanner(),
                     context.instrumentRepository(),
                     context.liveCandleRepository(),
+                    context.marketEventRepository(),
                     context.tradingDayRepository(),
                     context.tradingCalendar(),
                     new SessionReconciler(context.ingestionService()),

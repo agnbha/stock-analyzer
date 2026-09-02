@@ -27,6 +27,7 @@ import com.stockanalyzer.store.AlertRepository;
 import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.LiveCandleRepository;
+import com.stockanalyzer.store.MarketEventRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
@@ -71,6 +72,7 @@ public final class MarketMonitor {
     private final SessionAlertPlanner alertPlanner;
     private final InstrumentRepository instrumentRepository;
     private final LiveCandleRepository liveCandleRepository;
+    private final MarketEventRepository marketEventRepository;
     private final TradingDayRepository tradingDayRepository;
     private final TradingCalendar calendar;
     private final SessionReconciler reconciler;
@@ -96,6 +98,7 @@ public final class MarketMonitor {
                          SessionAlertPlanner alertPlanner,
                          InstrumentRepository instrumentRepository,
                          LiveCandleRepository liveCandleRepository,
+                         MarketEventRepository marketEventRepository,
                          TradingDayRepository tradingDayRepository,
                          TradingCalendar calendar,
                          SessionReconciler reconciler,
@@ -114,6 +117,7 @@ public final class MarketMonitor {
         this.alertPlanner = alertPlanner;
         this.instrumentRepository = instrumentRepository;
         this.liveCandleRepository = liveCandleRepository;
+        this.marketEventRepository = marketEventRepository;
         this.tradingDayRepository = tradingDayRepository;
         this.calendar = calendar;
         this.reconciler = reconciler;
@@ -218,6 +222,7 @@ public final class MarketMonitor {
             TradingSession session = new TradingSession(symbol, settings.exchange(), settings.segment(),
                     sessionDate, settings.intervalMinutes(), completed);
             events = eventDetector.detect(session, context);
+            persistEvents(symbol, events);
             fireEventAlerts(sessionDate, symbol, events, now);
 
             List<FeatureVector> features = featureExtractor.extract(session, context, events);
@@ -240,6 +245,28 @@ public final class MarketMonitor {
         return new LiveSymbolState(symbol, state.allCandles(), state.lastCandleProvisional(now), state.lastPrice(),
                 dayChangePct, volumeRatio(state.allCandles()), topSoFar, events, latest,
                 projectedReturnPct(latest, completed), state.watermark());
+    }
+
+    /**
+     * Stores what was detected. Events are not just alert fodder: they are the
+     * reasons a trade gets attributed to, model features, and the record of what
+     * happened that day. Detecting them and only shouting about them leaves
+     * every trade UNEXPLAINED afterwards.
+     *
+     * <p>The repository ignores duplicates, so re-detecting the same event on
+     * each tick costs nothing.
+     */
+    private void persistEvents(String symbol, List<MarketEvent> events) {
+        if (events.isEmpty()) {
+            return;
+        }
+        try {
+            long instrumentId = instrumentRepository.findOrCreate(symbol, settings.exchange(),
+                    settings.segment());
+            marketEventRepository.saveAll(instrumentId, events, eventDetector.version());
+        } catch (RuntimeException e) {
+            log.warn("Could not store events for {}: {}", symbol, e.getMessage());
+        }
     }
 
     /**

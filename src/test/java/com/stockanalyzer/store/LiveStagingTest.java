@@ -131,4 +131,39 @@ class LiveStagingTest {
         assertEquals(0, queryInt("SELECT COUNT(*) FROM candle"));
         assertEquals(0, queryInt("SELECT COUNT(*) FROM v_intraday_candles"));
     }
+
+    @Test
+    @DisplayName("VWAP is the running volume-weighted average within the session")
+    void vwapIsVolumeWeightedAndCumulative() {
+        // typical price = (high + low + close) / 3, and the helper builds
+        // high = close + 1, low = close - 1, so typical == close.
+        live.upsertAll(instrumentId, SESSION, 1,
+                List.of(weighted(0, 100, 10), weighted(1, 200, 30)), 0);
+
+        // First minute: 100 at weight 10 -> 100.
+        assertEquals(100.0, Double.parseDouble(queryText(
+                "SELECT vwap FROM v_intraday_merged WHERE ts_epoch = " + OPEN)), 0.001);
+        // Second: (100*10 + 200*30) / 40 = 175, not the 150 a plain mean gives.
+        assertEquals(175.0, Double.parseDouble(queryText(
+                "SELECT vwap FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 60))), 0.001);
+    }
+
+    @Test
+    @DisplayName("VWAP restarts each session rather than carrying yesterday's volume in")
+    void vwapResetsEachSession() {
+        LocalDate previous = SESSION.minusDays(1);
+        long previousOpen = OPEN - 86400;
+
+        live.upsertAll(instrumentId, previous, 1,
+                List.of(new Candle(previousOpen, 500, 501, 499, 500, 1_000_000)), 0);
+        live.upsertAll(instrumentId, SESSION, 1, List.of(weighted(0, 100, 10)), 0);
+
+        assertEquals(100.0, Double.parseDouble(queryText(
+                "SELECT vwap FROM v_intraday_merged WHERE ts_epoch = " + OPEN)), 0.001,
+                "a million shares traded at 500 yesterday must not move today's first minute");
+    }
+
+    private static Candle weighted(int minute, double close, long volume) {
+        return new Candle(OPEN + minute * 60L, close, close + 1, close - 1, close, volume);
+    }
 }
