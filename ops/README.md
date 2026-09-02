@@ -98,7 +98,15 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 - **Check the daemon is alive:** `java -cp target/stock-analyzer.jar
   com.stockanalyzer.MarketDayDaemon status` prints the last heartbeat and warns
   when it is more than ten minutes old.
-- Logs are in `logs/`: `market-day-YYYY-MM-DD.log` plus per-job stdout/stderr.
+- **Where the logs are.** The daemon writes two streams and they are kept
+  apart: `logs/market-day-YYYY-MM-DD.log` is the live view, reprinted each tick,
+  and `logs/market-day-YYYY-MM-DD.err.log` is the record of what happened —
+  alerts fired, events detected, failures. The batch jobs write their own
+  timestamped output; launchd's `logs/*.out.log` files are truncated on every
+  run and only ever show the latest.
+- Starting the daemon by hand with your own redirect puts everything in
+  whichever file you named, not the dated ones. Prefer `ops/bin/market-day.sh`,
+  which is also what launchd runs.
 
 ## Do not run a backfill during market hours
 

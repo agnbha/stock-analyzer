@@ -26,7 +26,10 @@ public final class TerminalLiveView implements LiveView {
 
     public TerminalLiveView(MarketClock clock, boolean ansi) {
         this.clock = clock;
-        this.ansi = ansi;
+        // Redirected to a file there is no screen to clear, and the escape codes
+        // turn a log into something you have to decode. A file gets an
+        // append-only record; a terminal gets the live redraw.
+        this.ansi = ansi && System.console() != null;
     }
 
     @Override
@@ -34,6 +37,10 @@ public final class TerminalLiveView implements LiveView {
         StringBuilder out = new StringBuilder();
         if (ansi) {
             out.append(CLEAR_SCREEN);
+        } else {
+            // No redraw, so each frame needs its own separator to be findable.
+            out.append(System.lineSeparator()).append("-".repeat(104))
+               .append(System.lineSeparator());
         }
         String freshness = snapshot.degraded()
                 ? "DELAYED (" + snapshot.degradedReason() + ")"

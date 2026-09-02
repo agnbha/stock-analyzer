@@ -11,5 +11,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 LOG_FILE="$LOG_DIR/market-day-$(date '+%F').log"
 
-log "starting MarketDayDaemon (logging to $LOG_FILE)"
-exec java -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@" >>"$LOG_FILE" 2>&1
+# The live view goes to stdout and the log lines to stderr, so they are worth
+# separating: one is a dashboard reprinted every tick, the other is the record
+# of what happened.
+log "starting MarketDayDaemon (view -> $LOG_FILE, log -> ${LOG_FILE%.log}.err.log)"
+exec java -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@" \
+    >>"$LOG_FILE" 2>>"${LOG_FILE%.log}.err.log"
