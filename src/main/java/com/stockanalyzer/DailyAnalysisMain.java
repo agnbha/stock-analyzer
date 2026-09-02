@@ -1,6 +1,8 @@
 package com.stockanalyzer;
 
+import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.config.AppConfig;
+import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.intraday.IngestionReport;
 import com.stockanalyzer.model.HotWindow;
 import com.stockanalyzer.report.DailyOpportunityReporter;
@@ -11,6 +13,7 @@ import com.stockanalyzer.util.Args;
 
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -29,6 +32,7 @@ import java.util.Locale;
  *   hot-windows [--lookback N]       recompute the time-of-day prior
  *   evaluate [--date D]              score yesterday's predictions against what happened
  *   consolidate [--date D]           re-fetch the session authoritatively and clear its staging
+ *   week52 [--days 365]              refresh the 52-week high/low from daily candles
  * </pre>
  */
 public final class DailyAnalysisMain {
@@ -47,10 +51,11 @@ public final class DailyAnalysisMain {
                 case "hot-windows" -> hotWindows(context, parsed);
                 case "evaluate" -> evaluate(context, parsed);
                 case "consolidate" -> consolidate(context, parsed);
+                case "week52" -> week52(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
                     System.err.println("Try: daily | backfill | recompute | report | export "
-                            + "| hot-windows | evaluate | consolidate");
+                            + "| hot-windows | evaluate | consolidate | week52");
                     System.exit(2);
                 }
             }
@@ -179,6 +184,47 @@ public final class DailyAnalysisMain {
                 sessionDate, report.sessionsWritten(), cleared, staged);
         report.failures().forEach(f -> System.out.printf("  %-12s %s%n", f.symbol(), f.error()));
         exitNonZeroOnTotalFailure(report);
+    }
+
+    /**
+     * Refreshes the 52-week range from daily-interval candles.
+     *
+     * <p>One request per symbol, so it is cheap enough to run weekly. It is
+     * separate from the intraday ingestion because the two work at different
+     * resolutions over different horizons.
+     */
+    private static void week52(AppContext context, Args args) {
+        int days = args.integer("days", 365);
+        AppConfig config = context.config();
+        CandleDataClient client = context.wideRangeCandleDataClient();
+        LocalDateTime end = LocalDateTime.now(context.clock().zone());
+        LocalDateTime start = end.minusDays(days);
+
+        int updated = 0;
+        int failed = 0;
+        for (String symbol : config.stockSymbols()) {
+            try {
+                List<Candle> candles = client.fetchCandles(symbol, config.exchange(), config.segment(),
+                        start, end, 1440).candles();
+                if (candles.isEmpty()) {
+                    failed++;
+                    continue;
+                }
+                double high = candles.stream().mapToDouble(Candle::high).max().orElseThrow();
+                double low = candles.stream().mapToDouble(Candle::low).min().orElseThrow();
+                long instrumentId = context.instrumentRepository()
+                        .findOrCreate(symbol, config.exchange(), config.segment());
+                context.week52Repository().upsert(instrumentId, high, low, candles.size(),
+                        context.clock().sessionDateOf(candles.getFirst().epochSeconds()),
+                        context.clock().sessionDateOf(candles.getLast().epochSeconds()));
+                updated++;
+            } catch (RuntimeException e) {
+                System.err.printf("  %-12s %s%n", symbol, e.getMessage());
+                failed++;
+            }
+        }
+        System.out.printf("52-week range refreshed for %d symbols over %d days (%d failed)%n",
+                updated, days, failed);
     }
 
     private static void evaluate(AppContext context, Args args) {

@@ -1,0 +1,679 @@
+{
+  "uid": "stockanalyzer-watchlist",
+  "title": "Watchlist",
+  "description": "Which names look strongest, which are sitting at the bottom of their range, and which are too thinly traded to size into.",
+  "tags": [
+    "stock-analyzer",
+    "screening"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-3M",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Market breadth today",
+      "description": "Share of the tracked universe that closed up. Context for everything below: a strong name in a weak market is a different proposition.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(advancing_pct,1) AS \"Advancing\" FROM v_market_breadth ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT ROUND(advancing_pct,1) AS \"Advancing\" FROM v_market_breadth ORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 40
+              },
+              {
+                "color": "green",
+                "value": 55
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Stocks reading bullish",
+      "description": "Close and the 5-day average both above the 20-day average.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS \"Bullish\" FROM v_bullish_ranking WHERE trend_score = 2",
+          "queryText": "SELECT COUNT(*) AS \"Bullish\" FROM v_bullish_ranking WHERE trend_score = 2",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Stocks in the bottom decile of their 52-week range",
+      "description": "How many sit in the lowest tenth of their range over the past year.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS \"Bottom decile\" FROM v_range_context WHERE pct_of_52w_range <= 10",
+          "queryText": "SELECT COUNT(*) AS \"Bottom decile\" FROM v_range_context WHERE pct_of_52w_range <= 10",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "The 5 strongest setups right now",
+      "description": "Ranked by: distance above the 20-day average (%) + the 5-day return (%) + (RSI-50)/10, less a penalty above RSI 75. This describes momentum that already exists - a ranking of current strength, not a forecast. Nothing here knows anything about tomorrow.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT b.symbol                       AS \"Symbol\",\n       ROUND(b.bullish_score, 2)            AS \"Score\",\n       b.session_date                       AS \"As of\",\n       b.open                               AS \"Open\",\n       b.high                               AS \"High\",\n       b.low                                AS \"Low\",\n       b.close                              AS \"Close\",\n       ROUND(b.pct_above_sma20, 2)          AS \"vs SMA20 %\",\n       ROUND(b.ret5, 2)                     AS \"5-day %\",\n       ROUND(b.rsi14, 1)                    AS \"RSI(14)\",\n       w.week52_high                        AS \"52w high\",\n       w.week52_low                         AS \"52w low\",\n       r.high_10                            AS \"10d high\",\n       r.low_10                             AS \"10d low\",\n       ROUND(r.pct_of_10d_range, 1)         AS \"% of 10d range\"\nFROM v_bullish_ranking b\nJOIN instrument i ON i.symbol = b.symbol\nLEFT JOIN symbol_week52 w ON w.instrument_id = i.id\nLEFT JOIN (SELECT symbol, high_10, low_10, pct_of_10d_range,\n                  ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn\n           FROM v_range_position) r ON r.symbol = b.symbol AND r.rn = 1\nORDER BY b.bullish_score DESC\nLIMIT 5",
+          "queryText": "SELECT b.symbol                       AS \"Symbol\",\n       ROUND(b.bullish_score, 2)            AS \"Score\",\n       b.session_date                       AS \"As of\",\n       b.open                               AS \"Open\",\n       b.high                               AS \"High\",\n       b.low                                AS \"Low\",\n       b.close                              AS \"Close\",\n       ROUND(b.pct_above_sma20, 2)          AS \"vs SMA20 %\",\n       ROUND(b.ret5, 2)                     AS \"5-day %\",\n       ROUND(b.rsi14, 1)                    AS \"RSI(14)\",\n       w.week52_high                        AS \"52w high\",\n       w.week52_low                         AS \"52w low\",\n       r.high_10                            AS \"10d high\",\n       r.low_10                             AS \"10d low\",\n       ROUND(r.pct_of_10d_range, 1)         AS \"% of 10d range\"\nFROM v_bullish_ranking b\nJOIN instrument i ON i.symbol = b.symbol\nLEFT JOIN symbol_week52 w ON w.instrument_id = i.id\nLEFT JOIN (SELECT symbol, high_10, low_10, pct_of_10d_range,\n                  ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn\n           FROM v_range_position) r ON r.symbol = b.symbol AND r.rn = 1\nORDER BY b.bullish_score DESC\nLIMIT 5",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs SMA20 %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5-day %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of 10d range"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Open"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52w high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52w low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10d high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10d low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Bottom 10% of the 52-week range (or as far back as data goes)",
+      "description": "Where price sits between the 52-week low and high. The 10-day figure is kept alongside, because they answer different questions: ten sessions says where a stock sits this fortnight, a year says whether it is genuinely near a low. 'Sessions behind it' is how many daily candles back the range - anything well short of ~248 is not really a year. Near a low is not the same as cheap; a name can sit there while it keeps falling.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 15,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol                        AS \"Symbol\",\n       close                              AS \"Close\",\n       week52_low                         AS \"52w low\",\n       week52_high                        AS \"52w high\",\n       ROUND(pct_of_52w_range, 1)         AS \"% of 52w range\",\n       ROUND(pct_of_10d_range, 1)         AS \"% of 10d range\",\n       low_10                             AS \"10d low\",\n       high_10                            AS \"10d high\",\n       week52_sessions                    AS \"Sessions behind it\"\nFROM v_range_context\nWHERE pct_of_52w_range <= 10\nORDER BY pct_of_52w_range",
+          "queryText": "SELECT symbol                        AS \"Symbol\",\n       close                              AS \"Close\",\n       week52_low                         AS \"52w low\",\n       week52_high                        AS \"52w high\",\n       ROUND(pct_of_52w_range, 1)         AS \"% of 52w range\",\n       ROUND(pct_of_10d_range, 1)         AS \"% of 10d range\",\n       low_10                             AS \"10d low\",\n       high_10                            AS \"10d high\",\n       week52_sessions                    AS \"Sessions behind it\"\nFROM v_range_context\nWHERE pct_of_52w_range <= 10\nORDER BY pct_of_52w_range",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of 52w range"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of 10d range"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sessions behind it"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "orange",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 200
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52w low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52w high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10d low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10d high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Bottom decile by value actually traded (10-day average)",
+      "description": "The other reading of \"bottom 10 percentile of market value\": the least liquid names, by rupees changing hands per day rather than by price position. Worth knowing before sizing a position in one of them. This one stays on a 10-day window on purpose: liquidity is about what is trading now, not what traded last winter.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 15,
+        "y": 12,
+        "w": 9,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH latest AS (\n  SELECT symbol, close, avg_daily_turnover_10,\n         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn\n  FROM v_range_position),\ncurrent AS (SELECT * FROM latest WHERE rn = 1),\ncutoff AS (SELECT avg_daily_turnover_10 AS threshold FROM current\n           ORDER BY avg_daily_turnover_10\n           LIMIT 1 OFFSET (SELECT CAST(COUNT(*) * 0.1 AS INTEGER) FROM current))\nSELECT c.symbol                        AS \"Symbol\",\n       c.close                         AS \"Close\",\n       ROUND(c.avg_daily_turnover_10)  AS \"Avg daily value traded (10d)\"\nFROM current c, cutoff\nWHERE c.avg_daily_turnover_10 <= cutoff.threshold\nORDER BY c.avg_daily_turnover_10",
+          "queryText": "WITH latest AS (\n  SELECT symbol, close, avg_daily_turnover_10,\n         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn\n  FROM v_range_position),\ncurrent AS (SELECT * FROM latest WHERE rn = 1),\ncutoff AS (SELECT avg_daily_turnover_10 AS threshold FROM current\n           ORDER BY avg_daily_turnover_10\n           LIMIT 1 OFFSET (SELECT CAST(COUNT(*) * 0.1 AS INTEGER) FROM current))\nSELECT c.symbol                        AS \"Symbol\",\n       c.close                         AS \"Close\",\n       ROUND(c.avg_daily_turnover_10)  AS \"Avg daily value traded (10d)\"\nFROM current c, cutoff\nWHERE c.avg_daily_turnover_10 <= cutoff.threshold\nORDER BY c.avg_daily_turnover_10",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg daily value traded (10d)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

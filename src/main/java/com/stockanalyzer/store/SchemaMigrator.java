@@ -75,6 +75,8 @@ public final class SchemaMigrator {
         all.put(7, v7());
         all.put(8, v8());
         all.put(9, v9());
+        all.put(10, v10());
+        all.put(11, v11());
         return all;
     }
 
@@ -707,6 +709,132 @@ public final class SchemaMigrator {
                 WINDOW w AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
                              ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)""");
         return ddl;
+    }
+
+
+
+    /**
+     * v10: the screening views, and somewhere to keep a real 52-week range.
+     *
+     * <p>The 52-week high and low deliberately live in their own table rather
+     * than in {@code trading_day}. They come from daily-interval candles over a
+     * year, and {@code trading_day} is keyed by interval - mixing a second
+     * interval in would silently double every daily view, none of which filter
+     * on it.
+     */
+    private List<String> v10() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE symbol_week52 (
+                  instrument_id INTEGER PRIMARY KEY REFERENCES instrument(id),
+                  week52_high REAL,
+                  week52_low  REAL,
+                  sessions    INTEGER NOT NULL,
+                  from_date   TEXT,
+                  to_date     TEXT,
+                  computed_at INTEGER NOT NULL
+                )""");
+
+        // Where price sits inside its own recent range, and how much value
+        // actually changed hands. Only rows with a full ten-session window.
+        ddl.add("""
+                CREATE VIEW v_range_position AS
+                SELECT symbol, session_date, ts_epoch, close,
+                       high_10, low_10, turnover_10, avg_daily_turnover_10,
+                       CASE WHEN high_10 > low_10
+                            THEN (close - low_10) / (high_10 - low_10) * 100.0
+                            ELSE NULL END AS pct_of_10d_range
+                FROM (
+                  SELECT i.symbol AS symbol, t.session_date AS session_date,
+                         t.first_candle_ts AS ts_epoch, t.close AS close,
+                         MAX(t.high) OVER w10            AS high_10,
+                         MIN(t.low)  OVER w10            AS low_10,
+                         SUM(t.close * t.volume) OVER w10 AS turnover_10,
+                         AVG(t.close * t.volume) OVER w10 AS avg_daily_turnover_10,
+                         COUNT(*) OVER w10               AS window_size
+                  FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                  WINDOW w10 AS (PARTITION BY i.symbol ORDER BY t.session_date
+                                 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)
+                )
+                WHERE window_size = 10""");
+
+        /*
+         * A ranking of how strong a stock's current setup looks, on the most
+         * recent session. Every term is in percentage-ish units so they add
+         * meaningfully:
+         *
+         *   distance above the 20-day average, in percent
+         * + the last five sessions' return, in percent
+         * + (RSI - 50) / 10, so RSI 70 contributes +2 and RSI 30 contributes -2
+         * - an overbought penalty above RSI 75
+         *
+         * This describes momentum that already exists. It is not a forecast,
+         * and nothing here knows anything about tomorrow.
+         */
+        ddl.add("""
+                CREATE VIEW v_bullish_ranking AS
+                SELECT symbol, session_date, ts_epoch, open, high, low, close, volume,
+                       sma20, sma50, rsi14, trend_score, ret5, pct_above_sma20,
+                       ROUND(pct_above_sma20 + ret5
+                             + CASE WHEN rsi14 IS NULL THEN 0 ELSE (rsi14 - 50) / 10.0 END
+                             - CASE WHEN rsi14 > 75 THEN (rsi14 - 75) / 5.0 ELSE 0 END, 3)
+                       AS bullish_score
+                FROM (
+                  SELECT t.*,
+                         CASE WHEN t.sma20 IS NULL OR t.sma20 = 0 THEN NULL
+                              ELSE (t.close - t.sma20) / t.sma20 * 100.0 END AS pct_above_sma20,
+                         CASE WHEN LAG(t.close, 5) OVER p IS NULL THEN NULL
+                              ELSE (t.close - LAG(t.close, 5) OVER p)
+                                   / LAG(t.close, 5) OVER p * 100.0 END      AS ret5,
+                         ROW_NUMBER() OVER (PARTITION BY t.symbol
+                                            ORDER BY t.session_date DESC)    AS recency
+                  FROM v_symbol_trend t
+                  WINDOW p AS (PARTITION BY t.symbol ORDER BY t.session_date)
+                )
+                WHERE recency = 1""");
+        return ddl;
+    }
+
+
+
+    /**
+     * v11: one row per symbol placing today's close in every range that matters.
+     *
+     * <p>Ten sessions says where a stock sits this fortnight; a year says
+     * whether it is actually near a low. They answer different questions, so
+     * both are carried side by side.
+     *
+     * <p>{@code week52_sessions} is exposed rather than hidden: a symbol with
+     * only a few months of daily history has a "52-week" low that is really a
+     * few-months low, and a screen should say so instead of implying a year.
+     */
+    private List<String> v11() {
+        return List.of("""
+                CREATE VIEW v_range_context AS
+                WITH latest_close AS (
+                  SELECT symbol, session_date, ts_epoch, close,
+                         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn
+                  FROM v_symbol_trend),
+                latest_range AS (
+                  SELECT symbol, high_10, low_10, pct_of_10d_range, avg_daily_turnover_10,
+                         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY session_date DESC) AS rn
+                  FROM v_range_position)
+                SELECT c.symbol                          AS symbol,
+                       c.session_date                    AS session_date,
+                       c.ts_epoch                        AS ts_epoch,
+                       c.close                           AS close,
+                       r.high_10, r.low_10, r.pct_of_10d_range, r.avg_daily_turnover_10,
+                       w.week52_high, w.week52_low,
+                       w.sessions                        AS week52_sessions,
+                       CASE WHEN w.week52_high > w.week52_low
+                            THEN (c.close - w.week52_low)
+                                 / (w.week52_high - w.week52_low) * 100.0
+                            ELSE NULL END                AS pct_of_52w_range
+                FROM latest_close c
+                LEFT JOIN latest_range r ON r.symbol = c.symbol AND r.rn = 1
+                LEFT JOIN instrument i   ON i.symbol = c.symbol
+                LEFT JOIN symbol_week52 w ON w.instrument_id = i.id
+                WHERE c.rn = 1""");
     }
 
 

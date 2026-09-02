@@ -55,6 +55,7 @@ import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.store.SchemaMigrator;
 import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
+import com.stockanalyzer.store.Week52Repository;
 import com.stockanalyzer.store.jdbc.SqliteAlertRepository;
 import com.stockanalyzer.store.jdbc.SqliteAccountBalanceRepository;
 import com.stockanalyzer.store.jdbc.SqliteAttributionRepository;
@@ -73,6 +74,7 @@ import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradingDayRepository;
+import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
 import com.stockanalyzer.store.AttributionRepository;
 import com.stockanalyzer.store.TradeReasonRepository;
@@ -121,6 +123,7 @@ public final class AppContext implements AutoCloseable {
     private final GainOpportunityRepository gainOpportunityRepository;
     private final CandleRepository candleRepository;
     private final LiveCandleRepository liveCandleRepository;
+    private final Week52Repository week52Repository;
     private final CalendarRepository calendarRepository;
     private final IngestionRunRepository ingestionRunRepository;
     private final HotWindowRepository hotWindowRepository;
@@ -163,6 +166,7 @@ public final class AppContext implements AutoCloseable {
         this.gainOpportunityRepository = new SqliteGainOpportunityRepository(database);
         this.candleRepository = new SqliteCandleRepository(database);
         this.liveCandleRepository = new SqliteLiveCandleRepository(database);
+        this.week52Repository = new SqliteWeek52Repository(database);
         this.calendarRepository = new SqliteCalendarRepository(database);
         this.ingestionRunRepository = new SqliteIngestionRunRepository(database);
         this.hotWindowRepository = new SqliteHotWindowRepository(database);
@@ -343,6 +347,20 @@ public final class AppContext implements AutoCloseable {
 
     public TradeJournalService tradeJournalService() {
         return tradeJournalService;
+    }
+
+    public Week52Repository week52Repository() {
+        return week52Repository;
+    }
+
+    /**
+     * For daily-interval history, where a year is one request. The ordinary
+     * client chunks at five days, which suits one-minute candles and would turn
+     * a year of daily bars into seventy-odd needless calls.
+     */
+    public CandleDataClient wideRangeCandleDataClient() {
+        return CandleDataClients.rateLimited(httpClient, authenticator.get(), config.growwBaseUrl(),
+                rateLimiter, config.ingestMaxRetries(), config.ingestRetryBackoffMillis(), 400);
     }
 
     public LiveCandleRepository liveCandleRepository() {
