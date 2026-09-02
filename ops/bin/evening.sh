@@ -20,9 +20,10 @@ MONTH="${SESSION_DATE:0:7}"
 
 log "evening batch for $SESSION_DATE"
 
-# The monitor stages each tick so the dashboards can follow the session live.
-# Those rows may be provisional, so the day is re-fetched authoritatively here
-# and the staging it supersedes is dropped. Safe whether or not the monitor ran.
+# Usually a no-op: the daemon consolidates and clears its own staging when it
+# shuts down at the close. This is the safety net for the days it did not run -
+# machine asleep, a crash, or a SIGKILL that skipped its shutdown - and costs
+# nothing when there is nothing to do.
 run_step "consolidate live session" com.stockanalyzer.DailyAnalysisMain consolidate \
     --date "$SESSION_DATE"
 run_step "ingest session" com.stockanalyzer.DailyAnalysisMain daily --date "$SESSION_DATE"

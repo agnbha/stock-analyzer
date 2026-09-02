@@ -77,6 +77,7 @@ public final class SchemaMigrator {
         all.put(9, v9());
         all.put(10, v10());
         all.put(11, v11());
+        all.put(12, v12());
         return all;
     }
 
@@ -835,6 +836,61 @@ public final class SchemaMigrator {
                 LEFT JOIN instrument i   ON i.symbol = c.symbol
                 LEFT JOIN symbol_week52 w ON w.instrument_id = i.id
                 WHERE c.rn = 1""");
+    }
+
+
+
+    /**
+     * v12: stage the windows found so far, the way candles already are.
+     *
+     * <p>{@code gain_opportunity} is only ever written by ingestion, so a
+     * session ingested at 09:40 kept a top-3 covering 25 minutes for the rest of
+     * the day while the chart beneath it ran on live. The monitor was already
+     * recomputing the windows every tick for its own display and throwing the
+     * result away.
+     *
+     * <p>Unlike candles, staged windows <em>win</em> over the stored ones while
+     * they exist. For a candle the canonical tape is authoritative for the
+     * minutes it covers; for a window the staged version simply covers more of
+     * the session, and a top-3 over 25 minutes is not a better answer than one
+     * over five hours. Consolidation clears staging, after which the stored
+     * rows are the whole day and win by default.
+     */
+    private List<String> v12() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE live_opportunity (
+                  instrument_id    INTEGER NOT NULL REFERENCES instrument(id),
+                  session_date     TEXT NOT NULL,
+                  detector_version TEXT NOT NULL,
+                  rank             INTEGER NOT NULL,
+                  entry_ts INTEGER NOT NULL, exit_ts INTEGER NOT NULL,
+                  entry_price REAL NOT NULL, exit_price REAL NOT NULL,
+                  gain_pct REAL NOT NULL, duration_minutes INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL,
+                  PRIMARY KEY (instrument_id, session_date, detector_version, rank)
+                ) WITHOUT ROWID""");
+        ddl.add("DROP VIEW IF EXISTS v_opportunity_markers");
+        ddl.add("""
+                CREATE VIEW v_opportunity_markers AS
+                SELECT i.symbol AS symbol, l.session_date, l.detector_version, l.rank,
+                       l.entry_ts, l.exit_ts, l.entry_price, l.exit_price,
+                       l.gain_pct, l.duration_minutes, 'live' AS source
+                FROM live_opportunity l
+                JOIN instrument i ON i.id = l.instrument_id
+                UNION ALL
+                SELECT i.symbol, t.session_date, o.detector_version, o.rank,
+                       o.entry_ts, o.exit_ts, o.entry_price, o.exit_price,
+                       o.gain_pct, o.duration_minutes, 'final' AS source
+                FROM gain_opportunity o
+                JOIN trading_day t ON t.id = o.trading_day_id
+                JOIN instrument i  ON i.id = t.instrument_id
+                WHERE NOT EXISTS (
+                      SELECT 1 FROM live_opportunity l
+                      WHERE l.instrument_id = t.instrument_id
+                        AND l.session_date = t.session_date
+                        AND l.detector_version = o.detector_version)""");
+        return ddl;
     }
 
 

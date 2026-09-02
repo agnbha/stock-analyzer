@@ -10,7 +10,7 @@ shift the hours in the plists to match a 09:15–15:30 session.
 |---|---|---|---|
 | **08:58** Mon–Fri | `market-day.sh` | `MarketDayDaemon` | Plans the day's alerts before the 09:00 pre-open alert is due. Exits on its own after the close — this is a daily launch, not a service to keep alive. |
 | 09:15–15:30 | — | the daemon ticks every 150s | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → fire alerts → redraw. |
-| ~15:32 | — | the daemon reconciles and exits | Re-fetches the authoritative tape and writes the canonical rows through the same Part 1 path the nightly job uses. |
+| ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
 | **18:30** Mon–Fri | `evening.sh` | ingest → evaluate → import fills → capture → day P&L | Fills have settled by evening. |
 | **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, week P&L | The prior has to be current before Monday's open, because the daemon reads it when planning alerts. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
@@ -19,6 +19,9 @@ shift the hours in the plists to match a 09:15–15:30 session.
 
 It is dependency-driven, not arbitrary:
 
+0. **`consolidate`** is normally a no-op — the daemon already did it at the
+   close. It exists for the days the daemon did not run, and for a SIGKILL that
+   skipped its shutdown.
 1. **`daily`** writes `trading_day` and the top-3 windows.
 2. **`evaluate`** scores yesterday's predictions against the now-complete tape,
    so it needs step 1 to have finished.
@@ -30,10 +33,16 @@ It is dependency-driven, not arbitrary:
    nothing to compare against.
 5. **`pnl`** prints the day.
 
-If the daemon already reconciled the session at 15:32, step 1 finds nothing
-missing and does nothing. If the daemon never ran, step 1 is what saves the day.
-Either way you end up with the same rows, which is the point of routing both
-paths through one ingestion service.
+If the daemon already reconciled at 15:32, steps 0 and 1 find nothing to do.
+If it never ran, they are what save the day. Either way you end up with the same
+rows, which is the point of routing both paths through one ingestion service.
+
+**So is the evening job still needed?** Yes, for two reasons that have nothing
+to do with candles. The daemon cannot cover a day it did not run, and steps 3 to
+5 - importing fills, attributing reasons, capture, P&L - are journal work that
+is independent of whether the market-hours process was up. Everything is
+idempotent, so on a normal day the evening run simply skips the analysis steps
+and does the bookkeeping.
 
 One knock-on worth knowing: the live view's DAY% comes from the *previous*
 session's stored close. Skip the evening job and tomorrow's monitor shows `-`

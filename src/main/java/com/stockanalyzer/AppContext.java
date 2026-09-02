@@ -48,6 +48,7 @@ import com.stockanalyzer.store.HotWindowRepository;
 import com.stockanalyzer.store.IngestionRunRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.LiveCandleRepository;
+import com.stockanalyzer.store.LiveOpportunityRepository;
 import com.stockanalyzer.store.MarketEventRepository;
 import com.stockanalyzer.store.PnlPeriodRepository;
 import com.stockanalyzer.store.PredictionRepository;
@@ -68,6 +69,7 @@ import com.stockanalyzer.store.jdbc.SqliteHotWindowRepository;
 import com.stockanalyzer.store.jdbc.SqliteIngestionRunRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository;
+import com.stockanalyzer.store.jdbc.SqliteLiveOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteMarketEventRepository;
 import com.stockanalyzer.store.jdbc.SqlitePnlPeriodRepository;
 import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
@@ -123,6 +125,7 @@ public final class AppContext implements AutoCloseable {
     private final GainOpportunityRepository gainOpportunityRepository;
     private final CandleRepository candleRepository;
     private final LiveCandleRepository liveCandleRepository;
+    private final LiveOpportunityRepository liveOpportunityRepository;
     private final Week52Repository week52Repository;
     private final CalendarRepository calendarRepository;
     private final IngestionRunRepository ingestionRunRepository;
@@ -166,6 +169,7 @@ public final class AppContext implements AutoCloseable {
         this.gainOpportunityRepository = new SqliteGainOpportunityRepository(database);
         this.candleRepository = new SqliteCandleRepository(database);
         this.liveCandleRepository = new SqliteLiveCandleRepository(database);
+        this.liveOpportunityRepository = new SqliteLiveOpportunityRepository(database);
         this.week52Repository = new SqliteWeek52Repository(database);
         this.calendarRepository = new SqliteCalendarRepository(database);
         this.ingestionRunRepository = new SqliteIngestionRunRepository(database);
@@ -361,6 +365,10 @@ public final class AppContext implements AutoCloseable {
     public CandleDataClient wideRangeCandleDataClient() {
         return CandleDataClients.rateLimited(httpClient, authenticator.get(), config.growwBaseUrl(),
                 rateLimiter, config.ingestMaxRetries(), config.ingestRetryBackoffMillis(), 400);
+    }
+
+    public LiveOpportunityRepository liveOpportunityRepository() {
+        return liveOpportunityRepository;
     }
 
     public LiveCandleRepository liveCandleRepository() {

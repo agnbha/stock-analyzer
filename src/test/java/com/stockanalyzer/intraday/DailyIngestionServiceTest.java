@@ -149,6 +149,48 @@ class DailyIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("the daemon clears its own staging once it has reconciled")
+    void reconciliationClearsStaging() {
+        PartialThenFullClient client = new PartialThenFullClient();
+        DailyIngestionService service = service(client);
+        var liveCandles = new com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository(database);
+        var liveWindows = new com.stockanalyzer.store.jdbc.SqliteLiveOpportunityRepository(database);
+
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        List<Candle> staged = Candles.ofCloses(0, 100, 90, 130, 120);
+        liveCandles.saveAllForTest(instrumentId, DAY, 1, staged);
+        liveWindows.replace(instrumentId, DAY, DETECTOR,
+                List.of(new com.stockanalyzer.model.GainOpportunity(1, Candles.at(1),
+                        Candles.at(2), 90, 130, 44.4, 1)));
+
+        client.marketClosed = true;
+        var reconciler = new com.stockanalyzer.live.SessionReconciler(service, liveCandles, liveWindows);
+        reconciler.reconcile(DAY, List.of("GOOD"), "NSE", "CASH", 1, java.util.Map.of());
+
+        assertEquals(0, liveWindows.countForSession(DAY), "staged windows are gone");
+        assertEquals(0, liveCandles.countForSession(DAY), "staged candles superseded by the tape");
+    }
+
+    @Test
+    @DisplayName("a reconciliation that fetched nothing leaves staging alone")
+    void failedReconciliationKeepsStaging() {
+        DailyIngestionService service = service(new AlwaysFailingClient());
+        var liveCandles = new com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository(database);
+        var liveWindows = new com.stockanalyzer.store.jdbc.SqliteLiveOpportunityRepository(database);
+
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        liveWindows.replace(instrumentId, DAY, DETECTOR,
+                List.of(new com.stockanalyzer.model.GainOpportunity(1, Candles.at(1),
+                        Candles.at(2), 90, 130, 44.4, 1)));
+
+        new com.stockanalyzer.live.SessionReconciler(service, liveCandles, liveWindows)
+                .reconcile(DAY, List.of("GOOD"), "NSE", "CASH", 1, java.util.Map.of());
+
+        assertEquals(1, liveWindows.countForSession(DAY),
+                "the live view covers more than the stored one; do not throw it away");
+    }
+
+    @Test
     @DisplayName("a day with no data for any symbol is recorded as non-trading")
     void infersHolidays() {
         // GOOD returns data for DAY only; the planner also wants the day before.

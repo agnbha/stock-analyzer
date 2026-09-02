@@ -27,6 +27,7 @@ import com.stockanalyzer.store.AlertRepository;
 import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.LiveCandleRepository;
+import com.stockanalyzer.store.LiveOpportunityRepository;
 import com.stockanalyzer.store.MarketEventRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.util.MarketClock;
@@ -72,6 +73,7 @@ public final class MarketMonitor {
     private final SessionAlertPlanner alertPlanner;
     private final InstrumentRepository instrumentRepository;
     private final LiveCandleRepository liveCandleRepository;
+    private final LiveOpportunityRepository liveOpportunityRepository;
     private final MarketEventRepository marketEventRepository;
     private final TradingDayRepository tradingDayRepository;
     private final TradingCalendar calendar;
@@ -98,6 +100,7 @@ public final class MarketMonitor {
                          SessionAlertPlanner alertPlanner,
                          InstrumentRepository instrumentRepository,
                          LiveCandleRepository liveCandleRepository,
+                         LiveOpportunityRepository liveOpportunityRepository,
                          MarketEventRepository marketEventRepository,
                          TradingDayRepository tradingDayRepository,
                          TradingCalendar calendar,
@@ -117,6 +120,7 @@ public final class MarketMonitor {
         this.alertPlanner = alertPlanner;
         this.instrumentRepository = instrumentRepository;
         this.liveCandleRepository = liveCandleRepository;
+        this.liveOpportunityRepository = liveOpportunityRepository;
         this.marketEventRepository = marketEventRepository;
         this.tradingDayRepository = tradingDayRepository;
         this.calendar = calendar;
@@ -241,10 +245,31 @@ public final class MarketMonitor {
         }
 
         stage(symbol, sessionDate, state, now);
+        stageOpportunities(symbol, sessionDate, topSoFar);
 
         return new LiveSymbolState(symbol, state.allCandles(), state.lastCandleProvisional(now), state.lastPrice(),
                 dayChangePct, volumeRatio(state.allCandles()), topSoFar, events, latest,
                 projectedReturnPct(latest, completed), state.watermark());
+    }
+
+    /**
+     * Publishes the windows found so far, so the dashboards show a top-3 over
+     * the session as it stands rather than over however much of it happened to
+     * be ingested. Replaced wholesale each tick, because a later minute can
+     * change which windows are best.
+     */
+    private void stageOpportunities(String symbol, LocalDate sessionDate,
+                                    List<GainOpportunity> topSoFar) {
+        if (!settings.persistLiveCandles()) {
+            return;
+        }
+        try {
+            long instrumentId = instrumentRepository.findOrCreate(symbol, settings.exchange(),
+                    settings.segment());
+            liveOpportunityRepository.replace(instrumentId, sessionDate, detector.version(), topSoFar);
+        } catch (RuntimeException e) {
+            log.warn("Could not stage windows for {}: {}", symbol, e.getMessage());
+        }
     }
 
     /**

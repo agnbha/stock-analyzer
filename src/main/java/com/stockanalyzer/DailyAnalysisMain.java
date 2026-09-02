@@ -178,10 +178,11 @@ public final class DailyAnalysisMain {
                 config.exchange(), config.segment(), sessionDate, sessionDate,
                 config.intradayIntervalMinutes(), "consolidate", true);
         int cleared = context.liveCandleRepository().deleteConsolidated();
+        int windowsCleared = context.liveOpportunityRepository().deleteForSession(sessionDate);
 
-        System.out.printf("Consolidated %s: %d sessions written, %d staged rows cleared "
-                        + "(%d were staged)%n",
-                sessionDate, report.sessionsWritten(), cleared, staged);
+        System.out.printf("Consolidated %s: %d sessions written, %d staged candles cleared "
+                        + "(%d were staged), %d staged windows cleared%n",
+                sessionDate, report.sessionsWritten(), cleared, staged, windowsCleared);
         report.failures().forEach(f -> System.out.printf("  %-12s %s%n", f.symbol(), f.error()));
         exitNonZeroOnTotalFailure(report);
     }

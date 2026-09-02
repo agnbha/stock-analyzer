@@ -49,6 +49,12 @@ public final class SqliteLiveCandleRepository implements LiveCandleRepository {
         });
     }
 
+    /** Convenience for tests and tools that stage a session without the monitor. */
+    public void saveAllForTest(long instrumentId, java.time.LocalDate sessionDate,
+                               int intervalMinutes, List<Candle> candles) {
+        upsertAll(instrumentId, sessionDate, intervalMinutes, candles, 0);
+    }
+
     @Override
     public int deleteConsolidated() {
         return database.inTransaction(connection -> {
