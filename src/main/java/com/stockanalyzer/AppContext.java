@@ -58,6 +58,8 @@ import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.store.Week52Repository;
 import com.stockanalyzer.store.jdbc.SqliteAlertRepository;
+import com.stockanalyzer.client.AccountDataClient;
+import com.stockanalyzer.client.GrowwAccountClient;
 import com.stockanalyzer.store.jdbc.SqliteAccountBalanceRepository;
 import com.stockanalyzer.store.jdbc.SqliteAttributionRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeReasonRepository;
@@ -140,6 +142,7 @@ public final class AppContext implements AutoCloseable {
     private final AttributionRepository attributionRepository;
     private final TradeReasonRepository tradeReasonRepository;
     private final AccountBalanceRepository accountBalanceRepository;
+    private final Supplier<AccountDataClient> accountDataClient;
 
     // Built on first use: reading the journal or a stored report must not require
     // API credentials, and constructing the authenticator does.
@@ -196,6 +199,9 @@ public final class AppContext implements AutoCloseable {
         this.candleDataClient = memoize(() -> CandleDataClients.rateLimited(httpClient, authenticator.get(),
                 config.growwBaseUrl(), rateLimiter, config.ingestMaxRetries(),
                 config.ingestRetryBackoffMillis(), config.backfillMaxDaysPerRequest()));
+
+        this.accountDataClient = memoize(() -> new GrowwAccountClient(httpClient, authenticator.get(),
+                config.growwBaseUrl(), config.exchange(), config.segment(), rateLimiter));
 
         this.detector = new TopKNonOverlappingDetector(config.intradayTopN(),
                 PriceBasis.valueOf(config.intradayPriceBasis()), config.intradayMinHoldCandles(),
@@ -283,6 +289,11 @@ public final class AppContext implements AutoCloseable {
 
     public AccountBalanceRepository accountBalanceRepository() {
         return accountBalanceRepository;
+    }
+
+    /** Lazy: authenticating costs a token request, and most commands never ask. */
+    public AccountDataClient accountDataClient() {
+        return accountDataClient.get();
     }
 
     public CaptureAnalyzer captureAnalyzer() {

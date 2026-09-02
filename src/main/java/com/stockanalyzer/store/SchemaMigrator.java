@@ -78,6 +78,7 @@ public final class SchemaMigrator {
         all.put(10, v10());
         all.put(11, v11());
         all.put(12, v12());
+        all.put(13, v13());
         return all;
     }
 
@@ -890,6 +891,103 @@ public final class SchemaMigrator {
                       WHERE l.instrument_id = t.instrument_id
                         AND l.session_date = t.session_date
                         AND l.detector_version = o.detector_version)""");
+        return ddl;
+    }
+
+
+    /**
+     * v13: the balance as the broker reports it, instead of a number typed in
+     * once and carried forward. The old columns keep their meaning - {@code cash}
+     * is still the credit balance, {@code invested} still what is held - and the
+     * new ones record the parts that only a broker can tell you: how much of the
+     * cash is blocked as margin, and what the holdings were marked at.
+     */
+    private List<String> v13() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("ALTER TABLE account_balance ADD COLUMN margin_used REAL");
+        ddl.add("ALTER TABLE account_balance ADD COLUMN available REAL");
+        ddl.add("ALTER TABLE account_balance ADD COLUMN collateral REAL");
+        ddl.add("ALTER TABLE account_balance ADD COLUMN unpriced_holdings INTEGER");
+        ddl.add("ALTER TABLE account_balance ADD COLUMN fetched_at INTEGER");
+
+        // The positions behind `invested`, so the account value can be audited
+        // rather than taken on faith. One row per holding per day.
+        ddl.add("""
+                CREATE TABLE account_holding (
+                  session_date  TEXT NOT NULL,
+                  symbol        TEXT NOT NULL,
+                  isin          TEXT,
+                  quantity      REAL NOT NULL,
+                  average_price REAL NOT NULL,
+                  last_price    REAL,
+                  market_value  REAL NOT NULL,
+                  unrealised    REAL,
+                  recorded_at   INTEGER NOT NULL,
+                  PRIMARY KEY (session_date, symbol)
+                ) WITHOUT ROWID""");
+
+        // What the account is worth, taken from the broker. `total` is cash plus
+        // holdings at market - not a starting balance plus realised P&L, which is
+        // what the equity curve does and why the two can legitimately disagree.
+        ddl.add("""
+                CREATE VIEW v_account_value AS
+                SELECT session_date,
+                       cash                                   AS cash,
+                       COALESCE(margin_used, 0)               AS margin_used,
+                       COALESCE(available, cash)              AS available,
+                       COALESCE(collateral, 0)                AS collateral,
+                       COALESCE(invested, 0)                  AS holdings_value,
+                       COALESCE(total, cash + COALESCE(invested, 0)) AS total,
+                       COALESCE(unpriced_holdings, 0)         AS unpriced_holdings,
+                       source,
+                       fetched_at,
+                       recorded_at
+                FROM account_balance""");
+
+        // The curve the overview draws. Days come from both sides, because a
+        // balance is worth reading on a day with no trades and a trade can land
+        // on a day the balance was never read - keying off either alone drops
+        // rows. `account_value` prefers that day's reading, falls back to the
+        // most recent one, and only reaches for cumulative P&L before the first
+        // reading exists. `basis` names the provenance - 'broker' or 'manual'
+        // for that day's own reading, 'carried' for an older one, 'derived' for
+        // P&L alone - so a mixed line is never mistaken for one claim.
+        ddl.add("""
+                CREATE VIEW v_account_equity AS
+                WITH days AS (
+                  SELECT session_date FROM v_daily_pnl
+                  UNION
+                  SELECT session_date FROM account_balance
+                )
+                SELECT d.session_date AS session_date,
+                       (SELECT SUM(p.net_pnl) FROM v_daily_pnl p
+                         WHERE p.session_date <= d.session_date)   AS realized_net_cumulative,
+                       a.cash                                      AS broker_cash,
+                       a.holdings_value                            AS broker_holdings,
+                       a.total                                     AS broker_total,
+                       COALESCE(a.total,
+                                (SELECT b.total FROM v_account_value b
+                                  WHERE b.session_date <= d.session_date
+                                  ORDER BY b.session_date DESC LIMIT 1),
+                                (SELECT SUM(p.net_pnl) FROM v_daily_pnl p
+                                  WHERE p.session_date <= d.session_date)) AS account_value,
+                       CASE WHEN a.total IS NOT NULL THEN a.source
+                            WHEN EXISTS (SELECT 1 FROM v_account_value b
+                                          WHERE b.session_date <= d.session_date) THEN 'carried'
+                            ELSE 'derived' END                      AS basis
+                FROM days d
+                LEFT JOIN v_account_value a ON a.session_date = d.session_date""");
+
+        // Holdings as of the most recent day they were recorded, biggest first.
+        ddl.add("""
+                CREATE VIEW v_current_holdings AS
+                SELECT h.session_date, h.symbol, h.quantity, h.average_price, h.last_price,
+                       h.market_value, h.unrealised,
+                       CASE WHEN h.last_price IS NULL OR h.average_price <= 0 THEN NULL
+                            ELSE (h.last_price - h.average_price) * 100.0 / h.average_price
+                       END AS unrealised_pct
+                FROM account_holding h
+                WHERE h.session_date = (SELECT MAX(session_date) FROM account_holding)""");
         return ddl;
     }
 

@@ -31,7 +31,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -42,8 +42,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS value\nFROM v_equity_curve ORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS value\nFROM v_equity_curve ORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "SELECT total FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT total FROM v_account_value ORDER BY session_date DESC LIMIT 1",
           "timeColumns": []
         }
       ],
@@ -75,7 +75,124 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Cash plus holdings at market, as the broker reports it. Read every evening; not a starting balance with P&L added on."
+    },
+    {
+      "id": 14,
+      "title": "Free to deploy",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT available FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT available FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "description": "Credit balance minus the margin blocked against open positions."
+    },
+    {
+      "id": 15,
+      "title": "Holdings at market",
+      "type": "stat",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT holdings_value FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT holdings_value FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "description": "Demat holdings marked to the last traded price at the time of the reading."
     },
     {
       "id": 11,
@@ -86,9 +203,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 6,
+        "x": 12,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -143,9 +260,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 12,
+        "x": 16,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -212,9 +329,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 18,
+        "x": 20,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -282,8 +399,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS \"Account value\",\n       recorded_cash                                                     AS \"Recorded cash\",\n       realized_net_cumulative                                           AS \"Cumulative net P&L\"\nFROM v_equity_curve\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       COALESCE(recorded_cash, 0) + COALESCE(realized_net_cumulative, 0) AS \"Account value\",\n       recorded_cash                                                     AS \"Recorded cash\",\n       realized_net_cumulative                                           AS \"Cumulative net P&L\"\nFROM v_equity_curve\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       account_value           AS \"Account value\",\n       broker_cash             AS \"Cash\",\n       broker_holdings         AS \"Holdings\",\n       realized_net_cumulative AS \"Cumulative net P&L\"\nFROM v_account_equity\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       account_value           AS \"Account value\",\n       broker_cash             AS \"Cash\",\n       broker_holdings         AS \"Holdings\",\n       realized_net_cumulative AS \"Cumulative net P&L\"\nFROM v_account_equity\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -314,7 +431,7 @@
         },
         "overrides": []
       },
-      "description": "Recorded cash is what you told the journal the account holds; cumulative net P&L is derived from closed lots. Account value adds the two, so it is only as accurate as the last balance you recorded."
+      "description": "Account value is what the broker reported that evening - cash plus holdings at market. Cumulative net P&L is derived from closed lots and is a different claim: it ignores deposits, withdrawals and anything traded outside this journal. Before the first broker reading the value line falls back to the derived one."
     },
     {
       "id": 21,
@@ -573,6 +690,177 @@
           }
         ]
       }
+    },
+    {
+      "id": 25,
+      "title": "What the account holds",
+      "type": "table",
+      "description": "The positions behind the account value, as of the last balance reading. A blank Last price means no quote came back and the position is counted at cost.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 10
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "sum"
+          ],
+          "fields": [
+            "Value",
+            "Unrealised"
+          ],
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Value"
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Last"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unrealised"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unrealised %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-RdYlGr"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Qty"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
+          "queryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
+          "timeColumns": []
+        }
+      ]
     }
   ]
 }

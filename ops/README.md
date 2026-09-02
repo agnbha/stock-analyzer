@@ -11,7 +11,7 @@ shift the hours in the plists to match a 09:15–15:30 session.
 | **08:58** Mon–Fri | `market-day.sh` | `MarketDayDaemon` | Plans the day's alerts before the 09:00 pre-open alert is due. Exits on its own after the close — this is a daily launch, not a service to keep alive. |
 | 09:15–15:30 | — | the daemon ticks every 150s | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → fire alerts → redraw. |
 | ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
-| **18:30** Mon–Fri | `evening.sh` | ingest → evaluate → import fills → capture → day P&L | Fills have settled by evening. |
+| **18:30** Mon–Fri | `evening.sh` | ingest → evaluate → import fills → capture → broker balance → day P&L | Fills have settled by evening. |
 | **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, week P&L | The prior has to be current before Monday's open, because the daemon reads it when planning alerts. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
 
@@ -136,7 +136,11 @@ java -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
 # After changing the charge schedule
 java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain pnl --rebuild
 
-# Record what the account actually holds, so the equity curve is a real claim
+# Read the balance from the broker. evening.sh does this nightly; run it by hand
+# to refresh the account value mid-day, or after depositing or withdrawing funds.
+java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain trades balance
+
+# Only when the API cannot be reached - stored as 'manual', and the dashboards say so
 java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain \
      trades balance --cash 250000 --invested 50000
 ```

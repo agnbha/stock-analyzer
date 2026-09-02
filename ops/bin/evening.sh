@@ -7,7 +7,8 @@
 #   2. score yesterday's calls - needs the completed tape from step 1
 #   3. import fills            - matches lots and attributes reasons
 #   4. capture                 - compares 3 against 1, so it must come last
-#   5. print the day           - what you actually read
+#   5. balance                 - what the broker says the account now holds
+#   6. print the day           - what you actually read
 #
 # Every step is idempotent. If the daemon already reconciled the session, step 1
 # finds nothing missing and does nothing; if the daemon never ran, step 1 is what
@@ -31,6 +32,11 @@ run_step "score predictions" com.stockanalyzer.DailyAnalysisMain evaluate --date
 run_step "import fills" com.stockanalyzer.TradeJournalMain trades import --broker \
     --from "$SESSION_DATE" --to "$SESSION_DATE"
 run_step "capture analysis" com.stockanalyzer.TradeJournalMain capture --month "$MONTH"
+# Read the balance from the broker rather than carrying a number forward. It runs
+# after the fills are in so the day's ledger has settled, and it is what makes the
+# overview's account value a reading instead of an estimate.
+run_step "record broker balance" com.stockanalyzer.TradeJournalMain trades balance \
+    --date "$SESSION_DATE"
 run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$SESSION_DATE"
 
 finish

@@ -1,6 +1,7 @@
 package com.stockanalyzer;
 
 import com.stockanalyzer.config.AppConfig;
+import com.stockanalyzer.model.AccountSnapshot;
 import com.stockanalyzer.model.PeriodType;
 import com.stockanalyzer.model.PnlSummary;
 import com.stockanalyzer.model.Product;
@@ -22,7 +23,9 @@ import com.stockanalyzer.util.Args;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -35,7 +38,8 @@ import java.util.stream.Collectors;
  *   trades import --csv FILE                  import a CSV or contract note
  *   trades add --symbol S --side BUY --qty N --price P --at TS [--product MIS] [--reason "..."]
  *   trades reasons [--month YYYY-MM]          attribute why each trade was taken
- *   trades balance --cash X [--date D]        record what the account is worth
+ *   trades balance [--date D]                 read the balance from the broker
+ *   trades balance --cash X [--date D]        record it by hand instead
  *   pnl --period day|week|month|fy [--date D | --of D | --month YYYY-MM | --year YYYY-YY]
  *   pnl --rebuild                             re-match every stored trade
  *   statement --from D --to D --out FILE      one row per realized lot
@@ -221,14 +225,62 @@ public final class TradeJournalMain {
         System.out.println();
     }
 
+    /**
+     * Records what the account is worth. Reads it from the broker by default -
+     * a balance typed in once and carried forward stops being true at the first
+     * deposit, dividend or fill this process never saw. {@code --cash} is the
+     * fallback for when the API cannot be reached, and is marked as such.
+     */
     private static void balance(AppContext context, Args args) {
-        double cash = Double.parseDouble(args.require("cash"));
-        Double invested = args.value("invested").map(Double::parseDouble).orElse(null);
         LocalDate date = args.date("date", LocalDate.now(context.clock().zone()));
 
-        context.accountBalanceRepository().record(date, cash, invested, "manual");
-        System.out.printf("Recorded balance for %s: cash %.2f%s%n", date, cash,
-                invested == null ? "" : String.format(", invested %.2f", invested));
+        if (args.value("cash").isPresent()) {
+            double cash = Double.parseDouble(args.require("cash"));
+            Double invested = args.value("invested").map(Double::parseDouble).orElse(null);
+            context.accountBalanceRepository().record(date, cash, invested, "manual");
+            System.out.printf("Recorded balance for %s by hand: cash %s%s%n", date, rupees(cash),
+                    invested == null ? "" : ", invested " + rupees(invested));
+            return;
+        }
+
+        AccountSnapshot snapshot = context.accountDataClient().fetch();
+        context.accountBalanceRepository().record(date, snapshot);
+        printBalance(date, snapshot);
+    }
+
+    private static void printBalance(LocalDate date, AccountSnapshot snapshot) {
+        System.out.printf("%nAccount as of %s, from the broker%n%n", date);
+        System.out.printf("  Credit balance (cash)   %14s%n", rupees(snapshot.cash()));
+        System.out.printf("    blocked as margin     %14s%n", rupees(snapshot.marginUsed()));
+        System.out.printf("    free to deploy        %14s%n", rupees(snapshot.available()));
+        if (snapshot.collateral() > 0) {
+            System.out.printf("  Collateral available    %14s%n", rupees(snapshot.collateral()));
+        }
+        System.out.printf("  Holdings (%d)            %14s%n",
+                snapshot.holdings().size(), rupees(snapshot.holdingsValue()));
+        System.out.printf("  %-23s %14s%n", "Account value", rupees(snapshot.totalValue()));
+
+        if (snapshot.unpricedHoldings() > 0) {
+            System.out.printf("%n  Note: %d holding(s) had no quote and are counted at cost, so the%n"
+                            + "        account value is approximate.%n",
+                    snapshot.unpricedHoldings());
+        }
+        if (!snapshot.holdings().isEmpty()) {
+            System.out.printf("%n  %-12s %8s %12s %12s %14s %10s%n",
+                    "SYMBOL", "QTY", "AVG", "LAST", "VALUE", "UNREALISED");
+            snapshot.holdings().stream()
+                    .sorted(Comparator.comparingDouble(AccountSnapshot.Holding::value).reversed())
+                    .forEach(h -> System.out.printf("  %-12s %8.0f %12s %12s %14s %10s%n",
+                            h.symbol(), h.quantity(), rupees(h.averagePrice()),
+                            h.lastPrice() == null ? "-" : rupees(h.lastPrice()),
+                            rupees(h.value()),
+                            h.unrealised() == null ? "-" : rupees(h.unrealised())));
+        }
+        System.out.println();
+    }
+
+    private static String rupees(double amount) {
+        return String.format(Locale.ROOT, "%,.2f", amount);
     }
 
     private TradeJournalMain() {

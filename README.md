@@ -105,7 +105,8 @@ java -cp $CP com.stockanalyzer.TradeJournalMain trades import --broker --from 20
 java -cp $CP com.stockanalyzer.TradeJournalMain trades import --csv contract-notes.csv
 java -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIANCE --side BUY \
      --qty 10 --price 1418.20 --at 2026-08-28T09:47 --product MIS --reason "VWAP reclaim"
-java -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000 --invested 50000
+java -cp $CP com.stockanalyzer.TradeJournalMain trades balance                    # read it from the broker
+java -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000        # fallback: enter it by hand
 java -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
 
 java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28

@@ -794,12 +794,28 @@ rather than becoming an empty panel nobody investigates.
 cost. Stat tiles, then the equity curve, per-day gains and bet amounts, taxes
 and charges stacked, and every fill sorted by bet amount descending.
 
-Account value needs a caveat built into the design rather than bolted on: this
-system sees fills, not funds. So `account_balance` records what you tell it
-(`trades balance --cash`), and the panel plots *recorded cash*, *cumulative net
-P&L* and their sum as three separate lines. A curve built only from P&L is a
-different claim from "this is what the account is worth", and conflating them
-would be the kind of number that looks authoritative and is not.
+Account value is read from the broker, not derived. `trades balance` calls
+`GET /v1/margins/detail/user` for the credit balance — `clear_cash`, of which
+`net_margin_used` is blocked against open positions — and `GET /v1/holdings/user`
+for the positions, marked to last traded price in batches via
+`GET /v1/live-data/ltp`. Cash plus holdings is the account value, and it lands in
+`account_balance` with `source = 'broker'`; the positions behind it land in
+`account_holding`, so the number can be audited instead of taken on faith.
+
+The alternative — a starting balance carried forward with realised P&L added —
+stops being true at the first deposit, withdrawal, dividend, or fill this journal
+never imported, and it drifts silently rather than visibly. That series is still
+plotted, as *cumulative net P&L*, because "what trading earned" is a genuinely
+different question from "what the account is worth"; the two are kept as separate
+lines rather than added together. `trades balance --cash` remains for when the
+API cannot be reached, and is stored as `source = 'manual'` so `v_account_equity`
+can name the provenance of every point on the curve: `broker`, `manual`,
+`carried` (the last reading, on a day with none of its own), or `derived`
+(P&L alone, before any reading existed).
+
+A holding that comes back without a quote is counted at cost and tallied in
+`unpriced_holdings`, so an approximate account value announces itself rather than
+passing as exact.
 
 **Candles and Calls** — daily and weekly candles for one symbol, marked with the
 buys and sells actually taken, at the average fill price for that session or
@@ -1062,8 +1078,9 @@ Decisions taken, each reversible by a config key:
    close.
 7. Trades imported from the broker trade book, FIFO matched, MIS and CNC kept
    separate, reported net of actual-or-modelled charges.
-8. Dashboards read SQLite directly from Grafana; account value comes from a
-   balance you record, not from a funds API.
+8. Dashboards read SQLite directly from Grafana; account value is read from the
+   broker's margin and holdings endpoints every evening, with a hand-entered
+   balance only as the fallback.
 
 Worth settling before phase 3, and before phase 10:
 
