@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TotpGrowwAuthenticatorTest {
 
+    private static final com.stockanalyzer.client.RateLimiter NO_LIMIT = () -> { };
+
     private static final String SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
     private HttpServer server;
@@ -45,7 +47,8 @@ class TotpGrowwAuthenticatorTest {
         server.start();
 
         TotpGrowwAuthenticator authenticator = new TotpGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "api-key", SECRET);
+                HttpClient.newHttpClient(), baseUrl(), "api-key", SECRET,
+                TokenCache.none(), NO_LIMIT);
 
         assertEquals("totp-token", authenticator.getAccessToken());
         assertEquals("totp-token", authenticator.getAccessToken());
@@ -70,7 +73,8 @@ class TotpGrowwAuthenticatorTest {
 
         CountingCodeSource generator = new CountingCodeSource();
         TotpGrowwAuthenticator authenticator = new TotpGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "api-key", generator);
+                HttpClient.newHttpClient(), baseUrl(), "api-key", generator,
+                TokenCache.none(), NO_LIMIT);
 
         authenticator.getAccessToken();
         authenticator.getAccessToken();
@@ -87,7 +91,8 @@ class TotpGrowwAuthenticatorTest {
         server.start();
 
         TotpGrowwAuthenticator authenticator = new TotpGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "api-key", SECRET);
+                HttpClient.newHttpClient(), baseUrl(), "api-key", SECRET,
+                TokenCache.none(), NO_LIMIT);
 
         GrowwAuthException exception = assertThrows(GrowwAuthException.class, authenticator::getAccessToken);
         assertTrue(exception.getMessage().contains("TOTP"), exception.getMessage());

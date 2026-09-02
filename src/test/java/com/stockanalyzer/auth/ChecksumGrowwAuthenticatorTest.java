@@ -15,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChecksumGrowwAuthenticatorTest {
 
+    private static final com.stockanalyzer.client.RateLimiter NO_LIMIT = () -> { };
+
     private HttpServer server;
 
     @AfterEach
@@ -38,7 +40,8 @@ class ChecksumGrowwAuthenticatorTest {
         server.start();
 
         ChecksumGrowwAuthenticator authenticator = new ChecksumGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "api-key", "api-secret");
+                HttpClient.newHttpClient(), baseUrl(), "api-key", "api-secret",
+                TokenCache.none(), NO_LIMIT);
 
         assertEquals("access-token", authenticator.getAccessToken());
         assertEquals("access-token", authenticator.getAccessToken());
@@ -53,7 +56,8 @@ class ChecksumGrowwAuthenticatorTest {
         server.start();
 
         ChecksumGrowwAuthenticator authenticator = new ChecksumGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "key", "secret");
+                HttpClient.newHttpClient(), baseUrl(), "key", "secret",
+                TokenCache.none(), NO_LIMIT);
 
         GrowwAuthException exception = assertThrows(GrowwAuthException.class, authenticator::getAccessToken);
         assertTrue(exception.getMessage().contains("did not contain a token"));
@@ -66,7 +70,8 @@ class ChecksumGrowwAuthenticatorTest {
         server.start();
 
         ChecksumGrowwAuthenticator authenticator = new ChecksumGrowwAuthenticator(
-                HttpClient.newHttpClient(), baseUrl(), "key", "secret");
+                HttpClient.newHttpClient(), baseUrl(), "key", "secret",
+                TokenCache.none(), NO_LIMIT);
 
         GrowwAuthException exception = assertThrows(GrowwAuthException.class, authenticator::getAccessToken);
         assertTrue(exception.getMessage().contains("status 401"));

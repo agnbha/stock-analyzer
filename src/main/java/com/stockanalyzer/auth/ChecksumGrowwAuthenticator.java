@@ -1,5 +1,7 @@
 package com.stockanalyzer.auth;
 
+import com.stockanalyzer.client.RateLimiter;
+
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,8 +28,9 @@ public final class ChecksumGrowwAuthenticator extends AbstractGrowwTokenAuthenti
 
     private final String apiSecret;
 
-    public ChecksumGrowwAuthenticator(HttpClient httpClient, String baseUrl, String apiKey, String apiSecret) {
-        super(httpClient, baseUrl, apiKey);
+    public ChecksumGrowwAuthenticator(HttpClient httpClient, String baseUrl, String apiKey,
+                                      String apiSecret, TokenCache tokenCache, RateLimiter rateLimiter) {
+        super(httpClient, baseUrl, apiKey, tokenCache, rateLimiter);
         this.apiSecret = apiSecret;
     }
 

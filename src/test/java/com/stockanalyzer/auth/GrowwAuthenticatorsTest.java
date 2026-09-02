@@ -11,11 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GrowwAuthenticatorsTest {
 
+    private static final com.stockanalyzer.client.RateLimiter NO_LIMIT = () -> { };
+
     private static final String SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     private GrowwAuthenticator create(String mode, String apiSecret, String totpSecret) {
-        return GrowwAuthenticators.create(mode, httpClient, "http://localhost", "key", apiSecret, totpSecret);
+        return GrowwAuthenticators.create(mode, httpClient, "http://localhost", "key", apiSecret,
+                totpSecret, TokenCache.none(), NO_LIMIT);
     }
 
     @Test

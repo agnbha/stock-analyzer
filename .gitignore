@@ -11,3 +11,6 @@ nohup.out
 # Local Grafana runtime (downloaded binary, plugins, generated config)
 grafana/.runtime/
 data/stock-analyzer.db
+
+# Cached access token (a live bearer credential)
+data/.groww-token.json

@@ -1,7 +1,8 @@
 package com.stockanalyzer;
 
-import com.stockanalyzer.auth.ChecksumGrowwAuthenticator;
+import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticator;
+import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.FundamentalsClient;
 import com.stockanalyzer.client.CandleDataClients;
@@ -36,8 +37,12 @@ public final class FundamentalsExportMain {
 
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-        GrowwAuthenticator authenticator = new ChecksumGrowwAuthenticator(
-                httpClient, config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecret());
+        TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
+                config.rateLimitPerMinute(), config.rateLimitPerDay());
+        GrowwAuthenticator authenticator = GrowwAuthenticators.create(config.growwAuthMode(),
+                httpClient, config.growwBaseUrl(), config.growwApiKey(),
+                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull(),
+                new FileTokenCache(Path.of(config.tokenCachePath())), rateLimiter);
 
         // Sourced from historical candles (GET /v1/historical/candle/range), which needs only
         // the standard historical data access every Groww API key has. Swap in

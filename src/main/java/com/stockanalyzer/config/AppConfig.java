@@ -166,6 +166,11 @@ public final class AppConfig {
         return Integer.parseInt(get("db.busy.timeout.ms", "5000"));
     }
 
+    /** Where the access token is cached so separate processes can share it. */
+    public String tokenCachePath() {
+        return get("groww.token.cache.path", "data/.groww-token.json");
+    }
+
     public int rateLimitPerSecond() {
         return Integer.parseInt(get("ingest.rate.limit.per.second", "5"));
     }

@@ -1,6 +1,7 @@
 package com.stockanalyzer;
 
 import com.stockanalyzer.auth.GrowwAuthenticator;
+import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.CandleDataClients;
@@ -31,16 +32,16 @@ public final class Main {
         AppConfig config = AppConfig.load();
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
+        TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
+                config.rateLimitPerMinute(), config.rateLimitPerDay());
         GrowwAuthenticator authenticator = GrowwAuthenticators.create(config.growwAuthMode(),
                 httpClient, config.growwBaseUrl(), config.growwApiKey(),
-                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull());
+                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull(),
+                new FileTokenCache(java.nio.file.Path.of(config.tokenCachePath())), rateLimiter);
 
         CandleDataClient candleDataClient = CandleDataClients.rateLimited(httpClient, authenticator,
-                config.growwBaseUrl(),
-                new TokenBucketRateLimiter(config.rateLimitPerSecond(), config.rateLimitPerMinute(),
-                        config.rateLimitPerDay()),
-                config.ingestMaxRetries(), config.ingestRetryBackoffMillis(),
-                config.backfillMaxDaysPerRequest());
+                config.growwBaseUrl(), rateLimiter, config.ingestMaxRetries(),
+                config.ingestRetryBackoffMillis(), config.backfillMaxDaysPerRequest());
 
         GrowthPatternAnalyzer growthPatternAnalyzer = new RestGrowthPatternAnalyzer(
                 httpClient, config.mlServiceUrl(), Duration.ofSeconds(config.mlServiceTimeoutSeconds()));

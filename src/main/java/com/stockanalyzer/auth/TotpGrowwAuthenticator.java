@@ -3,6 +3,8 @@ package com.stockanalyzer.auth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.stockanalyzer.client.RateLimiter;
+
 import java.net.http.HttpClient;
 import java.time.Instant;
 import java.util.Map;
@@ -34,13 +36,15 @@ public final class TotpGrowwAuthenticator extends AbstractGrowwTokenAuthenticato
 
     private final TotpCodeSource codeSource;
 
-    public TotpGrowwAuthenticator(HttpClient httpClient, String baseUrl, String apiKey, String totpSecret) {
-        this(httpClient, baseUrl, apiKey, new TotpGenerator(totpSecret));
+    public TotpGrowwAuthenticator(HttpClient httpClient, String baseUrl, String apiKey,
+                                  String totpSecret, TokenCache tokenCache, RateLimiter rateLimiter) {
+        this(httpClient, baseUrl, apiKey, new TotpGenerator(totpSecret), tokenCache, rateLimiter);
     }
 
     public TotpGrowwAuthenticator(HttpClient httpClient, String baseUrl, String apiKey,
-                                  TotpCodeSource codeSource) {
-        super(httpClient, baseUrl, apiKey);
+                                  TotpCodeSource codeSource, TokenCache tokenCache,
+                                  RateLimiter rateLimiter) {
+        super(httpClient, baseUrl, apiKey, tokenCache, rateLimiter);
         this.codeSource = codeSource;
     }
 

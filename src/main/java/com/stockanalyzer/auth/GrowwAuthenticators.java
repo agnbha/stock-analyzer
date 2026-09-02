@@ -1,5 +1,7 @@
 package com.stockanalyzer.auth;
 
+import com.stockanalyzer.client.RateLimiter;
+
 import java.net.http.HttpClient;
 import java.util.Locale;
 
@@ -21,16 +23,19 @@ public final class GrowwAuthenticators {
      * @param totpSecret the Base32 seed, required for the TOTP flow, ignored by checksum
      */
     public static GrowwAuthenticator create(String mode, HttpClient httpClient, String baseUrl,
-                                            String apiKey, String apiSecret, String totpSecret) {
+                                            String apiKey, String apiSecret, String totpSecret,
+                                            TokenCache tokenCache, RateLimiter rateLimiter) {
         String normalised = mode == null ? MODE_CHECKSUM : mode.trim().toLowerCase(Locale.ROOT);
         return switch (normalised) {
             case MODE_CHECKSUM -> {
                 require(apiSecret, "groww.api.secret", MODE_CHECKSUM);
-                yield new ChecksumGrowwAuthenticator(httpClient, baseUrl, apiKey, apiSecret);
+                yield new ChecksumGrowwAuthenticator(httpClient, baseUrl, apiKey, apiSecret,
+                        tokenCache, rateLimiter);
             }
             case MODE_TOTP -> {
                 require(totpSecret, "groww.totp.secret", MODE_TOTP);
-                yield new TotpGrowwAuthenticator(httpClient, baseUrl, apiKey, totpSecret);
+                yield new TotpGrowwAuthenticator(httpClient, baseUrl, apiKey, totpSecret,
+                        tokenCache, rateLimiter);
             }
             default -> throw new GrowwAuthException("Unknown groww.auth.mode '" + mode
                     + "'. Use '" + MODE_CHECKSUM + "' or '" + MODE_TOTP + "'.");

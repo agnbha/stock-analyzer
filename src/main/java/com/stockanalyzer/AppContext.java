@@ -9,6 +9,7 @@ import com.stockanalyzer.alert.FileAlertSink;
 import com.stockanalyzer.alert.MacNotificationSink;
 import com.stockanalyzer.alert.SessionAlertPlanner;
 import com.stockanalyzer.auth.GrowwAuthenticator;
+import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.CandleDataClients;
@@ -176,12 +177,14 @@ public final class AppContext implements AutoCloseable {
         this.tradeReasonRepository = new SqliteTradeReasonRepository(database);
         this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
 
-        this.authenticator = memoize(() -> GrowwAuthenticators.create(config.growwAuthMode(), httpClient,
-                config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
-                config.growwTotpSecretOrNull()));
-
         this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
+
+        this.authenticator = memoize(() -> GrowwAuthenticators.create(config.growwAuthMode(), httpClient,
+                config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
+                config.growwTotpSecretOrNull(),
+                new FileTokenCache(Path.of(config.tokenCachePath())), this.rateLimiter));
+
         this.candleDataClient = memoize(() -> CandleDataClients.rateLimited(httpClient, authenticator.get(),
                 config.growwBaseUrl(), rateLimiter, config.ingestMaxRetries(),
                 config.ingestRetryBackoffMillis(), config.backfillMaxDaysPerRequest()));
