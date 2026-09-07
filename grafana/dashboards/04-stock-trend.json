@@ -982,6 +982,120 @@
           }
         ]
       }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "$symbol - where price sits in its own range",
+      "description": "0 means the session closed at the bottom of the range, 100 at the top. The closest thing to a valuation read this database can honestly produce: it says whether a stock is dear or cheap against its own history, not against its earnings. The 10-day window rolls with every session. The 52-week band does not - it is a stored snapshot written by 'DailyAnalysisMain week52', which no scheduled job refreshes, so a close recorded after that snapshot can read below 0 or above 100. That is a stale band rather than bad data; re-run 'week52 --days 365' and the line moves back inside.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       pct_of_52w_range AS \"% of 52-week range\",\n       pct_of_10d_range AS \"% of 10-day range\"\nFROM v_range_history\nWHERE symbol = '$symbol'\nORDER BY ts_epoch",
+          "queryText": "SELECT ts_epoch AS time,\n       pct_of_52w_range AS \"% of 52-week range\",\n       pct_of_10d_range AS \"% of 10-day range\"\nFROM v_range_history\nWHERE symbol = '$symbol'\nORDER BY ts_epoch",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of 52-week range"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 8
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% of 10-day range"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

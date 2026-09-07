@@ -80,6 +80,7 @@ public final class SchemaMigrator {
         all.put(12, v12());
         all.put(13, v13());
         all.put(14, v14());
+        all.put(15, v15());
         return all;
     }
 
@@ -1159,6 +1160,50 @@ public final class SchemaMigrator {
                          w60 AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
                                  ROWS BETWEEN 59 PRECEDING AND CURRENT ROW)
                 )""");
+        return ddl;
+    }
+
+    /**
+     * v15: where price sits inside its own range, as a series rather than a
+     * single reading.
+     *
+     * <p>{@code v_range_context} already answers "how far through its range is
+     * this stock" but only for the latest session, so the number can be read
+     * and not watched. The same arithmetic over every session is what shows a
+     * stock grinding toward its highs, or sliding, over weeks.
+     *
+     * <p>Two horizons, both scaled 0-100 so they share an axis honestly: the
+     * ten-day window from {@code v_range_position}, and the 52-week band.
+     *
+     * <p>The 52-week half carries a caveat the panel has to repeat. The band
+     * comes from {@code symbol_week52}, which is a stored snapshot refreshed by
+     * hand ({@code DailyAnalysisMain week52}) - no scheduled job touches it. It
+     * is therefore fixed, not rolling: a close after {@code week52_as_of} can
+     * sit outside the band it is measured against, and read below 0 or above
+     * 100. That is a stale band, not a data error, which is why the as-of date
+     * is carried here rather than left for someone to go and look up.
+     */
+    private List<String> v15() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE VIEW v_range_history AS
+                SELECT i.symbol            AS symbol,
+                       t.session_date      AS session_date,
+                       t.first_candle_ts   AS ts_epoch,
+                       t.close             AS close,
+                       w.week52_low        AS week52_low,
+                       w.week52_high       AS week52_high,
+                       w.to_date           AS week52_as_of,
+                       CASE WHEN w.week52_high > w.week52_low
+                            THEN (t.close - w.week52_low)
+                                 / (w.week52_high - w.week52_low) * 100.0
+                            ELSE NULL END  AS pct_of_52w_range,
+                       r.pct_of_10d_range  AS pct_of_10d_range
+                FROM trading_day t
+                JOIN instrument i            ON i.id = t.instrument_id
+                LEFT JOIN symbol_week52 w    ON w.instrument_id = i.id
+                LEFT JOIN v_range_position r ON r.symbol = i.symbol
+                                            AND r.session_date = t.session_date""");
         return ddl;
     }
 }
