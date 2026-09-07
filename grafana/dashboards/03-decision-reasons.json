@@ -65,7 +65,7 @@
         },
         "overrides": []
       },
-      "description": "UNEXPLAINED is a real category: a fill with no note, event or alert behind it."
+      "description": "How often each reason was recorded against a fill.\n\n- **UNEXPLAINED** — a real category rather than a gap: a fill with no note, event or alert behind it."
     },
     {
       "id": 11,
@@ -117,7 +117,7 @@
         "defaults": {},
         "overrides": []
       },
-      "description": "MANUAL is what you typed; EVENT and ALERT are what the system had just told you."
+      "description": "Where each recorded reason came from.\n\n- **MANUAL** — what you typed.\n- **EVENT** — a pattern the detector found.\n- **ALERT** — something the system had just told you."
     },
     {
       "id": 12,
@@ -165,7 +165,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "The same reasons split by side, showing which get you into a position and which get you out.\n\nA reason that only ever appears on one side is worth noticing."
     },
     {
       "id": 13,
@@ -218,7 +219,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "How the reasons you record shift over time, one line per reason code."
     },
     {
       "id": 14,
@@ -359,7 +361,7 @@
           }
         ]
       },
-      "description": "Frequency alone says what you do most; this says whether it works. A reason used often with a negative net is the one worth arguing with."
+      "description": "Frequency says what you do most; this says whether it works.\n\nA reason used often with a negative net is the one worth arguing with."
     }
   ]
 }

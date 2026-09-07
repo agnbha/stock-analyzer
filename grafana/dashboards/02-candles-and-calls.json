@@ -87,7 +87,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - minute candles for the selected sessions",
-      "description": "Real timestamps, so every candle sits at the minute it actually happened. Selecting several sessions leaves a gap where the market was shut - that is the market being shut, not missing data. For an uninterrupted view of one day, select a single session. Purple is VWAP; the yellow and blue lines are the 10- and 60-minute moving averages, simple rather than exponential and restarted each session, so neither exists until its window has filled - the 60-minute line only begins an hour into the day. Green and red mark the day's best window (all three windows when one session is selected); blue and orange are your own fills.",
+      "description": "One-minute candles at their real timestamps. Select a single session for an uninterrupted day; several sessions leave a gap where the market was shut.\n\n- **VWAP** (purple) — the day's average price, weighted by the volume traded at each price. The institutional \"fair price\" benchmark: above it buyers have had control today, below it sellers.\n- **SMA 10m / 60m** (yellow, blue) — simple moving averages of the last 10 and 60 one-minute closes. The fast line turns with a move; the slow one says whether that move is with or against the hour.\n- **Window entry / exit** (green, red) — the best gain window the detector found. All three windows when a single session is selected.\n- **Your buy / sell** (blue, orange dots) — your own fills.\n\nBoth averages restart each session and appear only once their window is full, so the 60-minute line begins an hour into the day.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -324,7 +324,7 @@
       "id": 21,
       "type": "table",
       "title": "$symbol - windows found in the selected sessions",
-      "description": "What was available, not what you took. Ranked by gain; the windows never overlap, so these are three distinct opportunities.",
+      "description": "What was available, not what you took.\n\nRanked by gain. The windows never overlap, so these are three distinct opportunities.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -534,7 +534,8 @@
             ]
           }
         ]
-      }
+      },
+      "description": "Your fills in the selected sessions, newest first.\n\n- **Bet amount** — quantity × price, the rupee value of the fill.\n- **Reason** — the note recorded against the trade, or \"-\" if none was."
     },
     {
       "id": 11,
@@ -644,7 +645,7 @@
           }
         ]
       },
-      "description": "The same fills aggregated to the week the trade happened in."
+      "description": "The same fills, aggregated to the week the trade happened in."
     }
   ]
 }

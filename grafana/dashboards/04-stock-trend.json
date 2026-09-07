@@ -141,7 +141,7 @@
         },
         "overrides": []
       },
-      "description": "Close and the 5-day average both above the 20-day average is bullish, both below is bearish, anything else neutral. A description of where price sits, not a forecast."
+      "description": "Where price sits against its own averages. A description, not a forecast.\n\n- **Bullish** — close and the 5-day average both above the 20-day average.\n- **Bearish** — both below.\n- **Neutral** — anything else."
     },
     {
       "id": 2,
@@ -212,7 +212,7 @@
         },
         "overrides": []
       },
-      "description": "Simple-average (Cutler) RSI, not Wilder's smoothing - a view cannot express the recursion. Below 30 is conventionally oversold, above 70 overbought."
+      "description": "Momentum on a 0–100 scale, over the last 14 sessions.\n\n- **RSI** — how hard price has been pushed one way. Above 70 is conventionally overbought (ran up fast, may pause); below 30 oversold (dropped fast, may bounce).\n\nSimple-average (Cutler) RSI, not Wilder's smoothing — a SQL view cannot express the recursion."
     },
     {
       "id": 3,
@@ -281,7 +281,7 @@
         },
         "overrides": []
       },
-      "description": "Against an equal-weighted basket of the tracked symbols, because no index series is stored. Comparable between these symbols, but not with a published NIFTY beta."
+      "description": "How much this symbol moves relative to the rest of the tracked universe.\n\n- **Beta** — 1.0 moves with the basket, above 1.0 amplifies it, below 1.0 damps it.\n\nMeasured against an equal-weighted basket of the tracked symbols, because no index series is stored. Comparable between these symbols, but not with a published NIFTY beta."
     },
     {
       "id": 4,
@@ -353,13 +353,13 @@
         },
         "overrides": []
       },
-      "description": "Share of the tracked universe that closed up. Above 55% is broad strength, below 40% broad weakness."
+      "description": "Share of the tracked universe that closed up.\n\n- **Breadth** — how widely a move is shared. Above 55% is broad strength, below 40% broad weakness."
     },
     {
       "id": 10,
       "type": "candlestick",
       "title": "$symbol - daily candles, moving averages, and the best window each day",
-      "description": "Green and red points are the entry and exit of that session's single best window. Averages only appear once their window is full, so a 50-day line starts 50 sessions in.",
+      "description": "Daily candles with their moving averages, and the best window the detector found each session.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n- **Best entry / exit** (green, red) — entry and exit of that session's single best window.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -601,13 +601,14 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Momentum over time, so you can see it building or fading rather than only today's reading.\n\n- **RSI (14)** — a 0–100 meter of how hard price has been pushed one way over 14 sessions. Above 70 is conventionally overbought, below 30 oversold.\n\nThe dashed lines mark 30 and 70."
     },
     {
       "id": 12,
       "type": "timeseries",
       "title": "Market breadth - how much of the universe rose",
-      "description": "Not symbol specific: the whole tracked universe. 50% is the line between a broad advance and a broad decline.",
+      "description": "Not symbol specific — the whole tracked universe.\n\n- **Breadth** — share of tracked symbols that closed up. 50% is the line between a broad advance and a broad decline.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -709,7 +710,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "$symbol - supports and resistances",
-      "description": "Classic floor-trader pivots computed from the previous session's high, low and close, plus the rolling 20-day extremes price has actually had to get through.",
+      "description": "Levels price has had to get through, plotted against the close.\n\n- **Pivot, R1/R2, S1/S2** — classic floor-trader pivots, computed from the previous session's high, low and close. R levels sit above as resistance, S levels below as support.\n- **20-day high / low** — the rolling extremes price has actually traded through.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -987,7 +988,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "$symbol - where price sits in its own range",
-      "description": "0 means the session closed at the bottom of the range, 100 at the top. The closest thing to a valuation read this database can honestly produce: it says whether a stock is dear or cheap against its own history, not against its earnings. The 10-day window rolls with every session. The 52-week band does not - it is a stored snapshot written by 'DailyAnalysisMain week52', which no scheduled job refreshes, so a close recorded after that snapshot can read below 0 or above 100. That is a stale band rather than bad data; re-run 'week52 --days 365' and the line moves back inside.",
+      "description": "Where the close sits between the low and high of a range: 0 is the bottom, 100 the top.\n\n- **% of 10-day range** — where a stock sits this fortnight. Rolls with every session.\n- **% of 52-week range** — where it sits over the past year. The closest thing to a valuation read here: dear or cheap against its own history, not against its earnings.\n\nThe 52-week band is a stored snapshot refreshed by hand (`DailyAnalysisMain week52`), so a later close can read below 0 or above 100. That is a stale band, not bad data.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

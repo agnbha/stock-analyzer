@@ -24,7 +24,7 @@
       "id": 1,
       "type": "stat",
       "title": "Market breadth today",
-      "description": "Share of the tracked universe that closed up. Context for everything below: a strong name in a weak market is a different proposition.",
+      "description": "Share of the tracked universe that closed up. Context for everything below, since a strong name in a weak market is a different proposition.\n\n- **Breadth** — how widely a move is shared. Above 55% is broad strength, below 40% broad weakness.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -92,7 +92,7 @@
       "id": 2,
       "type": "stat",
       "title": "Stocks reading bullish",
-      "description": "Close and the 5-day average both above the 20-day average.",
+      "description": "How many tracked symbols currently read bullish.\n\n- **Bullish** — close and the 5-day average both above the 20-day average.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -142,7 +142,7 @@
       "id": 3,
       "type": "stat",
       "title": "Stocks in the bottom decile of their 52-week range",
-      "description": "How many sit in the lowest tenth of their range over the past year.",
+      "description": "How many tracked symbols sit in the lowest tenth of their 52-week range.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -192,7 +192,7 @@
       "id": 10,
       "type": "table",
       "title": "The 5 strongest setups right now",
-      "description": "Ranked by: distance above the 20-day average (%) + the 5-day return (%) + (RSI-50)/10, less a penalty above RSI 75. This describes momentum that already exists - a ranking of current strength, not a forecast. Nothing here knows anything about tomorrow.",
+      "description": "A ranking of momentum that already exists, not a forecast. Nothing here knows anything about tomorrow.\n\n- **Score** — distance above the 20-day average (%) + the 5-day return (%) + (RSI − 50) / 10, less a penalty above RSI 75.\n- **RSI** — 0–100 momentum meter. Above 70 is conventionally overbought, which is why the score penalises it.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -461,7 +461,7 @@
       "id": 11,
       "type": "table",
       "title": "Bottom 10% of the 52-week range (or as far back as data goes)",
-      "description": "Where price sits between the 52-week low and high. The 10-day figure is kept alongside, because they answer different questions: ten sessions says where a stock sits this fortnight, a year says whether it is genuinely near a low. 'Sessions behind it' is how many daily candles back the range - anything well short of ~248 is not really a year. Near a low is not the same as cheap; a name can sit there while it keeps falling.",
+      "description": "Where price sits between its 52-week low and high, lowest first.\n\n- **% of 52-week range** — 0 is at the year's low, 100 at its high.\n- **% of 10-day range** — the same reading over ten sessions. Kept alongside because they answer different questions: ten sessions says where a stock sits this fortnight, a year says whether it is genuinely near a low.\n- **Sessions behind it** — how many daily candles back the range. Well short of ~248 is not really a year.\n\nNear a low is not the same as cheap: a name can sit there while it keeps falling.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -658,7 +658,7 @@
       "id": 12,
       "type": "table",
       "title": "Bottom decile by value actually traded (10-day average)",
-      "description": "The other reading of \"bottom 10 percentile of market value\": the least liquid names, by rupees changing hands per day rather than by price position. Worth knowing before sizing a position in one of them. This one stays on a 10-day window on purpose: liquidity is about what is trading now, not what traded last winter.",
+      "description": "The least liquid names, by rupees changing hands per day rather than by where price sits. Worth knowing before sizing a position in one of them.\n\n- **Average daily turnover** — close × volume, averaged over the last 10 sessions.\n\nDeliberately a 10-day window: liquidity is about what is trading now, not what traded last winter.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

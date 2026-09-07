@@ -76,7 +76,7 @@
         },
         "overrides": []
       },
-      "description": "Cash plus holdings at market, as the broker reports it. Read every evening; not a starting balance with P&L added on."
+      "description": "Cash plus holdings at market, as the broker reported it at the last evening reading.\n\nA reading taken from the broker, not a starting balance with P&L added on."
     },
     {
       "id": 14,
@@ -134,7 +134,7 @@
         },
         "overrides": []
       },
-      "description": "Credit balance minus the margin blocked against open positions."
+      "description": "Credit balance minus the margin blocked against open positions.\n\n- **Margin** — cash the broker holds against an open position. Still yours, but not spendable until the position closes."
     },
     {
       "id": 15,
@@ -192,7 +192,7 @@
         },
         "overrides": []
       },
-      "description": "Demat holdings marked to the last traded price at the time of the reading."
+      "description": "Demat holdings valued at the last traded price at the time of the reading.\n\n- **Demat holdings** — shares actually held in the account, as opposed to intraday positions closed the same day.\n- **Marked to market** — valued at the current price rather than at what you paid."
     },
     {
       "id": 11,
@@ -249,7 +249,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Quantity × price summed over every recorded fill, buys and sells alike.\n\n- **Bet amount** — the rupee value that changed hands on a fill. Turnover, not money at risk: buying and later selling the same share counts twice."
     },
     {
       "id": 12,
@@ -318,7 +319,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Realised profit after costs, summed over every session.\n\n- **Gross P&L** — profit from price movement alone.\n- **Net P&L** — gross minus brokerage, taxes and fees. This is what actually reached the account.\n\nClosed lots only. Open positions are not counted."
     },
     {
       "id": 13,
@@ -375,7 +377,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "What trading cost, summed over every session.\n\n- **Brokerage** — the broker's own fee.\n- **Taxes** — STT, stamp duty and GST.\n- **Fees** — exchange and SEBI charges."
     },
     {
       "id": 20,
@@ -431,7 +434,7 @@
         },
         "overrides": []
       },
-      "description": "Account value is what the broker reported that evening - cash plus holdings at market. Cumulative net P&L is derived from closed lots and is a different claim: it ignores deposits, withdrawals and anything traded outside this journal. Before the first broker reading the value line falls back to the derived one."
+      "description": "Two different claims, plotted together on purpose.\n\n- **Account value** — what the broker reported that evening: cash plus holdings at market.\n- **Cumulative net P&L** — derived from closed lots. Ignores deposits, withdrawals, and anything traded outside this journal.\n\nBefore the first broker reading, the value line falls back to the derived one."
     },
     {
       "id": 21,
@@ -483,7 +486,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "Realised profit per session.\n\n- **Gross P&L** — profit from price movement alone.\n- **Net P&L** — gross minus all charges.\n\nThe gap between the two bars is the cost of trading."
     },
     {
       "id": 22,
@@ -534,7 +538,8 @@
           }
         },
         "overrides": []
-      }
+      },
+      "description": "How much was put to work each session, and across how many fills.\n\n- **Bet amount** — quantity × price summed over the day's fills. Turnover, not money at risk.\n- **Trades** — number of fills that session."
     },
     {
       "id": 23,
@@ -593,7 +598,7 @@
         },
         "overrides": []
       },
-      "description": "Stacked, because what matters is the total drag on a small move - not which line is which."
+      "description": "Stacked on purpose: what matters is the total drag on a small move, not which line is which.\n\n- **Brokerage** — the broker's own fee.\n- **Taxes** — STT, stamp duty and GST.\n- **Fees** — exchange and SEBI charges."
     },
     {
       "id": 24,
@@ -701,13 +706,14 @@
             ]
           }
         ]
-      }
+      },
+      "description": "Every recorded fill, largest first. Capped at 500 rows.\n\n- **Bet amount** — quantity × price, the rupee value that changed hands.\n- **Product** — MIS is intraday, squared off the same day. CNC is delivery."
     },
     {
       "id": 25,
       "title": "What the account holds",
       "type": "table",
-      "description": "The positions behind the account value, as of the last balance reading. A blank Last price means no quote came back and the position is counted at cost.",
+      "description": "The positions behind the account value, as of the last balance reading.\n\nA blank **Last price** means no quote came back, and the position is counted at cost.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
