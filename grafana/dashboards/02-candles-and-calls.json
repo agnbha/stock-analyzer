@@ -87,7 +87,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - minute candles for the selected sessions",
-      "description": "Real timestamps, so every candle sits at the minute it actually happened. Selecting several sessions leaves a gap where the market was shut - that is the market being shut, not missing data. For an uninterrupted view of one day, select a single session. Purple is VWAP; green and red mark the day's best window (all three windows when one session is selected); blue and orange are your own fills.",
+      "description": "Real timestamps, so every candle sits at the minute it actually happened. Selecting several sessions leaves a gap where the market was shut - that is the market being shut, not missing data. For an uninterrupted view of one day, select a single session. Purple is VWAP; the yellow and blue lines are the 10- and 60-minute moving averages, simple rather than exponential and restarted each session, so neither exists until its window has filled - the 60-minute line only begins an hour into the day. Green and red mark the day's best window (all three windows when one session is selected); blue and orange are your own fills.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -106,8 +106,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "WITH scope AS (\n  SELECT COUNT(DISTINCT session_date) AS sessions\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\n-- One session: mark all three windows. Several: only the best of each.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT c.ts_epoch AS time,\n       c.open, c.high, c.low, c.close,\n       c.vwap        AS \"VWAP\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_merged c\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY c.ts_epoch",
-          "queryText": "WITH scope AS (\n  SELECT COUNT(DISTINCT session_date) AS sessions\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\n-- One session: mark all three windows. Several: only the best of each.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT c.ts_epoch AS time,\n       c.open, c.high, c.low, c.close,\n       c.vwap        AS \"VWAP\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_merged c\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY c.ts_epoch",
+          "rawQueryText": "WITH scope AS (\n  SELECT COUNT(DISTINCT session_date) AS sessions\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\n-- One session: mark all three windows. Several: only the best of each.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT c.ts_epoch AS time,\n       c.open, c.high, c.low, c.close,\n       c.vwap        AS \"VWAP\",\n       c.sma10       AS \"SMA 10m\",\n       c.sma60       AS \"SMA 60m\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_merged c\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY c.ts_epoch",
+          "queryText": "WITH scope AS (\n  SELECT COUNT(DISTINCT session_date) AS sessions\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\n-- One session: mark all three windows. Several: only the best of each.\ndepth AS (SELECT CASE WHEN (SELECT sessions FROM scope) = 1 THEN 3 ELSE 1 END AS max_rank)\nSELECT c.ts_epoch AS time,\n       c.open, c.high, c.low, c.close,\n       c.vwap        AS \"VWAP\",\n       c.sma10       AS \"SMA 10m\",\n       c.sma60       AS \"SMA 60m\",\n       e.entry_price AS \"Window entry\",\n       x.exit_price  AS \"Window exit\",\n       b.price       AS \"Your buy\",\n       s.price       AS \"Your sell\"\nFROM v_intraday_merged c\nLEFT JOIN v_opportunity_markers e\n       ON e.symbol = c.symbol AND e.entry_ts = c.ts_epoch\n      AND e.detector_version = '$detector' AND e.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN v_opportunity_markers x\n       ON x.symbol = c.symbol AND x.exit_ts = c.ts_epoch\n      AND x.detector_version = '$detector' AND x.rank <= (SELECT max_rank FROM depth)\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY symbol, minute) b\n       ON b.symbol = c.symbol AND b.minute = c.ts_epoch\nLEFT JOIN (SELECT symbol, ts_epoch / 60 * 60 AS minute, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY symbol, minute) s\n       ON s.symbol = c.symbol AND s.minute = c.ts_epoch\nWHERE c.symbol = '$symbol' AND c.session_date IN (${session:sqlstring})\nORDER BY c.ts_epoch",
           "timeColumns": [
             "time"
           ]
@@ -259,6 +259,60 @@
                 "value": {
                   "mode": "fixed",
                   "fixedColor": "purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 10m"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 60m"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
                 }
               }
             ]
