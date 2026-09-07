@@ -63,7 +63,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -121,7 +121,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -179,7 +179,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -237,7 +237,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -294,7 +294,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -363,7 +363,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -420,7 +420,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 2,
@@ -475,7 +475,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -526,7 +526,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -579,7 +579,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,
@@ -653,7 +653,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               },
               {
                 "id": "custom.cellOptions",
@@ -672,7 +676,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -684,7 +692,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           }
@@ -743,7 +755,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -759,7 +771,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -775,7 +787,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -791,7 +803,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",

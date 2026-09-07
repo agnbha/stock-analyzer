@@ -334,7 +334,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -346,7 +350,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -358,7 +366,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -370,7 +382,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -382,7 +398,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -394,7 +414,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -406,7 +430,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -418,7 +446,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           }
@@ -547,7 +579,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -559,7 +595,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -571,7 +611,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -583,7 +627,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -595,7 +643,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           }
@@ -649,7 +701,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               }
             ]
           },
@@ -661,7 +717,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
               },
               {
                 "id": "custom.cellOptions",

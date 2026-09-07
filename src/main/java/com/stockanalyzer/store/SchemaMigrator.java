@@ -79,6 +79,7 @@ public final class SchemaMigrator {
         all.put(11, v11());
         all.put(12, v12());
         all.put(13, v13());
+        all.put(14, v14());
         return all;
     }
 
@@ -1089,6 +1090,74 @@ public final class SchemaMigrator {
                   alert_log_id INTEGER REFERENCES alert_log(id),
                   entry_lag_minutes INTEGER,
                   capture_pct REAL
+                )""");
+        return ddl;
+    }
+
+    /**
+     * v14: short- and medium-term moving averages on the intraday view.
+     *
+     * <p>VWAP says where the day's money changed hands; it says nothing about
+     * which way the last few minutes are pointing. These two lines do, and the
+     * pair is the point: 10 minutes is short enough to turn with a move, 60 is
+     * the hour that says whether that move is with or against the session.
+     *
+     * <p>The periods are bar counts, and the tape is 1-minute throughout, so a
+     * period is a minute. Resample the candles and the names stop being true.
+     *
+     * <p>Two caveats carried over from the daily trend view. Averages stay null
+     * until their window is genuinely full, so the 60-minute line never shows a
+     * 12-minute one wearing its name - the first hour of a session has no
+     * {@code sma60}, which is correct rather than missing. And these are simple
+     * averages, not exponential: an EMA is recursive and a view cannot express
+     * it, the same reason {@code v_symbol_trend} carries Cutler's RSI rather
+     * than Wilder's.
+     *
+     * <p>Partitioned by session like VWAP, so the first minute of the day
+     * averages today's prices only and never drags yesterday's close in.
+     */
+    private List<String> v14() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("DROP VIEW IF EXISTS v_intraday_merged");
+        ddl.add("""
+                CREATE VIEW v_intraday_merged AS
+                SELECT symbol, ts_epoch, session_date, interval_minutes,
+                       open, high, low, close, volume, source, vwap, sma10, sma60,
+                       CASE WHEN sma60 IS NULL THEN NULL
+                            WHEN close > sma60 AND sma10 > sma60 THEN 2
+                            WHEN close < sma60 AND sma10 < sma60 THEN 0
+                            ELSE 1 END AS ma_trend
+                FROM (
+                  SELECT symbol, ts_epoch, session_date, interval_minutes,
+                         open, high, low, close, volume, source,
+                         SUM(((high + low + close) / 3.0) * volume) OVER w
+                           / NULLIF(SUM(volume) OVER w, 0) AS vwap,
+                         CASE WHEN COUNT(close) OVER w10 < 10 THEN NULL
+                              ELSE AVG(close) OVER w10 END AS sma10,
+                         CASE WHEN COUNT(close) OVER w60 < 60 THEN NULL
+                              ELSE AVG(close) OVER w60 END AS sma60
+                  FROM (
+                    SELECT symbol, ts_epoch, session_date, interval_minutes,
+                           open, high, low, close, volume, 'final' AS source
+                    FROM v_intraday_candles
+                    UNION ALL
+                    SELECT i.symbol, l.ts_epoch, l.session_date, l.interval_minutes,
+                           l.open, l.high, l.low, l.close, l.volume,
+                           CASE WHEN l.provisional = 1 THEN 'forming' ELSE 'live' END
+                    FROM live_candle l
+                    JOIN instrument i ON i.id = l.instrument_id
+                    WHERE NOT EXISTS (
+                          SELECT 1 FROM candle c
+                          WHERE c.instrument_id = l.instrument_id
+                            AND c.interval_minutes = l.interval_minutes
+                            AND c.ts_epoch = l.ts_epoch)
+                  )
+                  WINDOW w AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
+                               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
+                         w10 AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
+                                 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),
+                         w60 AS (PARTITION BY symbol, session_date ORDER BY ts_epoch
+                                 ROWS BETWEEN 59 PRECEDING AND CURRENT ROW)
                 )""");
         return ddl;
     }

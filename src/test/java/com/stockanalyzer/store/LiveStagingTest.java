@@ -14,9 +14,11 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Staging exists so the dashboards can follow a session in progress. The rule
@@ -161,6 +163,95 @@ class LiveStagingTest {
         assertEquals(100.0, Double.parseDouble(queryText(
                 "SELECT vwap FROM v_intraday_merged WHERE ts_epoch = " + OPEN)), 0.001,
                 "a million shares traded at 500 yesterday must not move today's first minute");
+    }
+
+    @Test
+    @DisplayName("the moving averages stay null until their window is genuinely full")
+    void movingAveragesAreNullUntilTheirWindowFills() {
+        List<Candle> minutes = new ArrayList<>();
+        for (int minute = 0; minute < 60; minute++) {
+            minutes.add(candle(minute, 100));
+        }
+        live.upsertAll(instrumentId, SESSION, 1, minutes, 0);
+
+        // Nine bars in, a ten-bar average would be a nine-bar one wearing its name.
+        assertNull(queryText("SELECT sma10 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 8 * 60)));
+        assertEquals(100.0, Double.parseDouble(queryText(
+                "SELECT sma10 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 9 * 60))), 0.001,
+                "the tenth bar is the first one with a full ten-bar window");
+
+        assertNull(queryText("SELECT sma60 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 58 * 60)),
+                "the first hour of a session has no hour-long average");
+        assertEquals(100.0, Double.parseDouble(queryText(
+                "SELECT sma60 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 59 * 60))), 0.001);
+    }
+
+    @Test
+    @DisplayName("the moving averages are the mean of their window, not of the session")
+    void movingAveragesCoverOnlyTheirWindow() {
+        List<Candle> minutes = new ArrayList<>();
+        // Ten minutes at 100, then ten at 200. At minute 19 the ten-bar window
+        // holds only the second leg; a session-wide mean would say 150.
+        for (int minute = 0; minute < 10; minute++) {
+            minutes.add(candle(minute, 100));
+        }
+        for (int minute = 10; minute < 20; minute++) {
+            minutes.add(candle(minute, 200));
+        }
+        live.upsertAll(instrumentId, SESSION, 1, minutes, 0);
+
+        assertEquals(200.0, Double.parseDouble(queryText(
+                "SELECT sma10 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 19 * 60))), 0.001);
+        // Halfway through the step, the window straddles it: five of each.
+        assertEquals(150.0, Double.parseDouble(queryText(
+                "SELECT sma10 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 14 * 60))), 0.001);
+    }
+
+    @Test
+    @DisplayName("the moving averages restart each session rather than averaging in yesterday")
+    void movingAveragesResetEachSession() {
+        LocalDate previous = SESSION.minusDays(1);
+        long previousOpen = OPEN - 86400;
+
+        List<Candle> yesterday = new ArrayList<>();
+        for (int minute = 0; minute < 60; minute++) {
+            yesterday.add(new Candle(previousOpen + minute * 60L, 500, 501, 499, 500, 100));
+        }
+        live.upsertAll(instrumentId, previous, 1, yesterday, 0);
+
+        List<Candle> today = new ArrayList<>();
+        for (int minute = 0; minute < 10; minute++) {
+            today.add(candle(minute, 100));
+        }
+        live.upsertAll(instrumentId, SESSION, 1, today, 0);
+
+        assertEquals(100.0, Double.parseDouble(queryText(
+                "SELECT sma10 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 9 * 60))), 0.001,
+                "an hour spent at 500 yesterday must not lift today's first ten minutes");
+        assertNull(queryText("SELECT sma60 FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 9 * 60)),
+                "yesterday's bars must not fill today's hour-long window either");
+    }
+
+    @Test
+    @DisplayName("ma_trend reads the pair rather than either line alone")
+    void maTrendClassifiesThePair() {
+        List<Candle> minutes = new ArrayList<>();
+        // A full hour flat at 100, then a decisive leg up: close and the short
+        // line both end above the hour average.
+        for (int minute = 0; minute < 60; minute++) {
+            minutes.add(candle(minute, 100));
+        }
+        for (int minute = 60; minute < 80; minute++) {
+            minutes.add(candle(minute, 200));
+        }
+        live.upsertAll(instrumentId, SESSION, 1, minutes, 0);
+
+        assertNull(queryText("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 30 * 60)),
+                "no verdict before the hour average exists");
+        assertEquals(2, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 79 * 60)));
+        // One bar into the leg the short line is still dragging the flat hour
+        // behind it, so the pair does not agree yet.
+        assertEquals(1, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 60 * 60)));
     }
 
     private static Candle weighted(int minute, double close, long volume) {

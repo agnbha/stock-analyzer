@@ -409,7 +409,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
+          "decimals": 2,
           "custom": {
             "lineWidth": 1
           }
@@ -747,7 +748,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyINR",
+          "unit": "prefix:₹",
+          "decimals": 2,
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 0,
