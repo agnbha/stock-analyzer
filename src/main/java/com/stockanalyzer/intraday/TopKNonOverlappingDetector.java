@@ -3,6 +3,7 @@ package com.stockanalyzer.intraday;
 import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.GainOpportunity;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -19,8 +20,12 @@ import java.util.PriorityQueue;
  * The windows therefore cannot overlap, so the answer is N genuinely distinct
  * opportunities rather than N shifted views of one move.
  *
- * <p>A session that never rises by {@code minGainPct} yields fewer than N
- * windows - which is the honest answer for a down day.
+ * <p>{@code minGainPct} is a floor on what counts as an opportunity at all,
+ * not a tie-breaker. A session whose best window never clears it yields fewer
+ * than N windows, and a session that never clears it at all yields none -
+ * which is the honest answer for a day that offered no tradable move. Set it
+ * above the round-trip cost of a trade and a recorded window always describes
+ * something worth acting on.
  */
 public final class TopKNonOverlappingDetector implements GainOpportunityDetector {
 
@@ -42,9 +47,23 @@ public final class TopKNonOverlappingDetector implements GainOpportunityDetector
         this.minGainPct = minGainPct;
     }
 
+    /**
+     * Identifies the rules that produced a result, so a changed detector writes
+     * a parallel series rather than quietly restating the old one under its
+     * name. The gain floor is part of those rules and so appears here - but
+     * only when it is set, which keeps the tag stable for the original
+     * floor-less runs already in the database.
+     */
     @Override
     public String version() {
-        return "topk-nonoverlap/" + priceBasis.tag() + "/v1";
+        return "topk-nonoverlap/" + priceBasis.tag() + minGainTag() + "/v1";
+    }
+
+    private String minGainTag() {
+        if (minGainPct <= 0) {
+            return "";
+        }
+        return "/min" + BigDecimal.valueOf(minGainPct).stripTrailingZeros().toPlainString();
     }
 
     @Override

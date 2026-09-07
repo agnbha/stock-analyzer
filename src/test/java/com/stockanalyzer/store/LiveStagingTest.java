@@ -248,10 +248,28 @@ class LiveStagingTest {
 
         assertNull(queryText("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 30 * 60)),
                 "no verdict before the hour average exists");
-        assertEquals(2, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 79 * 60)));
-        // One bar into the leg the short line is still dragging the flat hour
-        // behind it, so the pair does not agree yet.
-        assertEquals(1, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 60 * 60)));
+        assertEquals(2, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 79 * 60)),
+                "close and the ten-minute line both above the hour line: bullish");
+    }
+
+    @Test
+    @DisplayName("ma_trend is mixed when the close and the short line disagree about the hour")
+    void maTrendIsMixedWhenTheLinesDisagree() {
+        List<Candle> minutes = new ArrayList<>();
+        for (int minute = 0; minute < 60; minute++) {
+            minutes.add(candle(minute, 100));
+        }
+        for (int minute = 60; minute < 80; minute++) {
+            minutes.add(candle(minute, 90));
+        }
+        minutes.add(candle(80, 150));
+        live.upsertAll(instrumentId, SESSION, 1, minutes, 0);
+
+        // An hour at 100, a slide to 90, then one sharp bar to 150. The close is
+        // back above the hour average (97.5) while the ten-minute line (96) is
+        // still under it: price popped, the trend has not turned. Reading either
+        // line on its own would call this bullish.
+        assertEquals(1, queryInt("SELECT ma_trend FROM v_intraday_merged WHERE ts_epoch = " + (OPEN + 80 * 60)));
     }
 
     private static Candle weighted(int minute, double close, long volume) {

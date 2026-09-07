@@ -118,4 +118,52 @@ class TopKNonOverlappingDetectorTest {
         assertEquals("topk-nonoverlap/highlow/v1",
                 new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 0).version());
     }
+
+    @Test
+    @DisplayName("the gain floor is part of the version, so a raised floor is a parallel series")
+    void versionEncodesTheGainFloor() {
+        assertEquals("topk-nonoverlap/highlow/min0.5/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 0.5).version());
+        // Trailing zeros would make the same floor look like two different detectors.
+        assertEquals("topk-nonoverlap/highlow/min1/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 1.00).version());
+        // A floorless detector keeps the tag the existing rows were written under.
+        assertEquals("topk-nonoverlap/highlow/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 0.0).version());
+    }
+
+    @Test
+    @DisplayName("a day whose best move is under the floor yields no windows at all")
+    void wholeDayDroppedWhenNothingClearsTheFloor() {
+        TopKNonOverlappingDetector halfPercent =
+                new TopKNonOverlappingDetector(3, PriceBasis.CLOSE_CLOSE, 1, 0.5);
+        // Drifts up 0.3% at its very best - real movement, but not a tradable one.
+        List<Candle> candles = Candles.ofCloses(0, 100.0, 100.1, 100.3, 100.2, 100.25);
+
+        assertEquals(List.of(), halfPercent.detect(candles),
+                "no meaningful trade was possible, so there is no top-3 to record");
+    }
+
+    @Test
+    @DisplayName("the floor drops the weak windows without disturbing the strong ones")
+    void floorKeepsOnlyTheWindowsThatClearIt() {
+        // Three separate moves, each needing a dip before it so the earlier window
+        // cannot simply swallow the later high: +10%, +2%, then a +0.2% shuffle
+        // that must not survive the floor.
+        List<Candle> candles = Candles.ofCloses(0,
+                100, 110,          // +10%
+                105, 100, 102,     // +2% off the dip to 100
+                101, 100, 100.2);  // +0.2% - real, but not worth a round trip
+
+        List<GainOpportunity> found =
+                new TopKNonOverlappingDetector(3, PriceBasis.CLOSE_CLOSE, 1, 0.5).detect(candles);
+
+        assertEquals(2, found.size(), "the third window is below the floor and is not recorded");
+        for (GainOpportunity opportunity : found) {
+            assertTrue(opportunity.gainPct() >= 0.5,
+                    "recorded " + opportunity.gainPct() + "%, which is under the floor");
+        }
+        // Ranks stay contiguous: dropping a window must not leave a gap at rank 3.
+        assertEquals(List.of(1, 2), found.stream().map(GainOpportunity::rank).toList());
+    }
 }
