@@ -29,10 +29,13 @@
   <key>RunAtLoad</key>
   <false/>
 
+  <!-- The daemon's real output goes to dated files (logs/market-day-YYYY-MM-DD*)
+       that market-day.sh opens itself, since launchd cannot date this path.
+       These only catch bootstrap failures before the script's exec redirect. -->
   <key>StandardOutPath</key>
-  <string>/Users/agnibhanath/projects/stock-analyzer/logs/marketday.out.log</string>
+  <string>/Users/agnibhanath/projects/stock-analyzer/logs/marketday.launchd.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/agnibhanath/projects/stock-analyzer/logs/marketday.err.log</string>
+  <string>/Users/agnibhanath/projects/stock-analyzer/logs/marketday.launchd.log</string>
 
   <key>EnvironmentVariables</key>
   <dict>

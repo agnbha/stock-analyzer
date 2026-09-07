@@ -101,9 +101,11 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 - **Where the logs are.** The daemon writes two streams and they are kept
   apart: `logs/market-day-YYYY-MM-DD.log` is the live view, reprinted each tick,
   and `logs/market-day-YYYY-MM-DD.err.log` is the record of what happened —
-  alerts fired, events detected, failures. The batch jobs write their own
-  timestamped output; launchd's `logs/*.out.log` files are truncated on every
-  run and only ever show the latest.
+  alerts fired, events detected, failures. `market-day.sh` redirects itself to
+  that dated pair, so `logs/marketday.launchd.log` only ever holds bootstrap
+  errors from before the redirect. The batch jobs write their own timestamped
+  output; their `logs/*.out.log` files are truncated on every run and only ever
+  show the latest.
 - Starting the daemon by hand with your own redirect puts everything in
   whichever file you named, not the dated ones. Prefer `ops/bin/market-day.sh`,
   which is also what launchd runs.

@@ -9,11 +9,14 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-LOG_FILE="$LOG_DIR/market-day-$(date '+%F').log"
-
+# launchd cannot put a date in StandardOutPath, so the wrapper owns its logging
+# and redirects the whole script - not just the java process - to a dated pair.
 # The live view goes to stdout and the log lines to stderr, so they are worth
 # separating: one is a dashboard reprinted every tick, the other is the record
 # of what happened.
-log "starting MarketDayDaemon (view -> $LOG_FILE, log -> ${LOG_FILE%.log}.err.log)"
-exec java -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@" \
-    >>"$LOG_FILE" 2>>"${LOG_FILE%.log}.err.log"
+LOG_FILE="$LOG_DIR/market-day-$(date '+%F').log"
+ERR_FILE="${LOG_FILE%.log}.err.log"
+exec >>"$LOG_FILE" 2>>"$ERR_FILE"
+
+log "starting MarketDayDaemon (view -> $LOG_FILE, log -> $ERR_FILE)" >&2
+exec java -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@"
