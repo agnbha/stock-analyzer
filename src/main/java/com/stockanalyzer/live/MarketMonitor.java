@@ -169,19 +169,22 @@ public final class MarketMonitor {
         long now = nowEpoch();
         List<String> degradedSymbols = new ArrayList<>();
 
+        Map<String, List<String>> failuresByCause = new LinkedHashMap<>();
         List<CompletableFuture<Void>> fetches = settings.symbols().stream()
                 .map(symbol -> CompletableFuture.runAsync(() -> {
                     try {
                         fetchInto(symbol, sessionDate, now);
                     } catch (Exception e) {
+                        String cause = e.getMessage() == null ? e.toString() : e.getMessage();
                         synchronized (degradedSymbols) {
                             degradedSymbols.add(symbol);
+                            failuresByCause.computeIfAbsent(cause, key -> new ArrayList<>()).add(symbol);
                         }
-                        log.warn("Poll failed for {}: {}", symbol, e.getMessage());
                     }
                 }, executor))
                 .toList();
         fetches.forEach(CompletableFuture::join);
+        logFailures(failuresByCause);
 
         List<LiveSymbolState> symbolStates = new ArrayList<>();
         for (String symbol : settings.symbols()) {
@@ -200,6 +203,24 @@ public final class MarketMonitor {
         heartbeatRepository.beat(sessionDate, symbolStates.size(), !degradedSymbols.isEmpty(),
                 degradedSymbols.isEmpty() ? "ok" : "degraded: " + degradedSymbols);
         view.render(snapshot);
+    }
+
+    /**
+     * One line per distinct cause rather than one per symbol. A blocked token
+     * fails every symbol with the identical message, and fifty copies of it per
+     * tick buries anything that only went wrong for one stock.
+     */
+    private void logFailures(Map<String, List<String>> failuresByCause) {
+        failuresByCause.forEach((cause, symbols) -> {
+            if (symbols.size() == 1) {
+                log.warn("Poll failed for {}: {}", symbols.getFirst(), cause);
+            } else {
+                log.warn("Poll failed for {} of {} symbols ({}{}): {}",
+                        symbols.size(), settings.symbols().size(),
+                        String.join(", ", symbols.subList(0, Math.min(3, symbols.size()))),
+                        symbols.size() > 3 ? ", ..." : "", cause);
+            }
+        });
     }
 
     private void fetchInto(String symbol, LocalDate sessionDate, long now) {

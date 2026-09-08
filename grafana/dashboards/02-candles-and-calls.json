@@ -137,7 +137,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "prefix:₹",
+          "unit": "locale",
           "decimals": 2,
           "custom": {
             "lineWidth": 1
@@ -401,7 +401,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -417,7 +417,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -509,7 +509,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -525,7 +525,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -590,7 +590,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "prefix:₹",
+          "unit": "locale",
           "decimals": 2,
           "custom": {
             "lineWidth": 1

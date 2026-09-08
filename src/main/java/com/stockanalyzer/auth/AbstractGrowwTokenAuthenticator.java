@@ -32,6 +32,14 @@ abstract class AbstractGrowwTokenAuthenticator implements GrowwAuthenticator {
     private static final long RENEW_MARGIN_SECONDS = 120;
     private static final int MAX_TOKEN_ATTEMPTS = 3;
     private static final long THROTTLE_COOLDOWN_SECONDS = 60;
+    /**
+     * A rejected credential is not a busy server. Waiting a minute and asking
+     * again just spends the token endpoint's quota on a request that cannot
+     * succeed, so this hold is long enough to stop a polling loop turning one
+     * 403 into a throttling outage, and short enough that the run recovers on
+     * its own once the session is approved.
+     */
+    private static final long APPROVAL_COOLDOWN_SECONDS = 900;
 
     private final HttpClient httpClient;
     private final String baseUrl;
@@ -43,6 +51,7 @@ abstract class AbstractGrowwTokenAuthenticator implements GrowwAuthenticator {
     private volatile String cachedToken;
     private volatile Instant cachedTokenExpiry = Instant.EPOCH;
     private volatile Instant retryNotBefore = Instant.EPOCH;
+    private volatile Cooldown activeCooldown;
 
     AbstractGrowwTokenAuthenticator(HttpClient httpClient, String baseUrl, String apiKey,
                                     TokenCache tokenCache, RateLimiter rateLimiter) {
@@ -77,8 +86,7 @@ abstract class AbstractGrowwTokenAuthenticator implements GrowwAuthenticator {
                 return cachedToken;
             }
             if (Instant.now().isBefore(retryNotBefore)) {
-                throw new GrowwAuthException("Token requests are being throttled; not retrying before "
-                        + retryNotBefore + ". Every caller waits together rather than each retrying.");
+                throw new GrowwAuthException(cooldownMessage());
             }
             refreshToken();
             return cachedToken;
@@ -133,11 +141,43 @@ abstract class AbstractGrowwTokenAuthenticator implements GrowwAuthenticator {
                 sleep(waitMillis);
             }
         }
-        if (last != null && last.isThrottled()) {
+        if (last != null) {
             // Hold every caller off together instead of each one retrying.
-            retryNotBefore = Instant.now().plusSeconds(THROTTLE_COOLDOWN_SECONDS);
+            if (last.isThrottled()) {
+                beginCooldown(THROTTLE_COOLDOWN_SECONDS, "the provider is throttling token requests", null);
+            } else if (last.needsApproval()) {
+                beginCooldown(APPROVAL_COOLDOWN_SECONDS,
+                        "Groww rejected the credential (HTTP " + last.statusCode() + "): " + last.getMessage(),
+                        "Re-approve the API session at groww.in/trade-api/api-keys, or switch "
+                                + "groww.auth.mode to totp. Polling cannot fix this on its own.");
+                // Once, at the top of the hold - not once per symbol per tick.
+                log.error("Token requests are blocked until {}: {}", activeCooldown.untilLocalTime(),
+                        activeCooldown.remedy());
+            }
         }
         throw last;
+    }
+
+    private void beginCooldown(long seconds, String reason, String remedy) {
+        retryNotBefore = Instant.now().plusSeconds(seconds);
+        activeCooldown = new Cooldown(retryNotBefore, reason, remedy);
+    }
+
+    @Override
+    public final java.util.Optional<Cooldown> cooldown() {
+        Cooldown current = activeCooldown;
+        return current != null && current.isActive() ? java.util.Optional.of(current) : java.util.Optional.empty();
+    }
+
+    /** What a person needs to act: when they may call again, why, and what to do. */
+    private String cooldownMessage() {
+        Cooldown current = activeCooldown;
+        if (current == null) {
+            return "Token requests are held off until " + retryNotBefore + ".";
+        }
+        String message = "Token requests are held off until " + current.untilLocalTime()
+                + " because " + current.reason() + ". Every caller waits together rather than each retrying.";
+        return current.remedy() == null ? message : message + " " + current.remedy();
     }
 
     private static void sleep(long millis) {

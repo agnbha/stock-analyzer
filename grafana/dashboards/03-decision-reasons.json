@@ -275,7 +275,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -313,7 +313,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",
@@ -351,7 +351,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "prefix:₹"
+                "value": "locale"
               },
               {
                 "id": "decimals",

@@ -409,7 +409,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "prefix:₹",
+          "unit": "locale",
           "decimals": 2,
           "custom": {
             "lineWidth": 1
@@ -749,7 +749,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "prefix:₹",
+          "unit": "locale",
           "decimals": 2,
           "custom": {
             "lineWidth": 1,

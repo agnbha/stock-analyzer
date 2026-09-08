@@ -29,6 +29,19 @@ public class GrowwAuthException extends RuntimeException {
         return statusCode == 429;
     }
 
+    /**
+     * 401/403: the credential or the session behind it is not acceptable.
+     *
+     * <p>Unlike a 429 this does not come right on its own - someone has to
+     * re-approve the session or fix the credential. Retrying at poll frequency
+     * cannot succeed, and only spends the token endpoint's quota until it
+     * answers 429 as well, which is how one auth failure turns into an outage
+     * that looks like rate limiting.
+     */
+    public boolean needsApproval() {
+        return statusCode == 401 || statusCode == 403;
+    }
+
     public GrowwAuthException(String message, Throwable cause) {
         super(message, cause);
         this.statusCode = 0;
