@@ -1,4 +1,6 @@
-# NSE trading symbols to analyze. Edit freely; must match Groww's trading_symbol values.
+# NSE trading symbols to analyze. Edit freely; must match Groww's trading_symbol
+# values in https://growwapi-assets.groww.in/instruments/instrument.csv - a name
+# that has changed still resolves there and simply returns no candles.
 RELIANCE
 TCS
 HDFCBANK
@@ -24,7 +26,8 @@ ONGC
 NTPC
 POWERGRID
 M&M
-TATAMOTORS
+TMPV
+TMCV
 TATASTEEL
 ADANIENT
 ADANIPORTS
@@ -49,3 +52,6 @@ UPL
 APOLLOHOSP
 BAJAJ-AUTO
 TATACONSUM
+BECTORFOOD
+JPPOWER
+NIFTYBEES

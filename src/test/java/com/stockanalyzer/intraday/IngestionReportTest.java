@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,5 +52,32 @@ class IngestionReportTest {
 
         assertFalse(report.totalFailure());
         assertTrue(report.failures().isEmpty());
+    }
+
+    @Test
+    @DisplayName("a symbol that answers with no candles is reported, not counted as fine")
+    void namesSymbolsThatReturnedNothingWhileOthersGotData() {
+        IngestionReport report = new IngestionReport(1L, DAY, DAY, 3, 2,
+                List.of(new IngestionReport.SymbolResult("RELIANCE", 1, 375, Set.of(DAY), null),
+                        new IngestionReport.SymbolResult("TCS", 1, 375, Set.of(DAY), null),
+                        // Renamed ticker: the provider said SUCCESS and sent nothing.
+                        new IngestionReport.SymbolResult("TATAMOTORS", 0, 0, Set.of(), null)),
+                List.of());
+
+        assertEquals(0, report.failures().size(), "nothing errored, which is why this hid");
+        assertEquals(3, report.succeeded());
+        assertEquals(List.of("TATAMOTORS"),
+                report.returnedNothing().stream().map(IngestionReport.SymbolResult::symbol).toList());
+    }
+
+    @Test
+    @DisplayName("a day when nobody got data is a holiday, not a list of broken symbols")
+    void staysQuietWhenNoSymbolGotData() {
+        IngestionReport report = new IngestionReport(1L, DAY, DAY, 2, 0,
+                List.of(new IngestionReport.SymbolResult("RELIANCE", 0, 0, Set.of(), null),
+                        new IngestionReport.SymbolResult("TCS", 0, 0, Set.of(), null)),
+                List.of(DAY));
+
+        assertEquals(List.of(), report.returnedNothing());
     }
 }

@@ -46,7 +46,7 @@
           "type": "frser-sqlite-datasource",
           "uid": "stock-analyzer-sqlite"
         },
-        "query": "SELECT DISTINCT session_date FROM trading_day WHERE session_date BETWEEN date($__from/1000,'unixepoch','+5 hours','+30 minutes') AND date($__to/1000,'unixepoch','+5 hours','+30 minutes') ORDER BY session_date DESC",
+        "query": "SELECT DISTINCT session_date FROM (\n  SELECT session_date FROM trading_day\n  UNION\n  SELECT session_date FROM live_candle\n) WHERE session_date BETWEEN date($__from/1000,'unixepoch','+5 hours','+30 minutes') AND date($__to/1000,'unixepoch','+5 hours','+30 minutes') ORDER BY session_date DESC",
         "definition": "SELECT DISTINCT session_date FROM trading_day WHERE session_date BETWEEN date($__from/1000,'unixepoch','+5 hours','+30 minutes') AND date($__to/1000,'unixepoch','+5 hours','+30 minutes') ORDER BY session_date DESC",
         "refresh": 2,
         "sort": 0,
@@ -57,7 +57,7 @@
           "text": "",
           "value": ""
         },
-        "description": "Only sessions inside the dashboard time range. Pick one for the full top 3, or several to compare best windows."
+        "description": "Sessions that have any minute data, settled or still forming. Reads staging as well as the consolidated tape, so the day in progress is selectable instead of appearing only after the evening batch has run."
       },
       {
         "name": "detector",

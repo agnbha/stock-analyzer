@@ -90,6 +90,7 @@ public final class DailyAnalysisMain {
         System.out.printf("Wrote %d sessions across %d symbols; %d failed%n",
                 report.sessionsWritten(), report.succeeded(), report.failures().size());
         report.failures().forEach(f -> System.out.printf("  %-12s %s%n", f.symbol(), f.error()));
+        reportSymbolsThatReturnedNothing(report);
         exitNonZeroOnTotalFailure(report);
     }
 
@@ -107,6 +108,21 @@ public final class DailyAnalysisMain {
         report.failures().stream().findFirst()
                 .ifPresent(first -> System.err.println("First error: " + first.error()));
         System.exit(1);
+    }
+
+    /**
+     * A symbol nobody asked about because nothing went wrong. Worth a line: a
+     * ticker that has been renamed answers successfully with no candles, and
+     * without this it just quietly stops being collected.
+     */
+    private static void reportSymbolsThatReturnedNothing(IngestionReport report) {
+        List<IngestionReport.SymbolResult> silent = report.returnedNothing();
+        if (silent.isEmpty()) {
+            return;
+        }
+        System.out.printf("%d symbol(s) returned no data while others did - check the trading symbol "
+                + "against Groww's instrument list:%n", silent.size());
+        silent.forEach(r -> System.out.printf("  %-12s no candles%n", r.symbol()));
     }
 
     private static void recompute(AppContext context, Args args) {

@@ -34,6 +34,26 @@ public record IngestionReport(long runId,
         return !results.isEmpty() && succeeded() == 0;
     }
 
+    /**
+     * Symbols the provider accepted and answered, with nothing in the answer.
+     *
+     * <p>Not a failure and not a success: a renamed or delisted ticker still
+     * resolves, returns {@code SUCCESS} and no candles, and is counted among
+     * the symbols that "succeeded". That is how a symbol can quietly stop being
+     * collected for months while every run reports zero failures. It is only
+     * meaningful when other symbols did get data - a day when nobody did is a
+     * holiday, which is recognised separately.
+     */
+    public List<SymbolResult> returnedNothing() {
+        boolean anyoneGotData = results.stream().anyMatch(r -> r.sessionsWritten() > 0);
+        if (!anyoneGotData) {
+            return List.of();
+        }
+        return results.stream()
+                .filter(r -> r.error() == null && r.sessionsWritten() == 0)
+                .toList();
+    }
+
     public record SymbolResult(String symbol,
                                int sessionsWritten,
                                int candlesWritten,
