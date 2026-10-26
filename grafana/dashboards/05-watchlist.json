@@ -192,7 +192,7 @@
       "id": 10,
       "type": "table",
       "title": "The 5 strongest setups right now",
-      "description": "A ranking of momentum that already exists, not a forecast. Nothing here knows anything about tomorrow.\n\n- **Score** — distance above the 20-day average (%) + the 5-day return (%) + (RSI − 50) / 10, less a penalty above RSI 75.\n- **RSI** — 0–100 momentum meter. Above 70 is conventionally overbought, which is why the score penalises it.",
+      "description": "A ranking of momentum that already exists, not a forecast. Nothing here knows anything about tomorrow.\n\n- **Score** — distance above the 20-day average (%) + the 5-day return (%) + (RSI − 50) / 10, less a penalty above RSI 75.\n- **RSI** — 0–100 momentum meter. Above 70 is conventionally overbought, which is why the score penalises it.\n\nClick a symbol to open its minute candles for today, from 9:15 to now.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -227,6 +227,24 @@
           }
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
           {
             "matcher": {
               "id": "byName",
@@ -461,7 +479,7 @@
       "id": 11,
       "type": "table",
       "title": "Bottom 10% of the 52-week range (or as far back as data goes)",
-      "description": "Where price sits between its 52-week low and high, lowest first.\n\n- **% of 52-week range** — 0 is at the year's low, 100 at its high.\n- **% of 10-day range** — the same reading over ten sessions. Kept alongside because they answer different questions: ten sessions says where a stock sits this fortnight, a year says whether it is genuinely near a low.\n- **Sessions behind it** — how many daily candles back the range. Well short of ~248 is not really a year.\n\nNear a low is not the same as cheap: a name can sit there while it keeps falling.",
+      "description": "Where price sits between its 52-week low and high, lowest first.\n\n- **% of 52-week range** — 0 is at the year's low, 100 at its high.\n- **% of 10-day range** — the same reading over ten sessions. Kept alongside because they answer different questions: ten sessions says where a stock sits this fortnight, a year says whether it is genuinely near a low.\n- **Sessions behind it** — how many daily candles back the range. Well short of ~248 is not really a year.\n\nNear a low is not the same as cheap: a name can sit there while it keeps falling.\n\nClick a symbol to open its minute candles for today, from 9:15 to now.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -496,6 +514,24 @@
           }
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
           {
             "matcher": {
               "id": "byName",
@@ -658,7 +694,7 @@
       "id": 12,
       "type": "table",
       "title": "Bottom decile by value actually traded (10-day average)",
-      "description": "The least liquid names, by rupees changing hands per day rather than by where price sits. Worth knowing before sizing a position in one of them.\n\n- **Average daily turnover** — close × volume, averaged over the last 10 sessions.\n\nDeliberately a 10-day window: liquidity is about what is trading now, not what traded last winter.",
+      "description": "The least liquid names, by rupees changing hands per day rather than by where price sits. Worth knowing before sizing a position in one of them.\n\n- **Average daily turnover** — close × volume, averaged over the last 10 sessions.\n\nDeliberately a 10-day window: liquidity is about what is trading now, not what traded last winter.\n\nClick a symbol to open its minute candles for today, from 9:15 to now.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -693,6 +729,24 @@
           }
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          },
           {
             "matcher": {
               "id": "byName",
