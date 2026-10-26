@@ -563,7 +563,7 @@
     },
     {
       "id": 11,
-      "title": "$symbol - weekly candles, with the calls you took",
+      "title": "$symbol - weekly candles for the last 6 months, with the calls you took",
       "type": "candlestick",
       "datasource": {
         "type": "frser-sqlite-datasource",
@@ -583,8 +583,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
-          "queryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\nORDER BY w.session_date",
+          "rawQueryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
+          "queryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
           "timeColumns": [
             "time"
           ]
@@ -669,7 +669,8 @@
           }
         ]
       },
-      "description": "The same fills, aggregated to the week the trade happened in."
+      "description": "Always the last 6 months, whatever range the rest of the page is showing.\n\nThe **Buy** and **Sell** dots are your fills, averaged over the week the trade happened in.",
+      "timeFrom": "now-6M"
     }
   ]
 }

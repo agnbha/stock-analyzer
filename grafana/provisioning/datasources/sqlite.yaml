@@ -13,3 +13,9 @@ datasources:
       # Running Grafana natively instead? Change it to the absolute path of
       # data/stock-analyzer.db in this repo.
       path: /var/lib/stock-analyzer/stock-analyzer.db
+      # The analyzer writes this file while dashboards read it. Without a wait, a
+      # read that lands on the writer's checkpoint or on its connection closing
+      # (the daemon does both when the session ends) fails at once with
+      # "database is locked (261)". Waiting up to 10s rides that out.
+      pathPrefix: "file:"
+      pathOptions: "_pragma=busy_timeout(10000)"
