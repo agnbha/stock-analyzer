@@ -2,7 +2,7 @@
 
 A personal intraday analysis, alerting and trade-journal system for NSE
 equities, built on the [Groww Trading API](https://groww.in/trade-api/docs).
-Six parts, sharing one local database and one market-hours process:
+Seven parts, sharing one local database and one market-hours process:
 
 | Part | What it does | Runs |
 |---|---|---|
@@ -12,13 +12,16 @@ Six parts, sharing one local database and one market-hours process:
 | 4 | Live monitoring every 2-3 minutes, projecting new candles as they arrive | during market hours |
 | 5 | Trade journal and gain/loss statements per day, week, month and financial year | on demand |
 | 6 | Grafana dashboards over the same database | on demand |
+| 7 | CAN SLIM: screener.in fundamentals plus daily-chart buy and sell rules | nightly, batch |
 
 The full design, including why each decision was made, is in
 [docs/DESIGN.md](docs/DESIGN.md).
 
 > This produces statistics, signals, notifications and record-keeping. It places
-> no orders and makes no buy/sell recommendation. Part 5's P&L is for your own
-> review, not a tax filing - your broker's contract note remains authoritative.
+> no orders. Part 7's buy and sell signals are readings of William O'Neil's
+> published rules against the data, not recommendations. Part 5's P&L is for
+> your own review, not a tax filing - your broker's contract note remains
+> authoritative.
 
 ## Authentication
 
@@ -125,6 +128,36 @@ cd grafana && docker compose up -d    # http://localhost:3000
 ```
 
 See [grafana/README.md](grafana/README.md).
+
+### Part 7 - CAN SLIM
+
+```bash
+export SCREENER_SESSION_ID=...      # the 'sessionid' cookie from a signed-in screener.in browser session
+
+# screen with the configured query, then read every candidate's daily chart
+java -cp $CP com.stockanalyzer.CanSlimMain scan
+java -cp $CP com.stockanalyzer.CanSlimMain scan --query "Return on equity > 20 AND YOY Quarterly profit growth > 30"
+java -cp $CP com.stockanalyzer.CanSlimMain scan --all          # list every scored stock, not just signals
+
+# no screener: check holdings and the configured symbols for sell signals only
+java -cp $CP com.stockanalyzer.CanSlimMain scan --no-screener
+```
+
+screener.in runs the fundamental filter - **C**urrent and **A**nnual earnings
+growth, and **I**nstitutional buying - and its results are priced with a year
+of daily candles. Locally, each stock is scored for **N** (near its 52-week
+high), **S** (volume on up days over down days), **L** (an RS percentile) and
+**M** (the market's direction, from NIFTYBEES). Then:
+
+- **Buy** - a close through a base's pivot on 1.4x average volume, within 5% of it.
+- **Watch** - within 5% under the pivot of a sound base: about to rally, or not.
+- **Sell** - 8% under the buy point, a heavy-volume close below the 50-day
+  average, or a climax run: rallies that have ended or are ending. These are
+  checked for open positions and the configured universe too.
+
+The **CAN SLIM** dashboard shows the market, both lists, and each stock's daily
+chart with its pivot. The rules, the thresholds and what is approximated are in
+[docs/CANSLIM.md](docs/CANSLIM.md).
 
 ### The original ML growth report
 
@@ -249,6 +282,16 @@ MIS/CNC positions; alert cooldowns and restart dedup; and every Grafana
 dashboard query executed against a real migrated database.
 
 ## Important caveats
+
+- **CAN SLIM reads screener.in through your browser session.** Custom queries
+  need a signed-in account, and screener.in signs in through Google in a
+  browser - a flow a batch job cannot complete, and should not hold the
+  credentials for. So the scan sends the `sessionid` cookie you copy from a
+  signed-in browser; when it expires, the scan exits with status 3 and says so.
+  The client pages through results politely (one request every two seconds, at
+  most four pages); check screener.in's terms if you plan to run it more often
+  than once a day. A query that names a ratio screener.in does not know fails
+  with screener.in's own error message.
 
 - The historical candle endpoint used (`GET /v1/historical/candle/range`) is
   marked **deprecated** in Groww's docs in favor of a newer "Backtesting" data

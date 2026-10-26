@@ -9,6 +9,7 @@
 #   4. capture                 - compares 3 against 1, so it must come last
 #   5. balance                 - what the broker says the account now holds
 #   6. print the day           - what you actually read
+#   7. CAN SLIM scan           - needs the day's closing daily bar, so after the close
 #
 # Every step is idempotent. If the daemon already reconciled the session, step 1
 # finds nothing missing and does nothing; if the daemon never ran, step 1 is what
@@ -38,5 +39,14 @@ run_step "capture analysis" com.stockanalyzer.TradeJournalMain capture --month "
 run_step "record broker balance" com.stockanalyzer.TradeJournalMain trades balance \
     --date "$SESSION_DATE"
 run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$SESSION_DATE"
+# Without a screener.in session the scan still checks holdings and the universe
+# for sell signals; with one it also screens for new candidates. Exit status 3
+# from the full scan means the session cookie has expired.
+if [[ -n "${SCREENER_SESSION_ID:-}" ]]; then
+  run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan
+else
+  log "   SCREENER_SESSION_ID is not set - CAN SLIM checks sell signals only"
+  run_step "CAN SLIM sell signals" com.stockanalyzer.CanSlimMain scan --no-screener
+fi
 
 finish

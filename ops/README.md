@@ -59,6 +59,7 @@ GROWW_API_KEY=...
 GROWW_AUTH_MODE=checksum        # or totp
 GROWW_API_SECRET=...            # checksum mode
 # GROWW_TOTP_SECRET=...         # totp mode
+# SCREENER_SESSION_ID=...       # optional: screener.in 'sessionid' cookie, for CAN SLIM screening
 DB_URL=jdbc:sqlite:/Users/you/projects/stock-analyzer/data/stock-analyzer.db
 ENV
 chmod 600 ~/.stock-analyzer.env
@@ -109,6 +110,22 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 - Starting the daemon by hand with your own redirect puts everything in
   whichever file you named, not the dated ones. Prefer `ops/bin/market-day.sh`,
   which is also what launchd runs.
+
+## CAN SLIM and the screener.in session
+
+`evening.sh` ends with a CAN SLIM scan (`CanSlimMain scan`). Its fundamental
+filter runs on screener.in, which needs a signed-in session: sign in at
+https://www.screener.in in a browser (Google sign-in is fine), open the
+developer tools' cookie list for `www.screener.in`, and put the `sessionid`
+value in `~/.stock-analyzer.env` as `SCREENER_SESSION_ID`.
+
+- Without it, the step runs with `--no-screener`: holdings and the configured
+  symbols are still checked for sell signals, but nothing new is screened.
+- When the session expires the step fails with exit status 3 and a message
+  saying so. Sign in again and replace the value; nothing else needs changing.
+- The scan prices one year of daily bars per symbol (one request each), so a
+  scan of ~200 symbols takes a couple of minutes. Like a backfill, keep it out
+  of market hours.
 
 ## Do not run a backfill during market hours
 

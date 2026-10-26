@@ -65,6 +65,7 @@ What each tab needs:
 | Candles and Calls, markers | trades | `TradeJournalMain trades import` or `trades add` |
 | Account Overview | trades, and a balance for a true account value | `trades import`, `trades balance --cash ...` |
 | Decision Reasons | trades with reasons attached | `trades reasons --month ...` |
+| CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
 panel, one bar in the weekly panel, and two empty tabs.
@@ -92,6 +93,13 @@ you, an event the detector found, an alert that fired, or the model), buy
 reasons versus sell reasons, and a table of whether each reason actually paid.
 `UNEXPLAINED` is a real category, not a gap: a fill with no note, event or alert
 behind it is worth counting.
+
+**CAN SLIM** — the market's direction and distribution-day count across the
+top, then two lists: breakouts and setups about to break out (stocks that passed
+the screener.in query), and rallies that have ended (stop losses, heavy-volume
+breaks of the 50-day average, climax runs). Click a symbol for its daily chart
+with the 50- and 200-day averages, the pivot and every scan's reading of it; the
+full score sheet, letter by letter, is at the bottom.
 
 One number to read carefully: the overview's charges are **all charges paid on
 that day's fills**, while `pnl`'s charges are only those **allocated to lots that
