@@ -79,6 +79,29 @@ class SchemaAndIdempotencyTest {
     }
 
     @Test
+    @DisplayName("re-ingesting a day replaces its windows even when a trade is attributed to one")
+    void reingestingWithAttributedTrade() {
+        long instrumentId = instruments.findOrCreate("RELIANCE", "NSE", "CASH");
+        long tradingDayId = tradingDays.upsert(instrumentId, summary(), "groww");
+        opportunities.replace(tradingDayId, DETECTOR, threeWindows());
+        database.inTransaction(connection -> {
+            try (var statement = connection.createStatement()) {
+                statement.execute("INSERT INTO trade (id, instrument_id, broker_trade_id, session_date, "
+                        + "executed_ts, side, quantity, price, product, charges_source, source, imported_at) "
+                        + "VALUES (1, " + instrumentId + ", 'T1', '" + DAY + "', 1756001000, 'BUY', 1, 100, "
+                        + "'MIS', 'x', 'x', 0)");
+                statement.execute("INSERT INTO trade_attribution (trade_id, gain_opportunity_id) "
+                        + "VALUES (1, (SELECT MIN(id) FROM gain_opportunity WHERE trading_day_id = " + tradingDayId + "))");
+            }
+        });
+
+        tradingDays.upsert(instrumentId, summary(), "groww");
+        opportunities.replace(tradingDayId, DETECTOR, threeWindows());
+
+        assertEquals(3, opportunities.findByTradingDay(tradingDayId, DETECTOR).size());
+    }
+
+    @Test
     @DisplayName("a different detector version writes a parallel series instead of overwriting")
     void detectorVersionsCoexist() {
         long instrumentId = instruments.findOrCreate("RELIANCE", "NSE", "CASH");

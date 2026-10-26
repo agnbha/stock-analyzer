@@ -109,6 +109,7 @@ public final class SchemaMigrator {
                                               date(ts_epoch, 'unixepoch', '+330 minutes')
                                  ORDER BY ts_epoch) AS cum
                       FROM candle WHERE interval_minutes < 1440)""");
+        ddl.add("CREATE INDEX temp.ix_candle_volume_fix ON candle_volume_fix (instrument_id, interval_minutes, ts_epoch)");
         ddl.add("""
                 UPDATE candle SET volume = (
                   SELECT f.own FROM candle_volume_fix f
@@ -127,6 +128,7 @@ public final class SchemaMigrator {
                                  PARTITION BY instrument_id, interval_minutes, session_date
                                  ORDER BY ts_epoch) AS cum
                       FROM live_candle)""");
+        ddl.add("CREATE INDEX temp.ix_live_volume_fix ON live_volume_fix (instrument_id, interval_minutes, ts_epoch)");
         ddl.add("""
                 UPDATE live_candle SET volume = (
                   SELECT f.own FROM live_volume_fix f

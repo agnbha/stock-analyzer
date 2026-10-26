@@ -31,6 +31,17 @@ public final class SqliteGainOpportunityRepository implements GainOpportunityRep
     @Override
     public void replace(long tradingDayId, String detectorVersion, List<GainOpportunity> opportunities) {
         database.inTransaction(connection -> {
+            // A trade attributed to one of these windows would block the delete. The link
+            // is derived data - the capture step rebuilds it against the new windows.
+            try (PreparedStatement detach = connection.prepareStatement("""
+                    UPDATE trade_attribution SET gain_opportunity_id = NULL
+                    WHERE gain_opportunity_id IN (
+                      SELECT id FROM gain_opportunity
+                      WHERE trading_day_id = ? AND detector_version = ?)""")) {
+                detach.setLong(1, tradingDayId);
+                detach.setString(2, detectorVersion);
+                detach.executeUpdate();
+            }
             try (PreparedStatement delete = connection.prepareStatement(
                     "DELETE FROM gain_opportunity WHERE trading_day_id = ? AND detector_version = ?")) {
                 delete.setLong(1, tradingDayId);
