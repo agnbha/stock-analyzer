@@ -81,7 +81,67 @@ public final class SchemaMigrator {
         all.put(13, v13());
         all.put(14, v14());
         all.put(15, v15());
+        all.put(16, v16());
         return all;
+    }
+
+    /**
+     * v16: intraday volume becomes the volume within each candle.
+     *
+     * <p>Until now candles were stored as the feed reports them - the session's
+     * running total - which made VWAP, volume ratios and the volume bars wrong.
+     * The ingest path now differences the feed; this does the same to what was
+     * already stored. The running maximum (not the previous row) is differenced
+     * so a zero-volume glitch cannot produce a negative or a lump. Session
+     * totals are then rebuilt from the converted candles.
+     */
+    private List<String> v16() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TEMP TABLE candle_volume_fix AS
+                SELECT instrument_id, interval_minutes, ts_epoch,
+                       cum - LAG(cum, 1, 0) OVER (
+                           PARTITION BY instrument_id, interval_minutes, day ORDER BY ts_epoch) AS own
+                FROM (SELECT instrument_id, interval_minutes, ts_epoch,
+                             date(ts_epoch, 'unixepoch', '+330 minutes') AS day,
+                             MAX(volume) OVER (
+                                 PARTITION BY instrument_id, interval_minutes,
+                                              date(ts_epoch, 'unixepoch', '+330 minutes')
+                                 ORDER BY ts_epoch) AS cum
+                      FROM candle WHERE interval_minutes < 1440)""");
+        ddl.add("""
+                UPDATE candle SET volume = (
+                  SELECT f.own FROM candle_volume_fix f
+                  WHERE f.instrument_id = candle.instrument_id
+                    AND f.interval_minutes = candle.interval_minutes
+                    AND f.ts_epoch = candle.ts_epoch)
+                WHERE interval_minutes < 1440""");
+        ddl.add("DROP TABLE candle_volume_fix");
+        ddl.add("""
+                CREATE TEMP TABLE live_volume_fix AS
+                SELECT instrument_id, interval_minutes, ts_epoch,
+                       cum - LAG(cum, 1, 0) OVER (
+                           PARTITION BY instrument_id, interval_minutes, session_date ORDER BY ts_epoch) AS own
+                FROM (SELECT instrument_id, interval_minutes, ts_epoch, session_date,
+                             MAX(volume) OVER (
+                                 PARTITION BY instrument_id, interval_minutes, session_date
+                                 ORDER BY ts_epoch) AS cum
+                      FROM live_candle)""");
+        ddl.add("""
+                UPDATE live_candle SET volume = (
+                  SELECT f.own FROM live_volume_fix f
+                  WHERE f.instrument_id = live_candle.instrument_id
+                    AND f.interval_minutes = live_candle.interval_minutes
+                    AND f.ts_epoch = live_candle.ts_epoch)""");
+        ddl.add("DROP TABLE live_volume_fix");
+        ddl.add("""
+                UPDATE trading_day SET volume = COALESCE((
+                  SELECT SUM(c.volume) FROM candle c
+                  WHERE c.instrument_id = trading_day.instrument_id
+                    AND c.interval_minutes = trading_day.interval_minutes
+                    AND date(c.ts_epoch, 'unixepoch', '+330 minutes') = trading_day.session_date),
+                  volume)""");
+        return ddl;
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

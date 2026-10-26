@@ -30,6 +30,7 @@ public final class GrowwCandleDataClient implements CandleDataClient {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** A server asking us to wait an hour is more likely a bad header than a real instruction. */
+    private static final int DAILY_INTERVAL_MINUTES = 1440;
     private static final long MAX_RETRY_AFTER_MILLIS = 5 * 60 * 1000L;
 
     /** Below this, dropped rows are noise; above it, something is wrong with the feed. */
@@ -107,6 +108,9 @@ public final class GrowwCandleDataClient implements CandleDataClient {
             }
         }
         reportSkipped(symbol, skipped, rows.size());
+        if (intervalMinutes < DAILY_INTERVAL_MINUTES) {
+            candles = CumulativeVolume.toPerCandle(candles);
+        }
 
         log.debug("Fetched {} candles for {}", candles.size(), symbol);
         return new StockCandleSeries(symbol, exchange, segment, candles);

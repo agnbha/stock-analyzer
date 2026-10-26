@@ -225,7 +225,9 @@ public final class MarketMonitor {
 
     private void fetchInto(String symbol, LocalDate sessionDate, long now) {
         LiveSessionState state = states.get(symbol);
-        long from = Math.max(state.watermark(), clock.sessionOpenEpoch(sessionDate));
+        // From the open, not the watermark: the feed reports a running volume total,
+        // so a range that starts mid-session cannot tell how much traded before it.
+        long from = clock.sessionOpenEpoch(sessionDate);
         LocalDateTime start = LocalDateTime.ofInstant(Instant.ofEpochSecond(from), clock.zone());
         LocalDateTime end = LocalDateTime.ofInstant(Instant.ofEpochSecond(now), clock.zone());
         StockCandleSeries series = candleDataClient.fetchCandles(symbol, settings.exchange(), settings.segment(),

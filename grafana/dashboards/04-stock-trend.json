@@ -358,8 +358,8 @@
     {
       "id": 10,
       "type": "candlestick",
-      "title": "$symbol - daily candles, moving averages, and the best window each day",
-      "description": "Daily candles with their moving averages, and the best window the detector found each session.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n- **Best entry / exit** (green, red) — entry and exit of that session's single best window.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.",
+      "title": "$symbol - daily candles and moving averages",
+      "description": "Daily candles with their moving averages.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.\n\n**Volume** (bars, right axis) — shares traded that day.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -378,15 +378,15 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\",\n       o.entry_price    AS \"Best entry\",\n       o.exit_price     AS \"Best exit\"\nFROM v_symbol_trend t\nLEFT JOIN v_opportunity_markers o\n       ON o.symbol = t.symbol AND o.session_date = t.session_date\n      AND o.detector_version = '$detector' AND o.rank = 1\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
-          "queryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\",\n       o.entry_price    AS \"Best entry\",\n       o.exit_price     AS \"Best exit\"\nFROM v_symbol_trend t\nLEFT JOIN v_opportunity_markers o\n       ON o.symbol = t.symbol AND o.session_date = t.session_date\n      AND o.detector_version = '$detector' AND o.rank = 1\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
+          "rawQueryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.volume,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\"\nFROM v_symbol_trend t\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
+          "queryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.volume,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\"\nFROM v_symbol_trend t\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
           "timeColumns": [
             "time"
           ]
         }
       ],
       "options": {
-        "mode": "candles",
+        "mode": "candles+volume",
         "candleStyle": "candles",
         "colorStrategy": "open-close",
         "colors": {
@@ -476,46 +476,24 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Best entry"
+              "options": "volume"
             },
             "properties": [
               {
-                "id": "custom.drawStyle",
-                "value": "points"
+                "id": "custom.axisPlacement",
+                "value": "right"
               },
               {
-                "id": "custom.pointSize",
-                "value": 10
+                "id": "custom.axisLabel",
+                "value": "Volume"
               },
               {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Best exit"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
+                "id": "unit",
+                "value": "short"
               },
               {
-                "id": "custom.pointSize",
-                "value": 10
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
-                }
+                "id": "decimals",
+                "value": 0
               }
             ]
           }
