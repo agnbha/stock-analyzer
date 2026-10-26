@@ -238,7 +238,7 @@
                 "value": [
                   {
                     "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
-                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h%2B15m&to=now",
                     "targetBlank": false
                   }
                 ]
@@ -525,7 +525,7 @@
                 "value": [
                   {
                     "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
-                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h%2B15m&to=now",
                     "targetBlank": false
                   }
                 ]
@@ -740,7 +740,7 @@
                 "value": [
                   {
                     "title": "Open ${__value.raw} in Candles and Calls (today, 9:15 to now)",
-                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h15m&to=now",
+                    "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${__value.raw}&var-session=All&from=now%2Fd%2B9h%2B15m&to=now",
                     "targetBlank": false
                   }
                 ]
