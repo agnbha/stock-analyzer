@@ -68,6 +68,77 @@ class HotWindowCalculatorTest {
         assertTrue(windows.stream().anyMatch(w -> w.symbol() == null), "market-wide windows are computed too");
     }
 
+    @Test
+    @DisplayName("several entries in one bucket on one day are one hit, not several")
+    void aSessionIsOneHit() {
+        List<OpportunityRow> rows = new ArrayList<>();
+        // Two windows open in the same 5-minute bucket on day 1; on day 2 only one does.
+        rows.add(row("RELIANCE", LocalDate.of(2026, 8, 24), LocalTime.of(9, 47), 2.0));
+        rows.add(row("RELIANCE", LocalDate.of(2026, 8, 24), LocalTime.of(9, 49), 1.0));
+        rows.add(row("RELIANCE", LocalDate.of(2026, 8, 25), LocalTime.of(9, 47), 2.0));
+        rows.add(row("RELIANCE", LocalDate.of(2026, 8, 25), LocalTime.of(13, 5), 0.8));
+
+        HotWindow morning = windows(rows, "RELIANCE", 30);
+
+        assertEquals(2, morning.hits(), "two sessions had an entry, however many windows");
+        assertEquals(2, morning.sessions());
+        assertEquals(1.0, morning.hitRate(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("the market-wide window counts symbol-sessions, so it can never claim every session")
+    void marketWideIsAPerSymbolSessionRate() {
+        List<OpportunityRow> rows = new ArrayList<>();
+        // Ten symbols, ten days. Every symbol opens a window at 09:47 on every day, and
+        // a second one in the afternoon on every day - so 09:47 is a hit in 100 of 100
+        // symbol-sessions, but the afternoon is too.
+        for (int s = 0; s < 10; s++) {
+            for (int day = 0; day < 10; day++) {
+                LocalDate date = LocalDate.of(2026, 8, 24).plusDays(day);
+                rows.add(row("S" + s, date, LocalTime.of(9, 47), 1.0));
+            }
+        }
+        // Only half the symbols also open one at 13:05, on only the first day.
+        for (int s = 0; s < 5; s++) {
+            rows.add(row("S" + s, LocalDate.of(2026, 8, 24), LocalTime.of(13, 5), 1.0));
+        }
+
+        HotWindow morning = windows(rows, null, 30);
+        HotWindow afternoon = windows(rows, null, 230);
+
+        assertEquals(100, morning.sessions(), "ten symbols over ten days");
+        assertEquals(100, morning.hits());
+        assertEquals(5, afternoon.hits(), "five symbol-sessions, not a share of all of them");
+        assertEquals(100, afternoon.sessions());
+        assertEquals(0.05, afternoon.hitRate(), 1e-9);
+        assertTrue(afternoon.hitRateLcb() < 0.12, "a 5% rate cannot have a high lower bound");
+    }
+
+    @Test
+    @DisplayName("fifty symbols opening in the same minute are not fifty sessions of evidence")
+    void simultaneousSymbolsDoNotInflateTheRate() {
+        List<OpportunityRow> rows = new ArrayList<>();
+        // One day. 50 symbols each have an entry at 09:15 - plus 50 symbols that were
+        // quiet at 09:15 but had a window later.
+        for (int s = 0; s < 50; s++) {
+            rows.add(row("A" + s, LocalDate.of(2026, 8, 24), LocalTime.of(9, 15), 1.0));
+            rows.add(row("B" + s, LocalDate.of(2026, 8, 24), LocalTime.of(14, 0), 1.0));
+        }
+
+        HotWindow open = windows(rows, null, 0);
+
+        assertEquals(50, open.hits());
+        assertEquals(100, open.sessions());
+        assertEquals(0.5, open.hitRate(), 1e-9);
+    }
+
+    private HotWindow windows(List<OpportunityRow> rows, String symbol, int bucketStartMinute) {
+        return calculator.compute(rows, 60).stream()
+                .filter(w -> java.util.Objects.equals(symbol, w.symbol())
+                        && w.bucketStartMinute() == bucketStartMinute)
+                .findFirst().orElseThrow();
+    }
+
     private OpportunityRow row(String symbol, LocalDate date, LocalTime time, double gainPct) {
         long entryTs = ZonedDateTime.of(date, time, clock.zone()).toEpochSecond();
         return new OpportunityRow(0, symbol, date,

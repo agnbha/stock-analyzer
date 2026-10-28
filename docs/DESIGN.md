@@ -435,9 +435,31 @@ Qualification thresholds (`alerts.hotwindow.min-sessions`, default 30;
 `alerts.hotwindow.min-lcb`, default 0.10) keep thin statistics from generating
 noise.
 
+Two more limits keep the list short and informative. Windows starting within
+`alerts.hotwindow.skip-opening-minutes` (default 5) of the open are ignored,
+because the day's low - and so the start of a top-3 window - often sits at the
+open: the opening bucket qualifies for nearly every symbol and says nothing
+about any one of them. The baseline entry signal ignores it for the same reason.
+And at most `alerts.hotwindow.max-per-day` (default 20) are planned, the
+strongest by lower bound, chosen when the day is planned so that the cut
+falls on the weakest windows rather than the latest ones.
+
 **(c) Live condition alerts** — an `event` fired now, or a Part 2 model
 probability crossing `alerts.model.min-probability` (default 0.65). Suppressed
 automatically whenever the active model has not beaten the baseline.
+
+Only what is **current** is announced. An event is recorded the moment it is
+detected, but it is alerted on only if it happened within
+`alerts.max.age.minutes` (default 10, counted from when its candle completed),
+and a scheduled alert that fell due more than that long before the monitor was
+looking is skipped rather than fired late. A daemon that starts at 10:08 would
+otherwise detect everything since 09:15 on its first tick and spend the day's
+alert cap on it in one burst.
+
+A hot window's hit rate is **sessions with an entry in the bucket over sessions**
+(for the market-wide window, symbol-sessions). Counting opportunities instead
+puts more hits than sessions in the numerator, which the denominator then
+stretches to match - a rate of 1.0 that is an artifact, not evidence.
 
 ## 3.2 Delivery and control
 

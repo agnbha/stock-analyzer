@@ -26,15 +26,18 @@ public final class HotWindowSignalModel implements IntradaySignalModel {
     private final int lookbackDays;
     private final int minSessions;
     private final double minLowerBound;
+    private final int skipOpeningMinutes;
 
+    /** @param skipOpeningMinutes windows starting this soon after the open predict nothing; see {@link com.stockanalyzer.alert.SessionAlertPlanner} */
     public HotWindowSignalModel(HotWindowRepository hotWindowRepository, MarketClock clock, int bucketMinutes,
-                                int lookbackDays, int minSessions, double minLowerBound) {
+                                int lookbackDays, int minSessions, double minLowerBound, int skipOpeningMinutes) {
         this.hotWindowRepository = hotWindowRepository;
         this.clock = clock;
         this.bucketMinutes = bucketMinutes;
         this.lookbackDays = lookbackDays;
         this.minSessions = minSessions;
         this.minLowerBound = minLowerBound;
+        this.skipOpeningMinutes = skipOpeningMinutes;
     }
 
     @Override
@@ -45,7 +48,8 @@ public final class HotWindowSignalModel implements IntradaySignalModel {
     @Override
     public List<SignalPrediction> score(SignalRequest request) {
         List<HotWindow> windows = hotWindowRepository.find(request.symbol(), bucketMinutes, lookbackDays).stream()
-                .filter(w -> w.sessions() >= minSessions && w.hitRateLcb() >= minLowerBound)
+                .filter(w -> w.sessions() >= minSessions && w.hitRateLcb() >= minLowerBound
+                        && w.bucketStartMinute() >= skipOpeningMinutes)
                 .toList();
         if (windows.isEmpty()) {
             return List.of();
