@@ -13,6 +13,10 @@ import com.stockanalyzer.alert.SessionAlertPlanner;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
+import com.stockanalyzer.canslim.CanSlimCriteria;
+import com.stockanalyzer.canslim.CanSlimService;
+import com.stockanalyzer.canslim.ScreenerCompanyClient;
+import com.stockanalyzer.canslim.ScreenerInClient;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.CandleDataClients;
 import com.stockanalyzer.client.RateLimiter;
@@ -67,6 +71,9 @@ import com.stockanalyzer.store.jdbc.SqliteAccountBalanceRepository;
 import com.stockanalyzer.store.jdbc.SqliteAttributionRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeReasonRepository;
 import com.stockanalyzer.store.jdbc.SqliteCalendarRepository;
+import com.stockanalyzer.store.jdbc.SqliteCanSlimRepository;
+import com.stockanalyzer.store.jdbc.SqliteDailyBarRepository;
+import com.stockanalyzer.store.jdbc.SqliteFundamentalsCacheRepository;
 import com.stockanalyzer.store.jdbc.SqliteCandleRepository;
 import com.stockanalyzer.store.jdbc.SqliteGainOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteHeartbeatRepository;
@@ -418,6 +425,51 @@ public final class AppContext implements AutoCloseable {
     public CandleDataClient wideRangeCandleDataClient() {
         return CandleDataClients.rateLimited(httpClient, authenticator.get(), config.growwBaseUrl(),
                 rateLimiter, config.ingestMaxRetries(), config.ingestRetryBackoffMillis(), 400);
+    }
+
+    /**
+     * The CAN SLIM scan. Built on request: it needs the screener session only
+     * when a query is actually run, and daily bars through the wide-range client.
+     */
+    public CanSlimService canSlimService() {
+        CanSlimCriteria d = CanSlimCriteria.defaults();
+        CanSlimCriteria criteria = new CanSlimCriteria(
+                config.canSlim("min.qtr.profit.growth.pct", d.minQtrProfitGrowthPct()),
+                config.canSlim("min.qtr.sales.growth.pct", d.minQtrSalesGrowthPct()),
+                config.canSlim("min.profit.growth.3y.pct", d.minProfitGrowth3yPct()),
+                config.canSlim("min.roe.pct", d.minRoePct()),
+                config.canSlim("max.pct.from.high", d.maxPctFromHigh()),
+                config.canSlim("min.up.down.volume.ratio", d.minUpDownVolumeRatio()),
+                (int) config.canSlim("min.rs.rating", d.minRsRating()),
+                (int) config.canSlim("min.base.sessions", d.minBaseSessions()),
+                (int) config.canSlim("max.base.sessions", d.maxBaseSessions()),
+                config.canSlim("max.base.depth.pct", d.maxBaseDepthPct()),
+                config.canSlim("min.prior.advance.pct", d.minPriorAdvancePct()),
+                config.canSlim("breakout.volume.ratio", d.breakoutVolumeRatio()),
+                config.canSlim("buy.range.pct", d.buyRangePct()),
+                (int) config.canSlim("buy.window.sessions", d.buyWindowSessions()),
+                config.canSlim("watch.within.pct", d.watchWithinPct()),
+                (int) config.canSlim("breakout.lookback.sessions", d.breakoutLookbackSessions()),
+                config.canSlim("stop.loss.pct", d.stopLossPct()),
+                config.canSlim("heavy.volume.ratio", d.heavyVolumeRatio()),
+                config.canSlim("climax.run.pct", d.climaxRunPct()),
+                config.canSlim("climax.min.gain.pct", d.climaxMinGainPct()),
+                config.canSlim("rally.min.pct", d.rallyMinPct()),
+                config.canSlim("distribution.drop.pct", d.distributionDropPct()),
+                (int) config.canSlim("distribution.under.pressure", d.distributionUnderPressure()),
+                (int) config.canSlim("distribution.correction", d.distributionCorrection()));
+        CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
+                config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
+                config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
+                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays());
+        return new CanSlimService(
+                new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
+                new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                        config.screenerRequestIntervalMillis()),
+                new SqliteFundamentalsCacheRepository(database),
+                wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
+                new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
+                executor, criteria, settings);
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {

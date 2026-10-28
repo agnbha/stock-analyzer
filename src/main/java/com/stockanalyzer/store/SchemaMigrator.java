@@ -82,6 +82,9 @@ public final class SchemaMigrator {
         all.put(14, v14());
         all.put(15, v15());
         all.put(16, v16());
+        all.put(17, v17());
+        all.put(18, v18());
+        all.put(19, v19());
         return all;
     }
 
@@ -144,6 +147,117 @@ public final class SchemaMigrator {
                     AND date(c.ts_epoch, 'unixepoch', '+330 minutes') = trading_day.session_date),
                   volume)""");
         return ddl;
+    }
+
+    /**
+     * v17: CAN SLIM. Daily-interval bars for whatever a scan priced - screened
+     * candidates are mostly outside the intraday universe, so they cannot come
+     * from {@code trading_day} - and each scan's market reading and per-stock
+     * scores, kept per run so a signal's history can be read back.
+     */
+    private List<String> v17() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE daily_bar (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  session_date TEXT NOT NULL,
+                  ts_epoch INTEGER NOT NULL,
+                  open REAL, high REAL, low REAL, close REAL, volume INTEGER,
+                  PRIMARY KEY (instrument_id, session_date)
+                ) WITHOUT ROWID""");
+        ddl.add("""
+                CREATE TABLE canslim_run (
+                  id INTEGER PRIMARY KEY,
+                  run_at INTEGER NOT NULL,
+                  as_of TEXT,
+                  query TEXT,
+                  screened INTEGER NOT NULL,
+                  evaluated INTEGER NOT NULL,
+                  market_symbol TEXT,
+                  market_state TEXT NOT NULL,
+                  market_close REAL,
+                  market_sma50 REAL,
+                  market_sma200 REAL,
+                  distribution_days INTEGER,
+                  market_note TEXT
+                )""");
+        ddl.add("""
+                CREATE TABLE canslim_score (
+                  run_id INTEGER NOT NULL REFERENCES canslim_run(id) ON DELETE CASCADE,
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  source TEXT NOT NULL,
+                  as_of TEXT,
+                  close REAL,
+                  letters TEXT NOT NULL,
+                  letters_passed INTEGER NOT NULL,
+                  c_pass INTEGER, a_pass INTEGER, n_pass INTEGER, s_pass INTEGER,
+                  l_pass INTEGER, i_pass INTEGER, m_pass INTEGER,
+                  qtr_profit_growth REAL, qtr_sales_growth REAL, profit_growth_3y REAL, roe REAL,
+                  institutional_change REAL,
+                  rs_rating INTEGER, weighted_return REAL, up_down_volume REAL,
+                  pct_from_high REAL, sma50 REAL, sma200 REAL, volume_ratio REAL, dry_up_ratio REAL,
+                  pivot REAL, pivot_date TEXT, base_sessions INTEGER, base_depth_pct REAL, pct_from_pivot REAL,
+                  breakout_date TEXT, buy_point REAL,
+                  signal TEXT NOT NULL,
+                  reason TEXT,
+                  ratios_json TEXT,
+                  PRIMARY KEY (run_id, instrument_id)
+                )""");
+        ddl.add("CREATE INDEX ix_canslim_score_signal ON canslim_score (signal)");
+        ddl.add("""
+                CREATE VIEW v_canslim_latest AS
+                SELECT i.symbol AS symbol, s.*, r.run_at, r.market_state
+                FROM canslim_score s
+                JOIN canslim_run r ON r.id = s.run_id
+                JOIN instrument i  ON i.id = s.instrument_id
+                WHERE s.run_id = (SELECT MAX(id) FROM canslim_run)""");
+        ddl.add("""
+                CREATE VIEW v_canslim_signal_history AS
+                SELECT i.symbol AS symbol, s.as_of, s.signal, s.letters, s.rs_rating, s.close,
+                       s.pivot, s.reason, r.run_at, r.market_state
+                FROM canslim_score s
+                JOIN canslim_run r ON r.id = s.run_id
+                JOIN instrument i  ON i.id = s.instrument_id""");
+        ddl.add("""
+                CREATE VIEW v_daily_bars AS
+                SELECT i.symbol AS symbol, b.session_date, b.ts_epoch,
+                       b.open, b.high, b.low, b.close, b.volume,
+                       CASE WHEN COUNT(b.close) OVER w50 < 50 THEN NULL
+                            ELSE AVG(b.close) OVER w50 END AS sma50,
+                       CASE WHEN COUNT(b.close) OVER w200 < 200 THEN NULL
+                            ELSE AVG(b.close) OVER w200 END AS sma200
+                FROM daily_bar b JOIN instrument i ON i.id = b.instrument_id
+                WINDOW w50  AS (PARTITION BY b.instrument_id ORDER BY b.session_date
+                                ROWS BETWEEN 49 PRECEDING AND CURRENT ROW),
+                       w200 AS (PARTITION BY b.instrument_id ORDER BY b.session_date
+                                ROWS BETWEEN 199 PRECEDING AND CURRENT ROW)""");
+        return ddl;
+    }
+
+    /**
+     * v18: fundamentals read from screener.in company pages. They change once a
+     * quarter, so a fetch is kept for days rather than repeated every night. An
+     * empty ratio set is kept too: it records that the page had nothing (an ETF),
+     * so that is not asked again either.
+     */
+    private List<String> v18() {
+        return List.of("""
+                CREATE TABLE screener_fundamentals (
+                  instrument_id INTEGER PRIMARY KEY REFERENCES instrument(id),
+                  fetched_at INTEGER NOT NULL,
+                  ratios_json TEXT NOT NULL
+                )""");
+    }
+
+    /**
+     * v19: which quarter each cached page showed. A page's figures change when the company
+     * reports, so the copy is judged by the quarter it carries and the calendar, not by its age.
+     * Rows from before this carry none, which reads as "unknown: fetch once more".
+     */
+    private List<String> v19() {
+        return List.of(
+                "ALTER TABLE screener_fundamentals ADD COLUMN results_quarter TEXT",
+                "ALTER TABLE screener_fundamentals ADD COLUMN holding_quarter TEXT");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

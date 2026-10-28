@@ -374,4 +374,60 @@ public final class AppConfig {
     public double chargeRate(String key, double fallback) {
         return Double.parseDouble(get("charges." + key, String.valueOf(fallback)));
     }
+
+    // ---- CAN SLIM ---------------------------------------------------------------------
+
+    /** The fundamental filter screener.in runs; see application.properties for the default. */
+    public String canSlimQuery() {
+        return get("canslim.screener.query", null);
+    }
+
+    /** The browser's screener.in {@code sessionid} cookie. Prefer the SCREENER_SESSION_ID env var. */
+    public String screenerSessionIdOrNull() {
+        return get("screener.session.id", null);
+    }
+
+    public String screenerBaseUrl() {
+        return get("screener.base.url", "https://www.screener.in");
+    }
+
+    public long screenerRequestIntervalMillis() {
+        return Long.parseLong(get("canslim.screener.request.interval.ms", "2000"));
+    }
+
+    /** An index ETF standing in for the market: the candle feed prices tradeable symbols. */
+    public String canSlimIndexSymbol() {
+        return get("canslim.market.index.symbol", "NIFTYBEES");
+    }
+
+    public int canSlimHistoryDays() {
+        return Integer.parseInt(get("canslim.history.days", "400"));
+    }
+
+    public int canSlimMaxCandidates() {
+        return Integer.parseInt(get("canslim.max.candidates", "150"));
+    }
+
+    /** Whether the configured symbols join each scan - for a wider RS field and their sell signals. */
+    public boolean canSlimIncludeUniverse() {
+        return Boolean.parseBoolean(get("canslim.include.universe", "true"));
+    }
+
+    /**
+     * The slow pace for company pages with nothing new to learn from (an ETF, a company past the
+     * reporting deadline still missing the quarter). Otherwise the calendar decides: see
+     * {@code FundamentalsRefreshPolicy}.
+     */
+    public int canSlimFundamentalsCacheDays() {
+        return Integer.parseInt(get("canslim.fundamentals.cache.days", "7"));
+    }
+
+    /** In reporting season, how often to look again at a company that has not yet shown the new quarter. */
+    public int canSlimFundamentalsSeasonCheckDays() {
+        return Integer.parseInt(get("canslim.fundamentals.season.check.days", "2"));
+    }
+
+    public double canSlim(String key, double fallback) {
+        return Double.parseDouble(get("canslim." + key, String.valueOf(fallback)));
+    }
 }

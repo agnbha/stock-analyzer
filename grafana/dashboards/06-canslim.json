@@ -1,0 +1,1698 @@
+{
+  "uid": "stockanalyzer-canslim",
+  "title": "CAN SLIM",
+  "description": "William O'Neil's CAN SLIM: screener.in filters for earnings growth, the daily chart decides when to buy and when a rally is over.",
+  "tags": [
+    "stock-analyzer",
+    "screening",
+    "canslim"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-1y",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "label": "Symbol",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT symbol FROM v_canslim_latest ORDER BY letters_passed DESC, rs_rating DESC",
+        "definition": "SELECT symbol FROM v_canslim_latest ORDER BY letters_passed DESC, rs_rating DESC",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Stocks in the last scan, strongest first."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Market direction (M)",
+      "description": "The \"M\" of CAN SLIM, read from the market proxy (NIFTYBEES by default) at the last scan.\n\n- **Confirmed uptrend** — above a rising 50-day average with few distribution days. Buy signals are actionable.\n- **Uptrend under pressure** — 4-5 distribution days, or below the 50-day. Be selective.\n- **Correction** — below a falling 50-day average, or 6+ distribution days. Buy setups are held back.\n\nA **distribution day** is an index decline of 0.2% or more on higher volume than the day before: institutions selling.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT market_state AS \"Market\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "queryText": "SELECT market_state AS \"Market\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "CONFIRMED_UPTREND": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Confirmed uptrend"
+                },
+                "UPTREND_UNDER_PRESSURE": {
+                  "color": "orange",
+                  "index": 1,
+                  "text": "Uptrend under pressure"
+                },
+                "CORRECTION": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "Market in correction"
+                },
+                "UNKNOWN": {
+                  "color": "gray",
+                  "index": 3,
+                  "text": "Unknown"
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "gray"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Distribution days (last 25 sessions)",
+      "description": "Index declines on rising volume in the last five weeks. 4-5 put the uptrend under pressure; 6 or more end it.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT distribution_days AS \"Distribution days\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "queryText": "SELECT distribution_days AS \"Distribution days\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 4
+              },
+              {
+                "color": "red",
+                "value": 6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Signals in the last scan",
+      "description": "How many stocks the last scan flagged in each group.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 13,
+        "y": 0,
+        "w": 7,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT COALESCE(SUM(signal IN ('BUY_BREAKOUT','BUY_ZONE')), 0) AS \"Buy\",\n       COALESCE(SUM(signal = 'WATCH_SETUP'), 0) AS \"About to break out\",\n       COALESCE(SUM(signal LIKE 'SELL_%'), 0) AS \"Sell\"\nFROM v_canslim_latest",
+          "queryText": "SELECT COALESCE(SUM(signal IN ('BUY_BREAKOUT','BUY_ZONE')), 0) AS \"Buy\",\n       COALESCE(SUM(signal = 'WATCH_SETUP'), 0) AS \"About to break out\",\n       COALESCE(SUM(signal LIKE 'SELL_%'), 0) AS \"Sell\"\nFROM v_canslim_latest",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "About to break out"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Last scan",
+      "description": "When CanSlimMain scan last ran. Signals are end-of-day readings; run the scan after the close.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT run_at * 1000 AS \"Last scan\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "queryText": "SELECT run_at * 1000 AS \"Last scan\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Buy signals, and setups about to rally",
+      "description": "Stocks that passed the screener.in fundamentals query and whose chart lines up with O'Neil's buy rules.\n\n- **Buy: breakout today / in buy range** — closed above the base's pivot on at least 1.4x average volume, and is no more than 5% above it.\n- **Watch: near pivot** — within 5% under the pivot of a sound base. This is the *about to rally* list: the breakout is a close above the pivot on heavy volume.\n- **Extended** — broke out but is now past the 5% buy range; chasing it raises the risk.\n- **Setup, market in correction** — would be a buy or a watch, but M is negative.\n\n**CAN SLIM** shows each letter that passed; '-' failed, '?' unknown. **RS** is the 1-99 relative-strength percentile against everything priced in the scan; CAN SLIM wants 80+.\n\nClick a symbol to chart it below. These are rule readings, not advice.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol                         AS \"Symbol\",\n       signal                         AS \"Signal\",\n       letters                        AS \"CAN SLIM\",\n       rs_rating                      AS \"RS\",\n       close                          AS \"Close\",\n       pivot                          AS \"Pivot\",\n       ROUND(pct_from_pivot, 1)       AS \"vs pivot %\",\n       base_sessions                  AS \"Base (sessions)\",\n       ROUND(base_depth_pct, 1)       AS \"Base depth %\",\n       ROUND(volume_ratio, 2)         AS \"Volume vs 50d\",\n       ROUND(qtr_profit_growth, 1)    AS \"Qtr profit %\",\n       ROUND(profit_growth_3y, 1)     AS \"3y profit %\",\n       ROUND(roe, 1)                  AS \"ROE %\",\n       reason                         AS \"Why\"\nFROM v_canslim_latest\nWHERE signal IN ('BUY_BREAKOUT', 'BUY_ZONE', 'WATCH_SETUP', 'AVOID_MARKET', 'EXTENDED')\nORDER BY CASE signal WHEN 'BUY_BREAKOUT' THEN 0 WHEN 'BUY_ZONE' THEN 1 WHEN 'WATCH_SETUP' THEN 2\n                     WHEN 'AVOID_MARKET' THEN 3 ELSE 4 END,\n         letters_passed DESC, rs_rating DESC",
+          "queryText": "SELECT symbol                         AS \"Symbol\",\n       signal                         AS \"Signal\",\n       letters                        AS \"CAN SLIM\",\n       rs_rating                      AS \"RS\",\n       close                          AS \"Close\",\n       pivot                          AS \"Pivot\",\n       ROUND(pct_from_pivot, 1)       AS \"vs pivot %\",\n       base_sessions                  AS \"Base (sessions)\",\n       ROUND(base_depth_pct, 1)       AS \"Base depth %\",\n       ROUND(volume_ratio, 2)         AS \"Volume vs 50d\",\n       ROUND(qtr_profit_growth, 1)    AS \"Qtr profit %\",\n       ROUND(profit_growth_3y, 1)     AS \"3y profit %\",\n       ROUND(roe, 1)                  AS \"ROE %\",\n       reason                         AS \"Why\"\nFROM v_canslim_latest\nWHERE signal IN ('BUY_BREAKOUT', 'BUY_ZONE', 'WATCH_SETUP', 'AVOID_MARKET', 'EXTENDED')\nORDER BY CASE signal WHEN 'BUY_BREAKOUT' THEN 0 WHEN 'BUY_ZONE' THEN 1 WHEN 'WATCH_SETUP' THEN 2\n                     WHEN 'AVOID_MARKET' THEN 3 ELSE 4 END,\n         letters_passed DESC, rs_rating DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Show ${__value.raw} below",
+                    "url": "/d/stockanalyzer-canslim/can-slim?orgId=1&var-symbol=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Signal"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "SELL_STOP_LOSS": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "Sell: stop loss"
+                      },
+                      "SELL_TREND_BREAK": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Sell: rally ended"
+                      },
+                      "SELL_CLIMAX": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "Sell: climax top"
+                      },
+                      "BUY_BREAKOUT": {
+                        "color": "green",
+                        "index": 3,
+                        "text": "Buy: breakout today"
+                      },
+                      "BUY_ZONE": {
+                        "color": "green",
+                        "index": 4,
+                        "text": "Buy: in buy range"
+                      },
+                      "WATCH_SETUP": {
+                        "color": "blue",
+                        "index": 5,
+                        "text": "Watch: near pivot"
+                      },
+                      "EXTENDED": {
+                        "color": "yellow",
+                        "index": 6,
+                        "text": "Extended"
+                      },
+                      "AVOID_MARKET": {
+                        "color": "purple",
+                        "index": 7,
+                        "text": "Setup, market in correction"
+                      },
+                      "NONE": {
+                        "color": "transparent",
+                        "index": 8,
+                        "text": "-"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CAN SLIM"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RS"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Why"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pivot"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs pivot %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Base depth %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume vs 50d"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Qtr profit %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3y profit %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROE %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Rallies that have ended - sell signals",
+      "description": "O'Neil's exits, checked for every stock with a rally to end: recent breakouts, open positions, and the configured universe.\n\n- **Stop loss** — the close is 8% or more below the buy point (your average cost for a holding, otherwise the breakout's pivot).\n- **Rally ended** — a close below the 50-day moving average on heavy volume (1.4x average or more).\n- **Climax top** — 20%+ above the buy point and either up 25% in three weeks, or posting its biggest gain since the breakout on its heaviest volume: the run is exhausting itself.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol                                   AS \"Symbol\",\n       signal                                   AS \"Signal\",\n       LOWER(source)                            AS \"Why scanned\",\n       close                                    AS \"Close\",\n       buy_point                                AS \"Buy point\",\n       ROUND((close - buy_point) / buy_point * 100.0, 1) AS \"vs buy point %\",\n       sma50                                    AS \"50-day avg\",\n       rs_rating                                AS \"RS\",\n       reason                                   AS \"Why\"\nFROM v_canslim_latest\nWHERE signal LIKE 'SELL_%'\nORDER BY CASE signal WHEN 'SELL_STOP_LOSS' THEN 0 WHEN 'SELL_TREND_BREAK' THEN 1 ELSE 2 END, symbol",
+          "queryText": "SELECT symbol                                   AS \"Symbol\",\n       signal                                   AS \"Signal\",\n       LOWER(source)                            AS \"Why scanned\",\n       close                                    AS \"Close\",\n       buy_point                                AS \"Buy point\",\n       ROUND((close - buy_point) / buy_point * 100.0, 1) AS \"vs buy point %\",\n       sma50                                    AS \"50-day avg\",\n       rs_rating                                AS \"RS\",\n       reason                                   AS \"Why\"\nFROM v_canslim_latest\nWHERE signal LIKE 'SELL_%'\nORDER BY CASE signal WHEN 'SELL_STOP_LOSS' THEN 0 WHEN 'SELL_TREND_BREAK' THEN 1 ELSE 2 END, symbol",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Show ${__value.raw} below",
+                    "url": "/d/stockanalyzer-canslim/can-slim?orgId=1&var-symbol=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Signal"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "SELL_STOP_LOSS": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "Sell: stop loss"
+                      },
+                      "SELL_TREND_BREAK": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Sell: rally ended"
+                      },
+                      "SELL_CLIMAX": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "Sell: climax top"
+                      },
+                      "BUY_BREAKOUT": {
+                        "color": "green",
+                        "index": 3,
+                        "text": "Buy: breakout today"
+                      },
+                      "BUY_ZONE": {
+                        "color": "green",
+                        "index": 4,
+                        "text": "Buy: in buy range"
+                      },
+                      "WATCH_SETUP": {
+                        "color": "blue",
+                        "index": 5,
+                        "text": "Watch: near pivot"
+                      },
+                      "EXTENDED": {
+                        "color": "yellow",
+                        "index": 6,
+                        "text": "Extended"
+                      },
+                      "AVOID_MARKET": {
+                        "color": "purple",
+                        "index": 7,
+                        "text": "Setup, market in correction"
+                      },
+                      "NONE": {
+                        "color": "transparent",
+                        "index": 8,
+                        "text": "-"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RS"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Why"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy point"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs buy point %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "50-day avg"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": "candlestick",
+      "title": "$symbol - daily candles, 50/200-day averages and the pivot",
+      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT b.ts_epoch     AS time,\n       b.open, b.high, b.low, b.close, b.volume,\n       b.sma50        AS \"SMA 50\",\n       b.sma200       AS \"SMA 200\",\n       l.pivot        AS \"Pivot\",\n       CASE WHEN h.signal IN ('BUY_BREAKOUT', 'BUY_ZONE') THEN b.close END AS \"Buy signal\",\n       CASE WHEN h.signal LIKE 'SELL_%' THEN b.close END              AS \"Sell signal\"\nFROM v_daily_bars b\nLEFT JOIN v_canslim_latest l ON l.symbol = b.symbol\nLEFT JOIN (SELECT symbol, as_of, MAX(signal) AS signal FROM v_canslim_signal_history\n           WHERE signal IN ('BUY_BREAKOUT', 'BUY_ZONE') OR signal LIKE 'SELL_%'\n           GROUP BY symbol, as_of) h\n       ON h.symbol = b.symbol AND h.as_of = b.session_date\nWHERE b.symbol = '$symbol'\nORDER BY b.session_date",
+          "queryText": "SELECT b.ts_epoch     AS time,\n       b.open, b.high, b.low, b.close, b.volume,\n       b.sma50        AS \"SMA 50\",\n       b.sma200       AS \"SMA 200\",\n       l.pivot        AS \"Pivot\",\n       CASE WHEN h.signal IN ('BUY_BREAKOUT', 'BUY_ZONE') THEN b.close END AS \"Buy signal\",\n       CASE WHEN h.signal LIKE 'SELL_%' THEN b.close END              AS \"Sell signal\"\nFROM v_daily_bars b\nLEFT JOIN v_canslim_latest l ON l.symbol = b.symbol\nLEFT JOIN (SELECT symbol, as_of, MAX(signal) AS signal FROM v_canslim_signal_history\n           WHERE signal IN ('BUY_BREAKOUT', 'BUY_ZONE') OR signal LIKE 'SELL_%'\n           GROUP BY symbol, as_of) h\n       ON h.symbol = b.symbol AND h.as_of = b.session_date\nWHERE b.symbol = '$symbol'\nORDER BY b.session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "options": {
+        "mode": "candles+volume",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "down": "red",
+          "up": "green",
+          "flat": "gray"
+        },
+        "includeAllFields": true,
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 50"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA 200"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pivot"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy signal"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 12
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell signal"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 12
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Volume"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "$symbol - every scan's reading",
+      "description": "How the reading for this stock has changed scan by scan: when a setup appeared, when it broke out, when it was sold.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT datetime(run_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Scanned\",\n       as_of        AS \"As of\",\n       signal       AS \"Signal\",\n       letters      AS \"CAN SLIM\",\n       rs_rating    AS \"RS\",\n       close        AS \"Close\",\n       pivot        AS \"Pivot\",\n       market_state AS \"Market\",\n       reason       AS \"Why\"\nFROM v_canslim_signal_history\nWHERE symbol = '$symbol'\nORDER BY run_at DESC\nLIMIT 60",
+          "queryText": "SELECT datetime(run_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Scanned\",\n       as_of        AS \"As of\",\n       signal       AS \"Signal\",\n       letters      AS \"CAN SLIM\",\n       rs_rating    AS \"RS\",\n       close        AS \"Close\",\n       pivot        AS \"Pivot\",\n       market_state AS \"Market\",\n       reason       AS \"Why\"\nFROM v_canslim_signal_history\nWHERE symbol = '$symbol'\nORDER BY run_at DESC\nLIMIT 60",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Signal"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "SELL_STOP_LOSS": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "Sell: stop loss"
+                      },
+                      "SELL_TREND_BREAK": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Sell: rally ended"
+                      },
+                      "SELL_CLIMAX": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "Sell: climax top"
+                      },
+                      "BUY_BREAKOUT": {
+                        "color": "green",
+                        "index": 3,
+                        "text": "Buy: breakout today"
+                      },
+                      "BUY_ZONE": {
+                        "color": "green",
+                        "index": 4,
+                        "text": "Buy: in buy range"
+                      },
+                      "WATCH_SETUP": {
+                        "color": "blue",
+                        "index": 5,
+                        "text": "Watch: near pivot"
+                      },
+                      "EXTENDED": {
+                        "color": "yellow",
+                        "index": 6,
+                        "text": "Extended"
+                      },
+                      "AVOID_MARKET": {
+                        "color": "purple",
+                        "index": 7,
+                        "text": "Setup, market in correction"
+                      },
+                      "NONE": {
+                        "color": "transparent",
+                        "index": 8,
+                        "text": "-"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RS"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Why"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CAN SLIM"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pivot"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Every stock in the last scan",
+      "description": "The full score sheet.\n\n- **C** — latest quarter's profit up 25%+ year on year, with sales up 20%+.\n- **A** — three-year profit growth 25%+ and ROE 17%+.\n- **N** — within 15% of its 52-week high.\n- **S** — more volume on up days than down days over 50 sessions.\n- **L** — RS rating 80+.\n- **I** — institutions (FII + DII) added to their holding last quarter.\n- **M** — the market is in a confirmed uptrend.\n\nC, A and I come from screener.in, so they are unknown ('?') for stocks that were scanned only because you hold them or they are in the configured universe.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT symbol                         AS \"Symbol\",\n       LOWER(source)                  AS \"Why scanned\",\n       signal                         AS \"Signal\",\n       letters                        AS \"CAN SLIM\",\n       letters_passed                 AS \"Letters passed\",\n       rs_rating                      AS \"RS\",\n       close                          AS \"Close\",\n       ROUND(pct_from_high, 1)        AS \"Below 52w high %\",\n       ROUND(up_down_volume, 2)       AS \"Up/down volume\",\n       ROUND(qtr_profit_growth, 1)    AS \"Qtr profit %\",\n       ROUND(qtr_sales_growth, 1)     AS \"Qtr sales %\",\n       ROUND(profit_growth_3y, 1)     AS \"3y profit %\",\n       ROUND(roe, 1)                  AS \"ROE %\",\n       ROUND(institutional_change, 2) AS \"FII+DII change\",\n       reason                         AS \"Why\"\nFROM v_canslim_latest\nORDER BY letters_passed DESC, rs_rating DESC",
+          "queryText": "SELECT symbol                         AS \"Symbol\",\n       LOWER(source)                  AS \"Why scanned\",\n       signal                         AS \"Signal\",\n       letters                        AS \"CAN SLIM\",\n       letters_passed                 AS \"Letters passed\",\n       rs_rating                      AS \"RS\",\n       close                          AS \"Close\",\n       ROUND(pct_from_high, 1)        AS \"Below 52w high %\",\n       ROUND(up_down_volume, 2)       AS \"Up/down volume\",\n       ROUND(qtr_profit_growth, 1)    AS \"Qtr profit %\",\n       ROUND(qtr_sales_growth, 1)     AS \"Qtr sales %\",\n       ROUND(profit_growth_3y, 1)     AS \"3y profit %\",\n       ROUND(roe, 1)                  AS \"ROE %\",\n       ROUND(institutional_change, 2) AS \"FII+DII change\",\n       reason                         AS \"Why\"\nFROM v_canslim_latest\nORDER BY letters_passed DESC, rs_rating DESC",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Show ${__value.raw} below",
+                    "url": "/d/stockanalyzer-canslim/can-slim?orgId=1&var-symbol=${__value.raw}&${__url_time_range}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Signal"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "SELL_STOP_LOSS": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "Sell: stop loss"
+                      },
+                      "SELL_TREND_BREAK": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Sell: rally ended"
+                      },
+                      "SELL_CLIMAX": {
+                        "color": "orange",
+                        "index": 2,
+                        "text": "Sell: climax top"
+                      },
+                      "BUY_BREAKOUT": {
+                        "color": "green",
+                        "index": 3,
+                        "text": "Buy: breakout today"
+                      },
+                      "BUY_ZONE": {
+                        "color": "green",
+                        "index": 4,
+                        "text": "Buy: in buy range"
+                      },
+                      "WATCH_SETUP": {
+                        "color": "blue",
+                        "index": 5,
+                        "text": "Watch: near pivot"
+                      },
+                      "EXTENDED": {
+                        "color": "yellow",
+                        "index": 6,
+                        "text": "Extended"
+                      },
+                      "AVOID_MARKET": {
+                        "color": "purple",
+                        "index": 7,
+                        "text": "Setup, market in correction"
+                      },
+                      "NONE": {
+                        "color": "transparent",
+                        "index": 8,
+                        "text": "-"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CAN SLIM"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RS"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Why"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 520
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Close"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Below 52w high %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Up/down volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Qtr profit %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Qtr sales %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3y profit %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROE %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FII+DII change"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

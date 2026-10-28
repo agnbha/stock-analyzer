@@ -9,6 +9,7 @@
 #   4. capture                 - compares 3 against 1, so it must come last
 #   5. balance                 - what the broker says the account now holds
 #   6. print the day           - what you actually read
+#   7. CAN SLIM scan           - needs the day's closing daily bar, so after the close
 #
 # Every step is idempotent. If the daemon already reconciled the session, step 1
 # finds nothing missing and does nothing; if the daemon never ran, step 1 is what
@@ -38,5 +39,9 @@ run_step "capture analysis" com.stockanalyzer.TradeJournalMain capture --month "
 run_step "record broker balance" com.stockanalyzer.TradeJournalMain trades balance \
     --date "$SESSION_DATE"
 run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$SESSION_DATE"
+# Without a screener.in session the query is skipped and the scan says so; holdings
+# and the configured symbols are still scored (fundamentals from public company
+# pages). Exit status 3 means a configured session was rejected: sign in again.
+run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan
 
 finish
