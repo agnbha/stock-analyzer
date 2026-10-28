@@ -96,7 +96,8 @@ public final class MarketDayDaemon {
                             config.stockSymbols(), config.exchange(), config.segment(),
                             config.intradayIntervalMinutes(), config.monitorPollIntervalSeconds(),
                             config.monitorPostCloseGraceSeconds(), config.modelHorizonMinutes(),
-                            config.alertModelMinProbability(), config.monitorPersistLiveCandles()));
+                            config.alertModelMinProbability(), config.monitorPersistLiveCandles(),
+                            config.alertMaxAgeMinutes()));
 
             warnIfSessionExceedsDailyBudget(context, config);
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));

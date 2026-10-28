@@ -249,12 +249,30 @@ public final class AppConfig {
         return Integer.parseInt(get("alerts.hotwindow.min-sessions", "30"));
     }
 
+    /** Windows starting within this many minutes of the open are ignored: see SessionAlertPlanner. */
+    public int alertHotWindowSkipOpeningMinutes() {
+        return Integer.parseInt(get("alerts.hotwindow.skip-opening-minutes", "5"));
+    }
+
+    /** The most "approaching a strong window" alerts planned for one day; the strongest are kept. */
+    public int alertHotWindowMaxPerDay() {
+        return Integer.parseInt(get("alerts.hotwindow.max-per-day", "20"));
+    }
+
     public double alertHotWindowMinLowerBound() {
         return Double.parseDouble(get("alerts.hotwindow.min-lcb", "0.10"));
     }
 
     public double alertModelMinProbability() {
         return Double.parseDouble(get("alerts.model.min-probability", "0.65"));
+    }
+
+    /**
+     * How old an event may be, counted from when it could first have been known,
+     * and still be alerted on. Older ones are recorded but not announced.
+     */
+    public int alertMaxAgeMinutes() {
+        return Integer.parseInt(get("alerts.max.age.minutes", "10"));
     }
 
     public int alertCooldownMinutes() {

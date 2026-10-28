@@ -224,7 +224,8 @@ public final class AppContext implements AutoCloseable {
 
         IntradaySignalModel baseline = new HotWindowSignalModel(hotWindowRepository, clock,
                 config.hotWindowBucketMinutes(), config.hotWindowLookbackDays(),
-                config.alertHotWindowMinSessions(), config.alertHotWindowMinLowerBound());
+                config.alertHotWindowMinSessions(), config.alertHotWindowMinLowerBound(),
+                config.alertHotWindowSkipOpeningMinutes());
         this.signalModel = config.modelEnabled()
                 ? new FallbackSignalModel(new RestIntradaySignalModel(httpClient, config.modelServiceUrl(),
                         Duration.ofSeconds(config.modelTimeoutSeconds())), baseline)
@@ -267,7 +268,8 @@ public final class AppContext implements AutoCloseable {
     public SessionAlertPlanner alertPlanner() {
         return new SessionAlertPlanner(hotWindowRepository, clock, config.hotWindowBucketMinutes(),
                 config.hotWindowLookbackDays(), config.alertLeadTimeMinutes(),
-                config.alertHotWindowMinSessions(), config.alertHotWindowMinLowerBound());
+                config.alertHotWindowMinSessions(), config.alertHotWindowMinLowerBound(),
+                config.alertHotWindowSkipOpeningMinutes(), config.alertHotWindowMaxPerDay());
     }
 
     public HotWindowCalculator hotWindowCalculator() {
