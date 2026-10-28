@@ -427,6 +427,90 @@ public final class AppConfig {
         return Integer.parseInt(get("canslim.fundamentals.season.check.days", "2"));
     }
 
+    // ---- CAN SLIM, whole market ----------------------------------------------------
+
+    /** Whether the nightly scan also prices and ranks every listed NSE/BSE equity. */
+    public boolean canSlimMarketEnabled() {
+        return Boolean.parseBoolean(get("canslim.market.enabled", "false"));
+    }
+
+    public String canSlimCatalogUrl() {
+        return get("canslim.market.catalog.url", "https://growwapi-assets.groww.in/instruments/instrument.csv");
+    }
+
+    public String canSlimCatalogCache() {
+        return get("canslim.market.catalog.cache", "data/instruments.csv");
+    }
+
+    public int canSlimCatalogMaxAgeHours() {
+        return Integer.parseInt(get("canslim.market.catalog.max.age.hours", "24"));
+    }
+
+    public java.util.Set<String> canSlimMarketExchanges() {
+        return csvSet("canslim.market.exchanges", "NSE,BSE");
+    }
+
+    /** NSE series to cover; the SME ones are added by {@code canslim.market.include.sme}. */
+    public java.util.Set<String> canSlimMarketNseSeries() {
+        java.util.Set<String> series = csvSet("canslim.market.nse.series", "EQ,BE,BZ");
+        if (canSlimMarketIncludeSme()) {
+            series.addAll(csvSet("canslim.market.nse.sme.series", "SM,ST,SZ"));
+        }
+        return series;
+    }
+
+    /** BSE groups to cover, for the companies NSE does not list. */
+    public java.util.Set<String> canSlimMarketBseSeries() {
+        java.util.Set<String> series = csvSet("canslim.market.bse.series", "A,B,T,Z,P,ZP,TS");
+        if (canSlimMarketIncludeSme()) {
+            series.addAll(csvSet("canslim.market.bse.sme.series", "X,XT,M,MT,MS"));
+        }
+        return series;
+    }
+
+    public boolean canSlimMarketIncludeSme() {
+        return Boolean.parseBoolean(get("canslim.market.include.sme", "false"));
+    }
+
+    public int canSlimMarketMinSessions() {
+        return Integer.parseInt(get("canslim.market.min.sessions", "126"));
+    }
+
+    public double canSlimMarketMinPrice() {
+        return Double.parseDouble(get("canslim.market.min.price", "10"));
+    }
+
+    /** Average daily value traded, in rupees, below which a listing is not ranked. */
+    public double canSlimMarketMinTurnover() {
+        return Double.parseDouble(get("canslim.market.min.turnover", "10000000"));
+    }
+
+    public int canSlimMarketMaxStaleDays() {
+        return Integer.parseInt(get("canslim.market.max.stale.days", "10"));
+    }
+
+    /** The RS rating from which a market-wide listing has its company page read. */
+    public int canSlimMarketFundamentalsMinRs() {
+        return Integer.parseInt(get("canslim.market.fundamentals.min.rs",
+                String.valueOf((int) canSlim("min.rs.rating", 80))));
+    }
+
+    public int canSlimMarketKeepRuns() {
+        return Integer.parseInt(get("canslim.market.keep.runs", "30"));
+    }
+
+    /** How many of the strongest stocks by RS the report lists. */
+    public int canSlimMarketTop() {
+        return Integer.parseInt(get("canslim.market.report.top", "50"));
+    }
+
+    private java.util.Set<String> csvSet(String key, String fallback) {
+        return java.util.Arrays.stream(get(key, fallback).split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
     public double canSlim(String key, double fallback) {
         return Double.parseDouble(get("canslim." + key, String.valueOf(fallback)));
     }

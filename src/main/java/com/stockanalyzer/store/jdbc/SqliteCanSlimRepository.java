@@ -71,6 +71,20 @@ public final class SqliteCanSlimRepository implements CanSlimRepository {
         });
     }
 
+    @Override
+    public void pruneMarketScores(int keepRuns) {
+        database.inTransaction(connection -> {
+            try (PreparedStatement prune = connection.prepareStatement("""
+                    DELETE FROM canslim_score
+                    WHERE source = 'MARKET'
+                      AND run_id NOT IN (SELECT DISTINCT run_id FROM canslim_score
+                                         WHERE source = 'MARKET' ORDER BY run_id DESC LIMIT ?)""")) {
+                prune.setInt(1, Math.max(keepRuns, 1));
+                prune.executeUpdate();
+            }
+        });
+    }
+
     private static void bind(PreparedStatement ps, long runId, long instrumentId, CanSlimScore score)
             throws SQLException {
         PriceAction pa = score.priceAction();
