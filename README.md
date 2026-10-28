@@ -98,6 +98,26 @@ java -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only, no not
 java -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
 ```
 
+**Desktop notifications.** Alerts go to the console and, on macOS, to a
+notification banner (`alerts.sinks=console,macos`). Per-symbol alerts
+(`NOTABLE`) show a silent banner; `URGENT` ones also play a sound; the session
+lifecycle chatter (`INFO`) stays in the console. Lower the bar with
+`alerts.desktop.min-severity=INFO`, or drop `macos` from `alerts.sinks` to turn
+the banners off. `--dry-run` never posts one.
+
+osascript posts the banner as *Script Editor*, so macOS shows nothing until that
+app is allowed to notify (System Settings > Notifications > Script Editor, and
+check that Focus modes are not hiding it). To test the channel without waiting
+for a market event:
+
+```bash
+osascript -e 'display notification "test" with title "stock-analyzer" sound name "Glass"'
+```
+
+A banner that fails to post is logged as `Desktop notification failed` in
+`logs/market-day-*.err.log`. The settings are read when the daemon starts, so a
+change takes effect on the next launch.
+
 ### Part 5 - the trade journal
 
 ```bash

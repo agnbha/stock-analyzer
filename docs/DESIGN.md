@@ -485,6 +485,9 @@ the design, not a later fix:
   re-reads it and never re-fires.
 - **Severity** (`INFO` / `NOTABLE` / `URGENT`) routed per sink, so lifecycle
   alerts stay in the console while only `URGENT` reaches a desktop notification.
+  (As built, the desktop threshold is `alerts.desktop.min-severity`, default
+  `NOTABLE`: with `model.enabled=false` nothing is ever `URGENT`, so an
+  `URGENT`-only threshold would leave the desktop silent.)
 
 ```sql
 CREATE TABLE alert_schedule (
