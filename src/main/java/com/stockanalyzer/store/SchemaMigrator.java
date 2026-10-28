@@ -84,6 +84,7 @@ public final class SchemaMigrator {
         all.put(16, v16());
         all.put(17, v17());
         all.put(18, v18());
+        all.put(19, v19());
         return all;
     }
 
@@ -246,6 +247,17 @@ public final class SchemaMigrator {
                   fetched_at INTEGER NOT NULL,
                   ratios_json TEXT NOT NULL
                 )""");
+    }
+
+    /**
+     * v19: which quarter each cached page showed. A page's figures change when the company
+     * reports, so the copy is judged by the quarter it carries and the calendar, not by its age.
+     * Rows from before this carry none, which reads as "unknown: fetch once more".
+     */
+    private List<String> v19() {
+        return List.of(
+                "ALTER TABLE screener_fundamentals ADD COLUMN results_quarter TEXT",
+                "ALTER TABLE screener_fundamentals ADD COLUMN holding_quarter TEXT");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

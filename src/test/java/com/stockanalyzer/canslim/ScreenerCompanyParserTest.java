@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Fixtures are the relevant sections cut from real screener.in company pages. */
@@ -19,6 +20,34 @@ class ScreenerCompanyParserTest {
         try (InputStream in = ScreenerCompanyParserTest.class.getResourceAsStream("/screener/" + fixture)) {
             return ScreenerCompanyParser.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
         }
+    }
+
+    private static CompanyFundamentals fundamentals(String fixture) throws IOException {
+        try (InputStream in = ScreenerCompanyParserTest.class.getResourceAsStream("/screener/" + fixture)) {
+            return ScreenerCompanyParser.fundamentals(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    @DisplayName("the newest quarter each table shows is read, so a copy can be judged by the calendar")
+    void quarterLabels() throws IOException {
+        // ITC's page was cut after the shareholding for September arrived but before its results did.
+        CompanyFundamentals itc = fundamentals("company-itc.html");
+        assertEquals(java.time.YearMonth.of(2026, 6), itc.resultsQuarter());
+        assertEquals(java.time.YearMonth.of(2026, 9), itc.holdingQuarter());
+
+        CompanyFundamentals hdfc = fundamentals("company-hdfcbank.html");
+        assertEquals(java.time.YearMonth.of(2026, 9), hdfc.resultsQuarter());
+        assertEquals(java.time.YearMonth.of(2026, 9), hdfc.holdingQuarter());
+    }
+
+    @Test
+    @DisplayName("a page without the tables has no quarters, and no ratios")
+    void noQuarters() throws IOException {
+        CompanyFundamentals etf = fundamentals("company-etf.html");
+        assertNull(etf.resultsQuarter());
+        assertNull(etf.holdingQuarter());
+        assertTrue(etf.isEmpty());
     }
 
     @Test

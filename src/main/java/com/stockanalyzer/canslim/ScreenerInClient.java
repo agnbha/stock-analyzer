@@ -10,10 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,31 +25,25 @@ import java.util.regex.Pattern;
  * session expires the site redirects to its login page, which surfaces here as
  * {@link ScreenerException#needsLogin()}.
  *
- * <p><b>Politeness.</b> Requests are spaced at least {@code minIntervalMillis}
- * apart and stop after {@code maxPages}; one scan is a handful of page loads,
- * the same as a person paging through the results.
+ * <p><b>Politeness.</b> One request per scan, for the first page of results. screener.in's
+ * robots.txt asks automated clients not to use its {@code page}, {@code limit}, {@code sort}
+ * or {@code q} parameters, so none is sent: a query that matches more than a page says so
+ * ({@link ScreenerClient.Result#moreAvailable()}) and should be tightened instead.
  */
 public final class ScreenerInClient implements ScreenerClient {
 
     private static final Logger log = LoggerFactory.getLogger(ScreenerInClient.class);
-    private static final int PAGE_SIZE = 50;
     private static final Pattern ERROR_TEXT = Pattern.compile(
             "class=\"[^\"]*(?:error|flash)[^\"]*\"[^>]*>\\s*(.*?)\\s*</", Pattern.DOTALL);
 
     private final HttpClient httpClient;
     private final String baseUrl;
     private final String sessionCookie;
-    private final int maxPages;
-    private final long minIntervalMillis;
-    private long lastRequestAt;
 
-    public ScreenerInClient(HttpClient httpClient, String baseUrl, String sessionId,
-                            int maxPages, long minIntervalMillis) {
+    public ScreenerInClient(HttpClient httpClient, String baseUrl, String sessionId) {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.sessionCookie = cookieHeader(sessionId);
-        this.maxPages = maxPages;
-        this.minIntervalMillis = minIntervalMillis;
     }
 
     @Override
@@ -62,39 +52,28 @@ public final class ScreenerInClient implements ScreenerClient {
     }
 
     @Override
-    public List<ScreenedStock> screen(String query) {
+    public Result screen(String query) {
         if (sessionCookie == null) {
             throw new ScreenerException("No screener.in session configured. Sign in at "
                     + "https://www.screener.in in a browser, copy the 'sessionid' cookie, and set "
                     + "SCREENER_SESSION_ID (or screener.session.id).", true);
         }
-        // Keyed by symbol: a company that moves between pages while we read them
-        // must not be counted twice.
-        Map<String, ScreenedStock> results = new LinkedHashMap<>();
-        int skipped = 0;
-        int totalPages = 1;
-        for (int page = 1; page <= Math.min(totalPages, maxPages); page++) {
-            ScreenerResultsParser.Page parsed = fetchPage(query, page);
-            parsed.stocks().forEach(stock -> results.putIfAbsent(stock.symbol(), stock));
-            skipped += parsed.skippedNonNse();
-            totalPages = parsed.totalPages();
-            if (parsed.stocks().isEmpty()) {
-                break;
-            }
+        ScreenerResultsParser.Page page = fetchPage(query);
+        boolean more = page.totalPages() > 1;
+        if (more) {
+            log.warn("The query matched {} pages of results; read only the first ({} companies), because "
+                    + "screener.in's robots.txt asks automated clients not to page. Tighten the query.",
+                    page.totalPages(), page.stocks().size());
         }
-        if (totalPages > maxPages) {
-            log.warn("Query matched {} pages of results; read the first {} ({} companies). "
-                    + "Tighten the query or raise canslim.screener.max.pages.", totalPages, maxPages, results.size());
+        if (page.skippedNonNse() > 0) {
+            log.info("Skipped {} BSE-only companies: there is no NSE symbol to fetch prices for",
+                    page.skippedNonNse());
         }
-        if (skipped > 0) {
-            log.info("Skipped {} BSE-only companies: there is no NSE symbol to fetch prices for", skipped);
-        }
-        return new ArrayList<>(results.values());
+        return new Result(page.stocks(), more);
     }
 
-    private ScreenerResultsParser.Page fetchPage(String query, int page) {
-        String url = baseUrl + "/screen/raw/?query=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
-                + "&limit=" + PAGE_SIZE + "&page=" + page;
+    private ScreenerResultsParser.Page fetchPage(String query) {
+        String url = baseUrl + "/screen/raw/?query=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(30))
@@ -106,7 +85,6 @@ public final class ScreenerInClient implements ScreenerClient {
 
         HttpResponse<String> response;
         try {
-            pace();
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -124,7 +102,7 @@ public final class ScreenerInClient implements ScreenerClient {
                     + "update SCREENER_SESSION_ID.", true);
         }
         if (status / 100 != 2) {
-            throw new ScreenerException("screener.in answered HTTP " + status + " for page " + page
+            throw new ScreenerException("screener.in answered HTTP " + status
                     + (location.isEmpty() ? "" : " (redirect to " + location + ")"), false);
         }
 
@@ -132,7 +110,7 @@ public final class ScreenerInClient implements ScreenerClient {
         if (parsed == null) {
             throw new ScreenerException(explainMissingTable(response.body()), isLoginPage(response.body()));
         }
-        log.debug("screener.in page {} of {}: {} companies", page, parsed.totalPages(), parsed.stocks().size());
+        log.debug("screener.in first of {} pages: {} companies", parsed.totalPages(), parsed.stocks().size());
         return parsed;
     }
 
@@ -154,14 +132,6 @@ public final class ScreenerInClient implements ScreenerClient {
 
     private static boolean isLoginPage(String body) {
         return body.contains("name=\"password\"") || body.contains("/login/google/");
-    }
-
-    private synchronized void pace() throws InterruptedException {
-        long wait = lastRequestAt + minIntervalMillis - System.currentTimeMillis();
-        if (wait > 0) {
-            Thread.sleep(wait);
-        }
-        lastRequestAt = System.currentTimeMillis();
     }
 
     /** Accepts the bare cookie value, or a whole {@code name=value; ...} header copied from the browser. */

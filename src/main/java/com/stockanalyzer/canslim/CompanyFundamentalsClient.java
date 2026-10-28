@@ -1,6 +1,5 @@
 package com.stockanalyzer.canslim;
 
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -11,5 +10,5 @@ import java.util.Optional;
  */
 public interface CompanyFundamentalsClient {
 
-    Optional<Map<String, Double>> fetch(String symbol);
+    Optional<CompanyFundamentals> fetch(String symbol);
 }

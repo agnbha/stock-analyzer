@@ -293,10 +293,12 @@ dashboard query executed against a real migrated database.
   browser - a flow a batch job cannot complete, and should not hold the
   credentials for. So the scan sends the `sessionid` cookie you copy from a
   signed-in browser; when it expires, the scan exits with status 3 and says so.
-  The client pages through results politely (one request every two seconds, at
-  most four pages); check screener.in's terms if you plan to run it more often
-  than once a day. A query that names a ratio screener.in does not know fails
-  with screener.in's own error message.
+  The query is one request for the first page of results: screener.in's
+  robots.txt asks automated clients not to use `page`, `limit` or `sort`, so none
+  is sent, and a query matching more than a page says so and should be tightened.
+  The result only changes when companies report, so running it once a week is
+  plenty. A query that names a ratio screener.in does not know fails with
+  screener.in's own error message.
 
 - The historical candle endpoint used (`GET /v1/historical/candle/range`) is
   marked **deprecated** in Groww's docs in favor of a newer "Backtesting" data

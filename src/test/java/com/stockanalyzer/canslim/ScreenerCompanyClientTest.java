@@ -60,10 +60,10 @@ class ScreenerCompanyClientTest {
     void consolidatedFirst() throws IOException {
         serve(path -> 200);
 
-        Optional<Map<String, Double>> ratios = client().fetch("M&M");
+        Optional<CompanyFundamentals> found = client().fetch("M&M");
 
         assertEquals(List.of("/company/M%26M/consolidated/"), requested);
-        assertEquals(50.0, ratios.orElseThrow().get(ScreenerRatios.QTR_PROFIT_GROWTH), 1e-9);
+        assertEquals(50.0, found.orElseThrow().ratios().get(ScreenerRatios.QTR_PROFIT_GROWTH), 1e-9);
     }
 
     @Test

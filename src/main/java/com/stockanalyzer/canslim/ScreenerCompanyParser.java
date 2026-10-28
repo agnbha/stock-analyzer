@@ -1,8 +1,12 @@
 package com.stockanalyzer.canslim;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,8 +44,33 @@ public final class ScreenerCompanyParser {
     private static final Pattern THREE_YEARS = Pattern.compile("3 Years:\\s*(-?[\\d,.]+)\\s*%");
     private static final Pattern NUMBER = Pattern.compile("-?[\\d,]+(?:\\.\\d+)?");
     private static final Pattern TAG = Pattern.compile("<[^>]+>");
+    private static final DateTimeFormatter QUARTER = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH);
 
     private ScreenerCompanyParser() {
+    }
+
+    /** The ratios together with the latest quarter each quarterly table shows. */
+    public static CompanyFundamentals fundamentals(String html) {
+        return new CompanyFundamentals(parse(html),
+                lastQuarter(section(html, "quarters")), lastQuarter(section(html, "quarterly-shp")));
+    }
+
+    /** The newest column heading that reads as a month and year ("Sep 2026"), or null. */
+    private static YearMonth lastQuarter(String section) {
+        Matcher row = ROW.matcher(section);
+        if (!row.find()) {
+            return null;
+        }
+        YearMonth last = null;
+        Matcher cell = CELL.matcher(row.group(1));
+        while (cell.find()) {
+            try {
+                last = YearMonth.parse(text(cell.group(1)), QUARTER);
+            } catch (DateTimeParseException notAMonth) {
+                // The row's label cell, or a heading like "TTM".
+            }
+        }
+        return last;
     }
 
     /** Empty when the page has none of it - the caller treats that as "no fundamentals". */

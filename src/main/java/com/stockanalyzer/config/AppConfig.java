@@ -370,10 +370,6 @@ public final class AppConfig {
         return get("screener.base.url", "https://www.screener.in");
     }
 
-    public int screenerMaxPages() {
-        return Integer.parseInt(get("canslim.screener.max.pages", "4"));
-    }
-
     public long screenerRequestIntervalMillis() {
         return Long.parseLong(get("canslim.screener.request.interval.ms", "2000"));
     }
@@ -396,9 +392,18 @@ public final class AppConfig {
         return Boolean.parseBoolean(get("canslim.include.universe", "true"));
     }
 
-    /** How long fundamentals read from company pages are reused; they change once a quarter. */
+    /**
+     * The slow pace for company pages with nothing new to learn from (an ETF, a company past the
+     * reporting deadline still missing the quarter). Otherwise the calendar decides: see
+     * {@code FundamentalsRefreshPolicy}.
+     */
     public int canSlimFundamentalsCacheDays() {
         return Integer.parseInt(get("canslim.fundamentals.cache.days", "7"));
+    }
+
+    /** In reporting season, how often to look again at a company that has not yet shown the new quarter. */
+    public int canSlimFundamentalsSeasonCheckDays() {
+        return Integer.parseInt(get("canslim.fundamentals.season.check.days", "2"));
     }
 
     public double canSlim(String key, double fallback) {

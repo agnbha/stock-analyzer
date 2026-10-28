@@ -10,7 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -20,8 +19,9 @@ import java.util.Optional;
  * page parameters, which this never uses.
  *
  * <p>Pages are fetched one at a time, {@code minIntervalMillis} apart, and the
- * caller caches what comes back: the numbers change once a quarter, so a stock
- * needs fetching about once a week, not once a night.
+ * caller caches what comes back: the numbers change when a company reports a
+ * quarter, so a page is read again only when that may have happened
+ * ({@link FundamentalsRefreshPolicy}), not on a timer.
  */
 public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
 
@@ -43,17 +43,17 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
      * has them, then the standalone ones for a company that does not.
      */
     @Override
-    public Optional<Map<String, Double>> fetch(String symbol) {
+    public Optional<CompanyFundamentals> fetch(String symbol) {
         String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
         for (String path : new String[]{"/company/" + encoded + "/consolidated/", "/company/" + encoded + "/"}) {
             String html = get(baseUrl + path, symbol);
             if (html == null) {
                 continue;
             }
-            Map<String, Double> ratios = ScreenerCompanyParser.parse(html);
-            if (ratios.containsKey(ScreenerRatios.QTR_PROFIT_GROWTH)
-                    || ratios.containsKey(ScreenerRatios.PROFIT_GROWTH_3Y)) {
-                return Optional.of(ratios);
+            CompanyFundamentals fundamentals = ScreenerCompanyParser.fundamentals(html);
+            if (fundamentals.ratios().containsKey(ScreenerRatios.QTR_PROFIT_GROWTH)
+                    || fundamentals.ratios().containsKey(ScreenerRatios.PROFIT_GROWTH_3Y)) {
+                return Optional.of(fundamentals);
             }
             log.debug("{}{} carried no growth figures", symbol, path);
         }

@@ -121,14 +121,17 @@ value in `~/.stock-analyzer.env` as `SCREENER_SESSION_ID`.
 
 - Without it, the step still runs: the query is skipped and the report says so,
   and holdings and the configured symbols are scored from screener.in's public
-  company pages (cached for a week), for buy and sell signals alike. Only
+  company pages (re-read only when a company may have reported a new quarter),
+  for buy and sell signals alike. Only
   candidates outside those symbols are missed.
 - When a configured session expires the step finishes its scan and stores the
   results, then fails with exit status 3 and a message saying so. Sign in again
   and replace the value; nothing else needs changing.
 - The scan prices one year of daily bars per symbol (one request each), so a
-  scan of ~200 symbols takes a couple of minutes. The first scan after a week
-  also reads one company page per symbol, two seconds apart. Like a backfill, keep it out
+  scan of ~200 symbols takes a couple of minutes. The first scan also reads one
+  company page per symbol, two seconds apart; after that, pages are read again
+  only in reporting season (mid-Jan, Apr, Jul and Oct to mid-Feb, May, Aug and
+  Nov), for the companies yet to show the new quarter. Like a backfill, keep it out
   of market hours.
 
 ## Do not run a backfill during market hours

@@ -11,7 +11,15 @@ import java.util.List;
  */
 public interface ScreenerClient {
 
-    List<ScreenedStock> screen(String query);
+    /**
+     * @param moreAvailable the query matched more than the one page that was read. Paging is not an
+     *                      option - screener.in's robots.txt asks automated clients to stay off the
+     *                      {@code page} and {@code limit} parameters - so the answer is a tighter query
+     */
+    record Result(List<ScreenedStock> stocks, boolean moreAvailable) {
+    }
+
+    Result screen(String query);
 
     /** Whether a query can be attempted at all. False means the account's session was never configured. */
     default boolean hasSession() {

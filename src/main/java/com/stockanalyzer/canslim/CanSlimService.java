@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -46,21 +48,27 @@ public final class CanSlimService {
 
     private static final Logger log = LoggerFactory.getLogger(CanSlimService.class);
     private static final int DAILY_INTERVAL_MINUTES = 1440;
+    private static final DateTimeFormatter QUARTER_LABEL = DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH);
 
     /**
      * @param historyDays   calendar days of daily bars to fetch: a year of sessions plus room for the 200-day average
      * @param maxCandidates the most screened companies to price in one scan
      * @param universe      extra symbols to price for RS ranking and sell signals
-     * @param fundamentalsCacheDays how long fundamentals read from company pages are reused; 0 reads them
-     *                      every scan
+     * @param fundamentalsCacheDays the slow pace for company pages with nothing new to learn from: ones with
+     *                      no figures, and companies past the reporting deadline still missing the quarter;
+     *                      0 reads every page every scan
+     * @param fundamentalsSeasonCheckDays how often, in reporting season, to look again at a company that has
+     *                      not yet shown the newly ended quarter
      */
     public record Settings(String exchange, String segment, String indexSymbol, int historyDays,
-                           int maxCandidates, List<String> universe, int fundamentalsCacheDays) {
+                           int maxCandidates, List<String> universe, int fundamentalsCacheDays,
+                           int fundamentalsSeasonCheckDays) {
     }
 
     private final ScreenerClient screener;
     private final CompanyFundamentalsClient companyFundamentals;
     private final FundamentalsCacheRepository fundamentalsCache;
+    private final FundamentalsRefreshPolicy refreshPolicy;
     private final CandleDataClient dailyClient;
     private final InstrumentRepository instruments;
     private final DailyBarRepository dailyBars;
@@ -82,6 +90,8 @@ public final class CanSlimService {
         this.screener = screener;
         this.companyFundamentals = companyFundamentals;
         this.fundamentalsCache = fundamentalsCache;
+        this.refreshPolicy = new FundamentalsRefreshPolicy(settings.fundamentalsCacheDays(),
+                settings.fundamentalsSeasonCheckDays());
         this.dailyClient = dailyClient;
         this.instruments = instruments;
         this.dailyBars = dailyBars;
@@ -114,8 +124,14 @@ public final class CanSlimService {
                         + "from their public screener.in company pages.";
             } else {
                 try {
-                    List<ScreenedStock> results = screener.screen(query);
+                    ScreenerClient.Result found = screener.screen(query);
+                    List<ScreenedStock> results = found.stocks();
                     screenedCount = results.size();
+                    if (found.moreAvailable()) {
+                        screenerNotice = "The query matched more than one page of results; only the first page ("
+                                + results.size() + " companies) was read, because screener.in's robots.txt asks "
+                                + "automated clients not to page. Tighten canslim.screener.query so it fits on one page.";
+                    }
                     results.stream().limit(settings.maxCandidates()).forEach(s -> screened.put(s.symbol(), s));
                     if (results.size() > settings.maxCandidates()) {
                         log.warn("The query returned {} companies; scoring the first {}. Tighten the query or "
@@ -198,12 +214,13 @@ public final class CanSlimService {
     }
 
     /**
-     * C, A and I for symbols the query did not return, from their public
-     * company pages. Anything fetched in the last {@code fundamentalsCacheDays}
-     * is reused, so the nightly scan reads the site only when a quarter's
-     * numbers may have changed. A failed fetch leaves that stock's letters
-     * unknown; a rate limit stops the fetching altogether rather than asking
-     * again, and the rest is picked up on a later run.
+     * C, A and I for symbols the query did not return, from their public company
+     * pages. A page is read again only when the calendar says the company may
+     * have reported since ({@link FundamentalsRefreshPolicy}), so most nights read
+     * nothing and reporting season reads exactly the companies still to report. A
+     * failed fetch leaves that stock's letters unknown; a rate limit stops the
+     * fetching altogether rather than asking again, and the rest is picked up on a
+     * later run.
      */
     private FundamentalsResult pageFundamentals(List<String> symbols) {
         Map<String, ScreenedStock> stocks = new LinkedHashMap<>();
@@ -211,41 +228,49 @@ public final class CanSlimService {
             return new FundamentalsResult(stocks, null);
         }
         long now = clock.instant().getEpochSecond();
-        long maxAge = settings.fundamentalsCacheDays() * 86_400L;
-        int cached = 0;
+        LocalDate today = LocalDate.now(clock.withZone(marketClock.zone()));
+        int reused = 0;
         int fetched = 0;
         int unavailable = 0;
+        int awaiting = 0;
         String stopped = null;
         for (String symbol : symbols) {
             long instrumentId = instruments.findOrCreate(symbol, settings.exchange(), settings.segment());
             Optional<FundamentalsCacheRepository.Cached> hit = fundamentalsCache.find(instrumentId);
-            Map<String, Double> ratios;
-            if (hit.isPresent() && now - hit.get().fetchedAtEpoch() < maxAge) {
-                ratios = hit.get().ratios();
-                cached++;
+            CompanyFundamentals fundamentals;
+            if (hit.isPresent() && !refreshPolicy.due(hit.get(), today, now)) {
+                fundamentals = hit.get().fundamentals();
+                reused++;
             } else if (stopped != null) {
-                ratios = hit.map(FundamentalsCacheRepository.Cached::ratios).orElse(Map.of());
+                fundamentals = hit.map(FundamentalsCacheRepository.Cached::fundamentals)
+                        .orElse(CompanyFundamentals.NONE);
             } else {
                 try {
-                    ratios = companyFundamentals.fetch(symbol).orElse(Map.of());
-                    fundamentalsCache.upsert(instrumentId, now, ratios);
+                    fundamentals = companyFundamentals.fetch(symbol).orElse(CompanyFundamentals.NONE);
+                    fundamentalsCache.upsert(instrumentId, now, fundamentals);
                     fetched++;
                 } catch (ScreenerException e) {
                     log.warn("Could not read fundamentals for {}: {}", symbol, e.getMessage());
                     stopped = e.getMessage();
-                    ratios = hit.map(FundamentalsCacheRepository.Cached::ratios).orElse(Map.of());
+                    fundamentals = hit.map(FundamentalsCacheRepository.Cached::fundamentals)
+                            .orElse(CompanyFundamentals.NONE);
                 }
             }
-            if (ratios.isEmpty()) {
+            if (fundamentals.isEmpty()) {
                 unavailable++;
             } else {
-                stocks.put(symbol, new ScreenedStock(symbol, symbol, ratios));
+                stocks.put(symbol, new ScreenedStock(symbol, symbol, fundamentals.ratios()));
+                if (FundamentalsRefreshPolicy.awaitingResults(fundamentals, today)) {
+                    awaiting++;
+                }
             }
         }
+        YearMonth expected = FundamentalsRefreshPolicy.expectedQuarter(today);
         String notice = String.format(Locale.ROOT, "Fundamentals for %d symbols from public screener.in company "
-                        + "pages: %d fetched, %d reused (under %d days old), %d with none available%s",
-                symbols.size(), fetched, cached, settings.fundamentalsCacheDays(), unavailable,
-                stopped == null ? "" : "; stopped early: " + stopped);
+                        + "pages: %d fetched, %d reused, %d with none available; %d still showing an earlier "
+                        + "quarter than %s%s",
+                symbols.size(), fetched, reused, unavailable, awaiting,
+                expected.format(QUARTER_LABEL), stopped == null ? "" : "; stopped early: " + stopped);
         log.info(notice);
         return new FundamentalsResult(stocks, notice);
     }

@@ -26,6 +26,8 @@ import java.sql.Statement;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,25 @@ class CanSlimServiceTest {
 
     private Database database;
     private ExecutorService executor;
+
+    /** Moves when a test moves it; the scan reads the date from it. */
+    private Instant now = Instant.parse("2025-08-01T13:00:00Z");
+    private final Clock clock = new Clock() {
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(now, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+    };
 
     @BeforeEach
     void setUp() {
@@ -72,7 +93,7 @@ class CanSlimServiceTest {
         ScreenedStock grow = new ScreenedStock("GROW", "Grower", Map.of(
                 ScreenerRatios.QTR_PROFIT_GROWTH, 40.0, ScreenerRatios.PROFIT_GROWTH_3Y, 30.0));
 
-        CanSlimService service = service(query -> List.of(grow, new ScreenedStock("GONE", "Delisted", Map.of())),
+        CanSlimService service = service(query -> new ScreenerClient.Result(List.of(grow, new ScreenedStock("GONE", "Delisted", Map.of())), false),
                 prices, List.of(new OpenPosition("HELD", Product.CNC, 10, 121.0, 0)), List.of("LAG"));
 
         CanSlimReport report = service.scan("Return on equity > 17");
@@ -118,8 +139,18 @@ class CanSlimServiceTest {
     private CompanyFundamentalsClient pages(Map<String, Map<String, Double>> byLabel) {
         return symbol -> {
             pagesRead.add(symbol);
-            return Optional.ofNullable(byLabel.get(symbol));
+            return Optional.ofNullable(byLabel.get(symbol)).map(CanSlimServiceTest::reported);
         };
+    }
+
+    /** Figures from a company that has reported the June 2025 quarter, the latest one to have ended in these tests. */
+    private static CompanyFundamentals reported(Map<String, Double> ratios) {
+        return new CompanyFundamentals(ratios, YearMonth.of(2025, 6), YearMonth.of(2025, 6));
+    }
+
+    /** The same figures from a company that has not yet reported June: its newest quarter is March. */
+    private static CompanyFundamentals notYetReported(Map<String, Double> ratios) {
+        return new CompanyFundamentals(ratios, YearMonth.of(2025, 3), YearMonth.of(2025, 6));
     }
 
     private static final Map<String, Double> STRONG = Map.of(
@@ -139,7 +170,7 @@ class CanSlimServiceTest {
     private static ScreenerClient noSession() {
         return new ScreenerClient() {
             @Override
-            public List<ScreenedStock> screen(String query) {
+            public Result screen(String query) {
                 throw new AssertionError("a query must not be attempted without a session");
             }
 
@@ -200,11 +231,63 @@ class CanSlimServiceTest {
     }
 
     @Test
+    @DisplayName("in reporting season a company yet to report is looked at again every couple of days, then left alone")
+    void seasonRechecksUntilTheQuarterAppears() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "LATE", TestBars.from(100).trend(120, 112).build());
+        java.util.concurrent.atomic.AtomicBoolean reportedNow = new java.util.concurrent.atomic.AtomicBoolean();
+        CompanyFundamentalsClient page = symbol -> {
+            pagesRead.add(symbol);
+            return Optional.of(reportedNow.get() ? reported(STRONG) : notYetReported(STRONG));
+        };
+        CanSlimService service = service(noSession(), page, prices, List.of(), List.of("LATE"));
+
+        CanSlimReport first = service.scan("q");
+        service.scan("q");
+        assertEquals(List.of("LATE"), pagesRead, "the same day: nothing to learn yet");
+        assertTrue(first.fundamentalsNotice().contains("1 still showing an earlier quarter than Jun 2025"),
+                first.fundamentalsNotice());
+
+        now = now.plusSeconds(3 * 86_400L);
+        service.scan("q");
+        assertEquals(List.of("LATE", "LATE"), pagesRead, "three days on: it may have reported");
+
+        reportedNow.set(true);
+        now = now.plusSeconds(3 * 86_400L);
+        CanSlimReport caughtUp = service.scan("q");
+        assertEquals(3, pagesRead.size(), "read once more and found June");
+        assertTrue(caughtUp.fundamentalsNotice().contains("0 still showing"), caughtUp.fundamentalsNotice());
+
+        now = now.plusSeconds(30 * 86_400L);
+        service.scan("q");
+        assertEquals(3, pagesRead.size(), "a month later, with June in hand, the page is not read");
+    }
+
+    @Test
+    @DisplayName("a query with more results than one page says so, without calling the scan a failure")
+    void moreThanOnePageIsReported() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "GROW", TestBars.from(100).trend(150, 70).range(138, 146, 38).add(152, 2000).build());
+        ScreenedStock grow = new ScreenedStock("GROW", "Grower", Map.of(
+                ScreenerRatios.QTR_PROFIT_GROWTH, 40.0, ScreenerRatios.PROFIT_GROWTH_3Y, 30.0));
+
+        CanSlimReport report = service(query -> new ScreenerClient.Result(List.of(grow), true),
+                prices, List.of(), List.of()).scan("q");
+
+        assertEquals(1, report.screened());
+        assertTrue(report.screenerNotice().contains("more than one page"), report.screenerNotice());
+        assertTrue(report.screenerNotice().contains("robots.txt"), report.screenerNotice());
+        assertFalse(report.screenerFailed());
+    }
+
+    @Test
     @DisplayName("a rejected session is reported, but holdings are still scored for sell signals")
     void expiredSessionDegrades() {
         ScreenerClient expired = new ScreenerClient() {
             @Override
-            public List<ScreenedStock> screen(String query) {
+            public Result screen(String query) {
                 throw new ScreenerException("screener.in did not accept the session (HTTP 302)", true);
             }
         };
@@ -234,7 +317,7 @@ class CanSlimServiceTest {
             if (symbol.equals("B")) {
                 throw new ScreenerException("screener.in is rate limiting (HTTP 429)", false);
             }
-            return Optional.of(STRONG);
+            return Optional.of(reported(STRONG));
         };
 
         CanSlimReport report = service(noSession(), limited, prices, List.of(), List.of("A", "B", "C")).scan("q");
@@ -280,9 +363,9 @@ class CanSlimServiceTest {
         return new CanSlimService(screener, companyPages, new SqliteFundamentalsCacheRepository(database),
                 candles, new SqliteInstrumentRepository(database),
                 new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database), positions,
-                MARKET, Clock.fixed(Instant.parse("2025-08-01T13:00:00Z"), ZoneOffset.UTC), executor,
+                MARKET, clock, executor,
                 CanSlimCriteria.defaults(),
-                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7));
+                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7, 2));
     }
 
     private int count(String sql) {

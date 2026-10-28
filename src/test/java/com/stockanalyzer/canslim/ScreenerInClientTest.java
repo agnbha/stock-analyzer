@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,39 +33,39 @@ class ScreenerInClientTest {
     }
 
     @Test
-    @DisplayName("sends the session cookie and the query, and reads every page")
-    void readsAllPages() throws IOException {
+    @DisplayName("sends the session cookie and the query in one request, with none of the parameters robots.txt rules out")
+    void oneRequestWithoutPagingParameters() throws IOException {
         List<String> cookies = new CopyOnWriteArrayList<>();
         List<String> queries = new CopyOnWriteArrayList<>();
         start(exchange -> {
             cookies.add(exchange.getRequestHeaders().getFirst("Cookie"));
-            String raw = exchange.getRequestURI().getRawQuery();
-            queries.add(URLDecoder.decode(raw, StandardCharsets.UTF_8));
-            int page = raw.contains("page=2") ? 2 : 1;
-            respond(exchange, 200, resultsPage(page, 2, page == 1 ? "AAA" : "BBB"));
+            queries.add(URLDecoder.decode(exchange.getRequestURI().getRawQuery(), StandardCharsets.UTF_8));
+            respond(exchange, 200, resultsPage(1, 1, "AAA"));
         });
 
-        List<ScreenedStock> stocks = client("abc123", 5).screen("Return on equity > 17");
+        ScreenerClient.Result result = client("abc123").screen("Return on equity > 17");
 
-        assertEquals(List.of("AAA", "BBB"), stocks.stream().map(ScreenedStock::symbol).toList());
-        assertEquals(List.of("sessionid=abc123", "sessionid=abc123"), cookies);
-        assertTrue(queries.getFirst().contains("query=Return on equity > 17"), queries.getFirst());
-        assertTrue(queries.getFirst().contains("limit=50"));
+        assertEquals(List.of("AAA"), result.stocks().stream().map(ScreenedStock::symbol).toList());
+        assertFalse(result.moreAvailable());
+        assertEquals(List.of("sessionid=abc123"), cookies, "one request");
+        assertEquals(List.of("query=Return on equity > 17"), queries,
+                "the query alone: robots.txt disallows page, limit, sort and q");
     }
 
     @Test
-    @DisplayName("stops at the page limit however many pages the result has")
-    void respectsPageLimit() throws IOException {
+    @DisplayName("a result with more pages reads only the first and says there is more")
+    void readsOnlyTheFirstPage() throws IOException {
         AtomicInteger requests = new AtomicInteger();
         start(exchange -> {
             int n = requests.incrementAndGet();
             respond(exchange, 200, resultsPage(n, 9, "S" + n));
         });
 
-        List<ScreenedStock> stocks = client("abc", 2).screen("x > 1");
+        ScreenerClient.Result result = client("abc").screen("x > 1");
 
-        assertEquals(2, requests.get());
-        assertEquals(2, stocks.size());
+        assertEquals(1, requests.get());
+        assertEquals(List.of("S1"), result.stocks().stream().map(ScreenedStock::symbol).toList());
+        assertTrue(result.moreAvailable());
     }
 
     @Test
@@ -75,7 +76,7 @@ class ScreenerInClientTest {
             respond(exchange, 302, "");
         });
 
-        ScreenerException e = assertThrows(ScreenerException.class, () -> client("old", 3).screen("x > 1"));
+        ScreenerException e = assertThrows(ScreenerException.class, () -> client("old").screen("x > 1"));
         assertTrue(e.needsLogin());
         assertTrue(e.getMessage().contains("SCREENER_SESSION_ID"));
     }
@@ -83,16 +84,16 @@ class ScreenerInClientTest {
     @Test
     @DisplayName("a client without a session says so, so a caller can skip the query")
     void hasSession() {
-        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", null, 3, 0).hasSession());
-        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "  ", 3, 0).hasSession());
-        assertTrue(new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "abc", 3, 0).hasSession());
+        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", null).hasSession());
+        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "  ").hasSession());
+        assertTrue(new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "abc").hasSession());
     }
 
     @Test
     @DisplayName("no session configured fails before any request, saying how to get one")
     void noSession() {
         ScreenerInClient client = new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1",
-                null, 3, 0);
+                null);
         ScreenerException e = assertThrows(ScreenerException.class, () -> client.screen("x > 1"));
         assertTrue(e.needsLogin());
     }
@@ -103,14 +104,14 @@ class ScreenerInClientTest {
         start(exchange -> respond(exchange, 200,
                 "<html><div class=\"flash-error\">Unknown ratio: Profit growth 9Years</div></html>"));
 
-        ScreenerException e = assertThrows(ScreenerException.class, () -> client("abc", 3).screen("bad"));
+        ScreenerException e = assertThrows(ScreenerException.class, () -> client("abc").screen("bad"));
         assertTrue(e.getMessage().contains("Unknown ratio"), e.getMessage());
         assertTrue(!e.needsLogin());
     }
 
-    private ScreenerInClient client(String session, int maxPages) {
+    private ScreenerInClient client(String session) {
         return new ScreenerInClient(HttpClient.newHttpClient(),
-                "http://localhost:" + server.getAddress().getPort(), session, maxPages, 0);
+                "http://localhost:" + server.getAddress().getPort(), session);
     }
 
     private interface Handler {

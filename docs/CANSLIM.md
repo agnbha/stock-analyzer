@@ -13,13 +13,16 @@ approximated.
    ratio it mentions comes back as a column, which is how the letters below get
    their numbers. This needs a signed-in session (see the last section); without
    one the step is skipped, the report says so, and the scan carries on at step 2.
+   It is one request for the first page of results: screener.in's robots.txt asks
+   automated clients not to use its `page`, `limit` or `sort` parameters, so none
+   is sent. A query that matches more than a page says so in the report - tighten
+   it (a higher market cap floor, stricter thresholds) until it fits on one.
 2. **Widen.** Open positions and the configured `symbols.txt` universe join the
    screened companies. They are checked for sell signals and widen the field the
    RS rating is ranked against. Their own C, A and I come from their public
-   screener.in company pages (cached for `canslim.fundamentals.cache.days`, 7 by
-   default, since the numbers change once a quarter), so they are scored like any
-   other stock - and a held or universe stock whose fundamentals pass both C and
-   A is a buy candidate too, not just a sell check.
+   screener.in company pages, so they are scored like any other stock - and a
+   held or universe stock whose fundamentals pass both C and A is a buy
+   candidate too, not just a sell check. See *When a page is read again* below.
 3. **Price.** About a year of daily candles per symbol, plus the market proxy
    (`NIFTYBEES`). The daily interval allows years per request, so this is one
    request per symbol, through the same rate limiter as everything else. A
@@ -104,6 +107,30 @@ In an uptrend under pressure, buy signals stand but say so.
   conditions are not in the data.
 - **Earnings acceleration**, a lower float, and industry-group leadership are
   not checked.
+
+## When a page is read again
+
+The figures move when a company reports a quarter, so a page is read again by the
+calendar and not on a timer. Each cached copy records the newest quarter its
+results table and its shareholding table showed (`Sep 2026`).
+
+- A copy showing the **latest quarter that has ended** is left alone, however old,
+  until the next quarter ends. Nothing on the page can change before then.
+- From **8 to 60 days after a quarter ends**, a company still showing the older
+  quarter is looked at again every `canslim.fundamentals.season.check.days` (2).
+  Eight days is before anyone reports; sixty is the filing deadline for the
+  year-end quarter (45 for the others, 21 for the shareholding pattern). A company
+  stops being checked the day it shows the new quarter.
+- **Past the deadline**, a company still missing the quarter is late or suspended,
+  and drops to `canslim.fundamentals.cache.days` (7).
+- A page with **no figures** (an ETF) is retried at that same slow pace.
+- A copy **more than a quarter behind** is read at once, and so is one stored
+  before quarters were recorded (once, to learn which quarter it holds).
+
+The annual figures (three-year profit growth, ROE) change when the year-end
+quarter's results arrive with the annual accounts, so the same rule covers them.
+The scan's report counts how many symbols are still showing an earlier quarter
+than the one that has just ended - the ones the next few nights will be checking.
 
 ## The screener.in session
 
