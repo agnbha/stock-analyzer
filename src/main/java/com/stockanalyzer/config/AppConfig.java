@@ -231,10 +231,15 @@ public final class AppConfig {
 
     /** Comma-separated: console, macos, file. */
     public List<String> alertSinks() {
-        return List.of(get("alerts.sinks", "console").split(",")).stream()
+        return List.of(get("alerts.sinks", "console,macos").split(",")).stream()
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .toList();
+    }
+
+    /** The least severe alert that becomes a desktop notification: INFO, NOTABLE or URGENT. */
+    public String alertDesktopMinSeverity() {
+        return get("alerts.desktop.min-severity", "NOTABLE").trim().toUpperCase();
     }
 
     public String alertFilePath() {

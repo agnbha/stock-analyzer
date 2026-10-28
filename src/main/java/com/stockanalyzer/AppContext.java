@@ -99,6 +99,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
@@ -253,7 +254,11 @@ public final class AppContext implements AutoCloseable {
         for (String name : config.alertSinks()) {
             switch (name.toLowerCase()) {
                 case "console" -> sinks.add(new ConsoleAlertSink(clock));
-                case "macos" -> sinks.add(new MacNotificationSink(AlertSeverity.NOTABLE));
+                case "macos" -> {
+                    if (MacNotificationSink.supportedHere()) {
+                        sinks.add(new MacNotificationSink(desktopMinSeverity()));
+                    }
+                }
                 case "file" -> sinks.add(new FileAlertSink(Path.of(config.alertFilePath())));
                 default -> throw new IllegalStateException("Unknown alert sink: " + name);
             }
@@ -263,6 +268,16 @@ public final class AppContext implements AutoCloseable {
                         config.alertMaxPerSymbolPerDay(), config.alertMaxPerDay()),
                 new CompositeAlertSink(sinks),
                 alertRepository);
+    }
+
+    private AlertSeverity desktopMinSeverity() {
+        String configured = config.alertDesktopMinSeverity();
+        try {
+            return AlertSeverity.valueOf(configured);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("alerts.desktop.min-severity must be one of "
+                    + Arrays.toString(AlertSeverity.values()) + ", not '" + configured + "'");
+        }
     }
 
     public SessionAlertPlanner alertPlanner() {
