@@ -435,6 +435,15 @@ Qualification thresholds (`alerts.hotwindow.min-sessions`, default 30;
 `alerts.hotwindow.min-lcb`, default 0.10) keep thin statistics from generating
 noise.
 
+Two more limits keep the list short and informative. Windows starting within
+`alerts.hotwindow.skip-opening-minutes` (default 5) of the open are ignored,
+because the day's low - and so the start of a top-3 window - often sits at the
+open: the opening bucket qualifies for nearly every symbol and says nothing
+about any one of them. The baseline entry signal ignores it for the same reason.
+And at most `alerts.hotwindow.max-per-day` (default 20) are planned, the
+strongest by lower bound, chosen when the day is planned so that the cut
+falls on the weakest windows rather than the latest ones.
+
 **(c) Live condition alerts** — an `event` fired now, or a Part 2 model
 probability crossing `alerts.model.min-probability` (default 0.65). Suppressed
 automatically whenever the active model has not beaten the baseline.
