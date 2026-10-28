@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 
 /**
  * The market-hours process: polls for new candles every couple of minutes,
@@ -82,10 +83,13 @@ public final class MarketMonitor {
     private final MarketClock clock;
     private final ExecutorService executor;
     private final MonitorSettings settings;
+    private final LongSupplier nowSeconds;
 
     private final Map<String, LiveSessionState> states = new LinkedHashMap<>();
     private final Map<String, EventDetector.PriorSessionContext> priorContexts = new HashMap<>();
     private final Set<String> firedEventKeys = new HashSet<>();
+    /** Alerts passed over this tick because what they describe is already old news. */
+    private int staleAlertsSkipped;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final List<Alert> recentAlerts = new ArrayList<>();
 
@@ -109,6 +113,35 @@ public final class MarketMonitor {
                          MarketClock clock,
                          ExecutorService executor,
                          MonitorSettings settings) {
+        this(candleDataClient, detector, eventDetector, featureExtractor, signalModel, alertEngine,
+                alertRepository, heartbeatRepository, alertPlanner, instrumentRepository, liveCandleRepository,
+                liveOpportunityRepository, marketEventRepository, tradingDayRepository, calendar, reconciler,
+                view, clock, executor, settings, () -> System.currentTimeMillis() / 1000);
+    }
+
+    /** With an injectable clock, so a test can start the monitor at 10:08 without waiting for it. */
+    MarketMonitor(CandleDataClient candleDataClient,
+                  GainOpportunityDetector detector,
+                  EventDetector eventDetector,
+                  FeatureExtractor featureExtractor,
+                  IntradaySignalModel signalModel,
+                  AlertEngine alertEngine,
+                  AlertRepository alertRepository,
+                  HeartbeatRepository heartbeatRepository,
+                  SessionAlertPlanner alertPlanner,
+                  InstrumentRepository instrumentRepository,
+                  LiveCandleRepository liveCandleRepository,
+                  LiveOpportunityRepository liveOpportunityRepository,
+                  MarketEventRepository marketEventRepository,
+                  TradingDayRepository tradingDayRepository,
+                  TradingCalendar calendar,
+                  SessionReconciler reconciler,
+                  LiveView view,
+                  MarketClock clock,
+                  ExecutorService executor,
+                  MonitorSettings settings,
+                  LongSupplier nowSeconds) {
+        this.nowSeconds = nowSeconds;
         this.candleDataClient = candleDataClient;
         this.detector = detector;
         this.eventDetector = eventDetector;
@@ -142,9 +175,7 @@ public final class MarketMonitor {
             return;
         }
 
-        settings.symbols().forEach(symbol ->
-                states.put(symbol, new LiveSessionState(symbol, settings.intervalMinutes())));
-        loadPriorContexts(sessionDate);
+        prepare(sessionDate);
 
         List<ScheduledAlert> plan = alertPlanner.plan(sessionDate, settings.symbols());
         alertRepository.replaceSchedule(sessionDate, plan);
@@ -162,6 +193,13 @@ public final class MarketMonitor {
         reconciler.reconcile(sessionDate, settings.symbols(), settings.exchange(), settings.segment(),
                 settings.intervalMinutes(), liveTop);
         view.close();
+    }
+
+    /** Per-symbol session state and the prior session's context; package-private so a test can set up a tick. */
+    void prepare(LocalDate sessionDate) {
+        settings.symbols().forEach(symbol ->
+                states.put(symbol, new LiveSessionState(symbol, settings.intervalMinutes())));
+        loadPriorContexts(sessionDate);
     }
 
     /** One poll: fetch, analyse, alert, render. Package-private so tests can drive it directly. */
@@ -192,6 +230,12 @@ public final class MarketMonitor {
         }
 
         fireDueScheduledAlerts(sessionDate, now);
+        if (staleAlertsSkipped > 0) {
+            log.info("Not alerting on {} event(s) and scheduled alert(s) older than {} minutes - "
+                    + "recorded and shown, but too late to act on", staleAlertsSkipped,
+                    settings.alertMaxAgeMinutes());
+            staleAlertsSkipped = 0;
+        }
 
         long staleness = symbolStates.stream()
                 .mapToLong(state -> now - state.lastUpdatedEpoch())
@@ -380,6 +424,10 @@ public final class MarketMonitor {
             if (!firedEventKeys.add(key)) {
                 continue;
             }
+            if (isStale(event.tsEpoch(), now)) {
+                staleAlertsSkipped++;
+                continue;
+            }
             String message = String.format("%s: %s at %s (strength %.2f)", symbol, event.type(),
                     clock.timeOf(event.tsEpoch()).withSecond(0).withNano(0), event.strength());
             deliver(new Alert(sessionDate, now, symbol, "event." + event.type().name().toLowerCase(),
@@ -390,6 +438,7 @@ public final class MarketMonitor {
     private void fireSignalAlerts(LocalDate sessionDate, String symbol, List<SignalPrediction> predictions, long now) {
         predictions.stream()
                 .filter(p -> p.signal() == SignalPrediction.Signal.ENTRY)
+                .filter(p -> !isStale(p.tsEpoch(), now))
                 .filter(p -> p.probability() >= settings.modelMinProbability())
                 .max(Comparator.comparingDouble(SignalPrediction::probability))
                 .ifPresent(best -> {
@@ -406,6 +455,11 @@ public final class MarketMonitor {
             if (scheduled.fireAtEpoch() > now) {
                 continue;
             }
+            if (now - scheduled.fireAtEpoch() > settings.alertMaxAgeMinutes() * 60L) {
+                alertRepository.markScheduleStatus(scheduled.id(), ScheduledAlert.Status.SKIPPED);
+                staleAlertsSkipped++;
+                continue;
+            }
             String key = sessionDate + "|" + scheduled.rule() + "|" + scheduled.symbol() + "|"
                     + scheduled.fireAtEpoch();
             AlertSeverity severity = scheduled.symbol() == null ? AlertSeverity.INFO : AlertSeverity.NOTABLE;
@@ -413,6 +467,21 @@ public final class MarketMonitor {
                     scheduled.rule(), scheduled.payload(), key));
             alertRepository.markScheduleStatus(scheduled.id(), ScheduledAlert.Status.FIRED);
         }
+    }
+
+    /**
+     * Whether something that happened in the candle starting at {@code tsEpoch}
+     * is too old to be worth interrupting for. The clock starts when the candle
+     * completes, because that is the earliest the event could have been known.
+     *
+     * <p>This is what keeps a late start, or a restart, from replaying the
+     * morning: a daemon that comes up at 10:08 detects every event since 09:15
+     * on its first tick, and without this they all arrive in one burst - using
+     * up the day's alert cap on events nobody can act on.
+     */
+    private boolean isStale(long tsEpoch, long now) {
+        long knowableAt = tsEpoch + settings.intervalMinutes() * 60L;
+        return now - knowableAt > settings.alertMaxAgeMinutes() * 60L;
     }
 
     private void deliver(Alert alert) {
@@ -439,7 +508,7 @@ public final class MarketMonitor {
     }
 
     private long nowEpoch() {
-        return System.currentTimeMillis() / 1000;
+        return nowSeconds.getAsLong();
     }
 
     private void sleep(int seconds) {
@@ -460,6 +529,7 @@ public final class MarketMonitor {
                                   int postCloseGraceSeconds,
                                   int horizonMinutes,
                                   double modelMinProbability,
-                                  boolean persistLiveCandles) {
+                                  boolean persistLiveCandles,
+                                  int alertMaxAgeMinutes) {
     }
 }

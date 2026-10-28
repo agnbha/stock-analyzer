@@ -257,6 +257,14 @@ public final class AppConfig {
         return Double.parseDouble(get("alerts.model.min-probability", "0.65"));
     }
 
+    /**
+     * How old an event may be, counted from when it could first have been known,
+     * and still be alerted on. Older ones are recorded but not announced.
+     */
+    public int alertMaxAgeMinutes() {
+        return Integer.parseInt(get("alerts.max.age.minutes", "10"));
+    }
+
     public int alertCooldownMinutes() {
         return Integer.parseInt(get("alerts.cooldown.minutes", "15"));
     }

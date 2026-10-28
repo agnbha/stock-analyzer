@@ -439,6 +439,19 @@ noise.
 probability crossing `alerts.model.min-probability` (default 0.65). Suppressed
 automatically whenever the active model has not beaten the baseline.
 
+Only what is **current** is announced. An event is recorded the moment it is
+detected, but it is alerted on only if it happened within
+`alerts.max.age.minutes` (default 10, counted from when its candle completed),
+and a scheduled alert that fell due more than that long before the monitor was
+looking is skipped rather than fired late. A daemon that starts at 10:08 would
+otherwise detect everything since 09:15 on its first tick and spend the day's
+alert cap on it in one burst.
+
+A hot window's hit rate is **sessions with an entry in the bucket over sessions**
+(for the market-wide window, symbol-sessions). Counting opportunities instead
+puts more hits than sessions in the numerator, which the denominator then
+stretches to match - a rate of 1.0 that is an artifact, not evidence.
+
 ## 3.2 Delivery and control
 
 ```java
