@@ -199,6 +199,14 @@ high), **S** (volume on up days over down days), **L** (an RS percentile) and
   average, or a climax run: rallies that have ended or are ending. These are
   checked for open positions and the configured universe too.
 
+**The whole market.** `CanSlimMain scan --market` (or `canslim.market.enabled=true` for every
+nightly scan) also prices and ranks every listed NSE and BSE equity - about 2,800 on the main
+boards, from Groww's instrument list - so the RS rating is a percentile of the market. Illiquid
+and stale listings are priced but left out of the ranking; company pages on screener.in are read
+only for the stocks that rank high enough to be a buy. `--limit 50` tries it on a spread of 50
+symbols first, and `--top N` sets how many of the strongest by RS the report lists. See
+[docs/CANSLIM.md](docs/CANSLIM.md).
+
 The **CAN SLIM** dashboard shows the market, both lists, and each stock's daily
 chart with its pivot. The rules, the thresholds and what is approximated are in
 [docs/CANSLIM.md](docs/CANSLIM.md).

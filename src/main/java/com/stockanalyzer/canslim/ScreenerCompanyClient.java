@@ -30,12 +30,22 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
     private final HttpClient httpClient;
     private final String baseUrl;
     private final long minIntervalMillis;
+    private final long rateLimitBackoffMillis;
     private long lastRequestAt;
 
-    public ScreenerCompanyClient(HttpClient httpClient, String baseUrl, long minIntervalMillis) {
+    /**
+     * @param minIntervalMillis      the least time between two page reads. screener.in answers a burst of
+     *                               about seven quick reads with HTTP 429 and then admits roughly one every
+     *                               ten seconds, so this is not a courtesy: faster than that, the answer is no
+     * @param rateLimitBackoffMillis how long to wait before asking again after a 429 (its Retry-After, when
+     *                               it gives one, wins); the second 429 in a row stops the run
+     */
+    public ScreenerCompanyClient(HttpClient httpClient, String baseUrl, long minIntervalMillis,
+                                 long rateLimitBackoffMillis) {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.minIntervalMillis = minIntervalMillis;
+        this.rateLimitBackoffMillis = rateLimitBackoffMillis;
     }
 
     /**
@@ -73,6 +83,16 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
         try {
             pace();
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 429) {
+                long wait = response.headers().firstValue("Retry-After").map(ScreenerCompanyClient::seconds)
+                        .map(seconds -> Math.max(seconds * 1000, rateLimitBackoffMillis))
+                        .orElse(rateLimitBackoffMillis);
+                log.info("screener.in asked for a pause (HTTP 429); waiting {} s before asking for {} again",
+                        wait / 1000, symbol);
+                Thread.sleep(wait);
+                pace();
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ScreenerException("Interrupted while reading screener.in for " + symbol, e);
@@ -84,13 +104,21 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
             return null;
         }
         if (status == 429) {
-            throw new ScreenerException("screener.in is rate limiting (HTTP 429) - stopping rather than "
-                    + "asking again; the rest will be fetched on a later run", false);
+            throw new ScreenerException("screener.in is still rate limiting (HTTP 429) after a pause - stopping "
+                    + "rather than asking again; the rest will be fetched on a later run", false);
         }
         if (status / 100 != 2) {
             throw new ScreenerException("screener.in answered HTTP " + status + " for " + symbol, false);
         }
         return response.body();
+    }
+
+    private static long seconds(String retryAfter) {
+        try {
+            return Long.parseLong(retryAfter.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private synchronized void pace() throws InterruptedException {

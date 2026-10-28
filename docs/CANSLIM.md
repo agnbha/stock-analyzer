@@ -33,6 +33,48 @@ approximated.
    `canslim_run` / `canslim_score`, so the dashboard can show today's lists and
    each stock's history of readings.
 
+## The whole market
+
+By default a scan covers the screener's results, your holdings and `symbols.txt`. With
+`canslim.market.enabled=true` (or `CanSlimMain scan --market` for one run) it also covers
+**every listed NSE and BSE equity**, and the RS rating becomes what O'Neil intends: a
+percentile of the *market*, not of a hand-picked field.
+
+1. **List.** Groww's public instrument list (`instrument.csv`, kept in `data/` and refreshed
+   daily) is filtered to equity shares - the file also carries bonds, ETFs, funds and F&O
+   contracts, told apart by the security-type digits of the ISIN. A company on both exchanges
+   is taken once, from NSE; BSE adds only the companies NSE does not list, priced on BSE and
+   looked up on screener.in by BSE scrip code. About 2,800 symbols on the main boards.
+2. **Price.** One daily-candle request each, through the shared rate limiter (allow 20-45
+   minutes), analysed as it arrives so a year of bars is not held for every symbol. Daily bars
+   are stored like any other scan's.
+3. **Rank.** Priced is not ranked. A symbol joins the RS field only with `min.sessions` of
+   history, a last close of at least `min.price`, an average daily value traded of at least
+   `min.turnover` over 50 sessions, and a bar no older than `max.stale.days`. Without that the
+   thousands of listings that barely trade would sit in the field, and everything real would look
+   strong for having beaten them. The report counts what was left out and why.
+4. **Re-evaluate.** With the full field ranked, every symbol is scored again with its RS rating.
+5. **Fundamentals, for the leaders only.** screener.in is asked for a company's figures only once
+   it reaches `fundamentals.min.rs` (the L bar, 80): below it the stock cannot be a buy whatever its
+   earnings say, so the page load would buy nothing. That is a few hundred pages the first time and
+   a handful a night after, refreshed by the calendar (see *When a page is read again*).
+   screener.in admits a burst of about seven quick reads and then roughly one every ten seconds - a
+   faster pace gets HTTP 429 - so pages are read 12 seconds apart, with a pause and one retry on a
+   429, and at most `canslim.fundamentals.max.pages.per.run` (60, about 12 minutes) in a scan. The
+   first scans therefore fill in over several nights: holdings and the universe first, then the
+   leaders, strongest RS first. Until a leader's page has been read its C, A and I show '?'.
+6. **Report.** The usual signals, then the strongest stocks by RS rating, strongest first (`--top
+   N`, 50 by default). The CAN SLIM dashboard's last table is ordered the same way.
+
+Differences from the rest of the scan: a market listing is **never given a sell signal** - nobody
+holds it, so a breakout that fell back is only a stock - and it is a buy candidate only if its own
+C and A pass. Market-wide scores are thousands of rows a night, so only the newest
+`canslim.market.keep.runs` scans (30) keep theirs; holdings and screened companies are never pruned.
+
+The SME platforms (NSE SM/ST, BSE X/XT/M/MT) are left out by default: they add ~3,000 symbols that
+trade in lots with narrow circuits and next to no volume, and the liquidity test would rank almost
+none of them. `canslim.market.include.sme=true` prices them anyway.
+
 ## The letters
 
 A letter is **passed**, **failed**, or **unknown** when its data was not

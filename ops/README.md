@@ -111,7 +111,13 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
   whichever file you named, not the dated ones. Prefer `ops/bin/market-day.sh`,
   which is also what launchd runs.
 
-## CAN SLIM and the screener.in session
+## CAN SLIM, the whole market, and the screener.in session
+
+The nightly scan also covers every listed NSE and BSE equity once `canslim.market.enabled=true`
+(or run `CanSlimMain scan --market` by hand). That is about 2,800 daily-candle requests through
+the rate limiter, 20-45 minutes the first time, so run it in the evening and not during market
+hours; start with `scan --market --limit 50` to see it work. The list of symbols is
+`data/instruments.csv`, downloaded from Groww and refreshed daily.
 
 `evening.sh` ends with a CAN SLIM scan (`CanSlimMain scan`). Its fundamental
 filter runs on screener.in, which needs a signed-in session: sign in at
@@ -128,11 +134,13 @@ value in `~/.stock-analyzer.env` as `SCREENER_SESSION_ID`.
   results, then fails with exit status 3 and a message saying so. Sign in again
   and replace the value; nothing else needs changing.
 - The scan prices one year of daily bars per symbol (one request each), so a
-  scan of ~200 symbols takes a couple of minutes. The first scan also reads one
-  company page per symbol, two seconds apart; after that, pages are read again
-  only in reporting season (mid-Jan, Apr, Jul and Oct to mid-Feb, May, Aug and
-  Nov), for the companies yet to show the new quarter. Like a backfill, keep it out
-  of market hours.
+  scan of ~200 symbols takes a couple of minutes. Company pages are read 12 seconds
+  apart - screener.in answers anything faster with HTTP 429 - and at most 60 per
+  scan (`canslim.fundamentals.max.pages.per.run`), so a first scan with many to read
+  fills the cache over several nights, holdings and the universe first and then the
+  market's leaders, strongest RS first. After that, pages are read again only in
+  reporting season (mid-Jan, Apr, Jul and Oct to mid-Feb, May, Aug and Nov), for the
+  companies yet to show the new quarter. Like a backfill, keep it out of market hours.
 
 ## Do not run a backfill during market hours
 

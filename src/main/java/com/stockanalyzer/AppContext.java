@@ -15,6 +15,9 @@ import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.canslim.CanSlimCriteria;
 import com.stockanalyzer.canslim.CanSlimService;
+import com.stockanalyzer.canslim.GrowwInstrumentCatalog;
+import com.stockanalyzer.canslim.MarketListing;
+import com.stockanalyzer.canslim.MarketScan;
 import com.stockanalyzer.canslim.ScreenerCompanyClient;
 import com.stockanalyzer.canslim.ScreenerInClient;
 import com.stockanalyzer.client.CandleDataClient;
@@ -461,15 +464,40 @@ public final class AppContext implements AutoCloseable {
         CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
                 config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
                 config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
-                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays());
+                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays(),
+                config.canSlimFundamentalsMaxPagesPerRun());
         return new CanSlimService(
                 new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
                 new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
-                        config.screenerRequestIntervalMillis()),
+                        config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
                 new SqliteFundamentalsCacheRepository(database),
                 wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
                 new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
                 executor, criteria, settings);
+    }
+
+    /**
+     * The whole-market part of a CAN SLIM scan: every listed equity the instrument list carries, under
+     * the {@code canslim.market.*} settings.
+     *
+     * @param limit when positive, only about this many listings, spread evenly through the list - for
+     *              trying the scan without spending thousands of requests
+     */
+    public MarketScan canSlimMarket(int limit) {
+        List<MarketListing> listings = new GrowwInstrumentCatalog(httpClient, new GrowwInstrumentCatalog.Settings(
+                config.canSlimCatalogUrl(), java.nio.file.Path.of(config.canSlimCatalogCache()),
+                Duration.ofHours(config.canSlimCatalogMaxAgeHours()), config.canSlimMarketExchanges(),
+                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries())).listings();
+        if (limit > 0 && limit < listings.size()) {
+            List<MarketListing> sample = new ArrayList<>(limit);
+            for (int i = 0; i < limit; i++) {
+                sample.add(listings.get((int) ((long) i * listings.size() / limit)));
+            }
+            listings = sample;
+        }
+        return new MarketScan(listings, config.canSlimMarketMinSessions(), config.canSlimMarketMinPrice(),
+                config.canSlimMarketMinTurnover(), config.canSlimMarketMaxStaleDays(),
+                config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns());
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {
