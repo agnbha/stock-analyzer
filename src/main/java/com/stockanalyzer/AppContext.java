@@ -86,11 +86,14 @@ import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
 import com.stockanalyzer.store.AttributionRepository;
 import com.stockanalyzer.store.TradeReasonRepository;
+import com.stockanalyzer.trade.BrokerFillSync;
 import com.stockanalyzer.trade.CaptureAnalyzer;
 import com.stockanalyzer.trade.ChargeModel;
 import com.stockanalyzer.trade.ChargeRates;
+import com.stockanalyzer.trade.ExecutionDataClient;
 import com.stockanalyzer.trade.FifoLotMatcher;
 import com.stockanalyzer.trade.GrowwChargeModel;
+import com.stockanalyzer.trade.GrowwExecutionClient;
 import com.stockanalyzer.trade.PeriodAggregator;
 import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.ReasonAttributor;
@@ -387,6 +390,16 @@ public final class AppContext implements AutoCloseable {
 
     public IntradaySignalModel signalModel() {
         return signalModel;
+    }
+
+    /** The broker's order book, sharing this process's token and rate limit. */
+    public ExecutionDataClient brokerExecutionClient() {
+        return new GrowwExecutionClient(httpClient, authenticator.get(), config.growwBaseUrl(), clock,
+                defaultProduct(), config.segment(), rateLimiter);
+    }
+
+    public BrokerFillSync brokerFillSync() {
+        return new BrokerFillSync(tradeJournalService, tradeRepository, tradeReasonRepository, reasonAttributor());
     }
 
     public TradeJournalService tradeJournalService() {

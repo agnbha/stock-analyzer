@@ -12,9 +12,9 @@ import com.stockanalyzer.model.TradeAttribution;
 import com.stockanalyzer.report.CaptureReporter;
 import com.stockanalyzer.report.ConsolePnlReporter;
 import com.stockanalyzer.report.CsvStatementExporter;
+import com.stockanalyzer.trade.BrokerFillSync;
 import com.stockanalyzer.trade.CsvTradeImporter;
 import com.stockanalyzer.trade.ExecutionDataClient;
-import com.stockanalyzer.trade.GrowwExecutionClient;
 import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.TradeIds;
 import com.stockanalyzer.store.TradeReasonRepository;
@@ -94,17 +94,13 @@ public final class TradeJournalMain {
             client = new CsvTradeImporter(Path.of(args.require("csv")), config.tradesCsvDateFormat(),
                     context.defaultProduct(), context.clock());
         } else {
-            client = new GrowwExecutionClient(context.httpClient(), context.authenticator(),
-                    config.growwBaseUrl(), context.clock(), context.defaultProduct(),
-                    config.segment(), context.rateLimiter());
+            client = context.brokerExecutionClient();
         }
 
-        int inserted = context.tradeJournalService().importTrades(client, from, to);
-        var result = context.tradeJournalService().rebuild();
-        int attributed = attributeReasons(context, from, to);
+        BrokerFillSync.Result result = context.brokerFillSync().sync(client, from, to);
         System.out.printf("Imported %d new trades; matched %d closed lots, %d positions open, "
                         + "%d reasons attributed%n",
-                inserted, result.lots().size(), result.openPositions().size(), attributed);
+                result.newTrades(), result.closedLots(), result.openPositions(), result.reasonsAttributed());
     }
 
     private static void addManualTrade(AppContext context, Args args) {

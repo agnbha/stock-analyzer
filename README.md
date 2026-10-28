@@ -219,7 +219,7 @@ annotated list):
 | `hotwindow.*`, `model.*` | The time-of-day prior, and the optional model service |
 | `alerts.*` | Sinks, lead time, evidence thresholds, cooldowns and caps, holiday file |
 | `monitor.*` | Poll interval, session hours, timezone |
-| `trades.*`, `charges.*`, `report.fy.start.month` | Trade import, the charge schedule, and the financial year |
+| `trades.*`, `charges.*`, `report.fy.start.month` | Trade import (including `trades.live.import.interval.minutes`, how often the daemon pulls the day's fills during the session), the charge schedule, and the financial year |
 
 ## How it fits together
 

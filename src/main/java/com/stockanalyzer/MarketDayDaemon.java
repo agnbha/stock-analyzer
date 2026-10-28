@@ -5,6 +5,7 @@ import com.stockanalyzer.alert.AlertPolicy;
 import com.stockanalyzer.alert.AlertScope;
 import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.config.AppConfig;
+import com.stockanalyzer.live.LiveFillImporter;
 import com.stockanalyzer.live.MarketMonitor;
 import com.stockanalyzer.live.SessionReconciler;
 import com.stockanalyzer.live.TerminalLiveView;
@@ -106,7 +107,12 @@ public final class MarketDayDaemon {
 
             warnIfSessionExceedsDailyBudget(context, config);
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
-            monitor.run(sessionDate);
+            try (LiveFillImporter fills = new LiveFillImporter(
+                    () -> context.brokerFillSync().sync(context.brokerExecutionClient(), sessionDate, sessionDate),
+                    config.tradesLiveImportIntervalMinutes())) {
+                fills.start();
+                monitor.run(sessionDate);
+            }
         }
     }
 

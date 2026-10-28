@@ -334,6 +334,11 @@ public final class AppConfig {
         return Boolean.parseBoolean(get("monitor.persist.live.candles", "true"));
     }
 
+    /** How often the daemon pulls the day's fills from the broker; zero turns it off. */
+    public int tradesLiveImportIntervalMinutes() {
+        return Integer.parseInt(get("trades.live.import.interval.minutes", "5"));
+    }
+
     public boolean monitorAnsi() {
         return Boolean.parseBoolean(get("monitor.view.ansi", "true"));
     }
