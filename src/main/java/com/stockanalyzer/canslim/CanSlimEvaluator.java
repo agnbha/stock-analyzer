@@ -83,8 +83,14 @@ public final class CanSlimEvaluator {
         if (sell != null) {
             return sell;
         }
-        if (source != CanSlimScore.Source.SCREENER) {
-            return new Decision(CanSlimSignal.NONE, "not a screened candidate; checked for sell signals only");
+        // A screener result already passed the earnings query. Anything else is a buy candidate only
+        // if its own fundamentals show both C and A passing - not merely nothing failing.
+        if (source != CanSlimScore.Source.SCREENER
+                && !(Boolean.TRUE.equals(letters.c()) && Boolean.TRUE.equals(letters.a()))) {
+            return new Decision(CanSlimSignal.NONE, letters.c() == null && letters.a() == null
+                    ? "no fundamentals available; checked for sell signals only"
+                    : "earnings do not qualify (C " + passFail(letters.c()) + ", A " + passFail(letters.a())
+                    + "); checked for sell signals only");
         }
 
         List<String> failing = new ArrayList<>();
@@ -118,6 +124,10 @@ public final class CanSlimEvaluator {
                     buy.reason() + "; market uptrend under pressure, size positions down");
             default -> buy;
         };
+    }
+
+    private static String passFail(Boolean letter) {
+        return letter == null ? "unknown" : letter ? "passes" : "fails";
     }
 
     private Decision sellDecision(PriceAction pa, Double buyPoint, boolean held) {

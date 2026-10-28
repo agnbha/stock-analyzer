@@ -39,14 +39,9 @@ run_step "capture analysis" com.stockanalyzer.TradeJournalMain capture --month "
 run_step "record broker balance" com.stockanalyzer.TradeJournalMain trades balance \
     --date "$SESSION_DATE"
 run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$SESSION_DATE"
-# Without a screener.in session the scan still checks holdings and the universe
-# for sell signals; with one it also screens for new candidates. Exit status 3
-# from the full scan means the session cookie has expired.
-if [[ -n "${SCREENER_SESSION_ID:-}" ]]; then
-  run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan
-else
-  log "   SCREENER_SESSION_ID is not set - CAN SLIM checks sell signals only"
-  run_step "CAN SLIM sell signals" com.stockanalyzer.CanSlimMain scan --no-screener
-fi
+# Without a screener.in session the query is skipped and the scan says so; holdings
+# and the configured symbols are still scored (fundamentals from public company
+# pages). Exit status 3 means a configured session was rejected: sign in again.
+run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan
 
 finish

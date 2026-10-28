@@ -81,6 +81,14 @@ class ScreenerInClientTest {
     }
 
     @Test
+    @DisplayName("a client without a session says so, so a caller can skip the query")
+    void hasSession() {
+        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", null, 3, 0).hasSession());
+        assertTrue(!new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "  ", 3, 0).hasSession());
+        assertTrue(new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1", "abc", 3, 0).hasSession());
+    }
+
+    @Test
     @DisplayName("no session configured fails before any request, saying how to get one")
     void noSession() {
         ScreenerInClient client = new ScreenerInClient(HttpClient.newHttpClient(), "http://localhost:1",

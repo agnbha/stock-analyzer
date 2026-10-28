@@ -146,11 +146,32 @@ class CanSlimEvaluatorTest {
     }
 
     @Test
-    @DisplayName("a stock that is neither screened nor in trouble has no signal")
+    @DisplayName("a stock with no fundamentals and no trouble has no signal")
     void universeOnly() {
         CanSlimScore score = evaluator.evaluate("CALM", CanSlimScore.Source.UNIVERSE, null,
                 analyzer.analyze(baseUnder150().add(152, 2000).build()), 90, UPTREND, null);
 
         assertEquals(CanSlimSignal.NONE, score.signal());
+        assertTrue(score.reason().contains("no fundamentals available"), score.reason());
+    }
+
+    @Test
+    @DisplayName("a universe stock whose own fundamentals pass C and A is a buy candidate")
+    void universeStockWithQualifyingFundamentals() {
+        CanSlimScore score = evaluator.evaluate("GROW", CanSlimScore.Source.UNIVERSE, GROWER,
+                analyzer.analyze(baseUnder150().add(152, 2000).build()), 90, UPTREND, null);
+
+        assertEquals(CanSlimSignal.BUY_BREAKOUT, score.signal());
+    }
+
+    @Test
+    @DisplayName("one passing letter is not enough for a stock the query did not vouch for")
+    void universeStockNeedsBothCAndA() {
+        ScreenedStock onlyC = new ScreenedStock("HALF", "Half", Map.of(ScreenerRatios.QTR_PROFIT_GROWTH, 40.0));
+        CanSlimScore score = evaluator.evaluate("HALF", CanSlimScore.Source.HOLDING, onlyC,
+                analyzer.analyze(baseUnder150().add(152, 2000).build()), 90, UPTREND, null);
+
+        assertEquals(CanSlimSignal.NONE, score.signal());
+        assertTrue(score.reason().contains("A unknown"), score.reason());
     }
 }

@@ -11,6 +11,7 @@ import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.store.TestDatabase;
 import com.stockanalyzer.store.jdbc.SqliteCanSlimRepository;
 import com.stockanalyzer.store.jdbc.SqliteDailyBarRepository;
+import com.stockanalyzer.store.jdbc.SqliteFundamentalsCacheRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.junit.jupiter.api.AfterEach;
@@ -28,11 +29,14 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CanSlimServiceTest {
@@ -108,8 +112,146 @@ class CanSlimServiceTest {
         assertEquals(List.of("LAG"), report.scores().stream().map(CanSlimScore::symbol).toList());
     }
 
+    private final List<String> pagesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Company pages by symbol; a symbol not in the map has no page. Every page read is recorded. */
+    private CompanyFundamentalsClient pages(Map<String, Map<String, Double>> byLabel) {
+        return symbol -> {
+            pagesRead.add(symbol);
+            return Optional.ofNullable(byLabel.get(symbol));
+        };
+    }
+
+    private static final Map<String, Double> STRONG = Map.of(
+            ScreenerRatios.QTR_PROFIT_GROWTH, 40.0, ScreenerRatios.QTR_SALES_GROWTH, 28.0,
+            ScreenerRatios.PROFIT_GROWTH_3Y, 32.0, ScreenerRatios.ROE, 22.0,
+            ScreenerRatios.FII_CHANGE, 0.8, ScreenerRatios.DII_CHANGE, 0.1);
+    private static final Map<String, Double> WEAK = Map.of(
+            ScreenerRatios.QTR_PROFIT_GROWTH, 4.0, ScreenerRatios.PROFIT_GROWTH_3Y, 6.0);
+
+    /** A run-up to {@code peak}, eight weeks of base under it, then a close through it on double volume. */
+    private static List<DailyBar> breakoutOver(double peak) {
+        return TestBars.from(100).trend(peak, 70).range(peak * 0.92, peak * 0.973, 38)
+                .add(peak * 1.013, 2000).build();
+    }
+
+    /** A client that was never given a session, so it cannot run a query. */
+    private static ScreenerClient noSession() {
+        return new ScreenerClient() {
+            @Override
+            public List<ScreenedStock> screen(String query) {
+                throw new AssertionError("a query must not be attempted without a session");
+            }
+
+            @Override
+            public boolean hasSession() {
+                return false;
+            }
+        };
+    }
+
+    @Test
+    @DisplayName("without a screener session the universe is still scored, from public company pages")
+    void noSessionUsesCompanyPages() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                // Different run-ups, so relative strength has a spread to rank: GROW leads.
+                "GROW", breakoutOver(180),
+                "DULL", breakoutOver(150),
+                "NOPAGE", breakoutOver(140));
+
+        CanSlimReport report = service(noSession(), pages(Map.of("GROW", STRONG, "DULL", WEAK)), prices,
+                List.of(), List.of("GROW", "DULL", "NOPAGE")).scan("Return on equity > 17");
+
+        Map<String, CanSlimScore> bySymbol = report.scores().stream()
+                .collect(java.util.stream.Collectors.toMap(CanSlimScore::symbol, Function.identity()));
+        assertTrue(report.screenerNotice().contains("No screener.in session"), report.screenerNotice());
+        assertFalse(report.screenerFailed(), "not having a session is a choice, not a failure");
+        assertEquals(0, report.screened());
+
+        CanSlimScore grow = bySymbol.get("GROW");
+        assertEquals(Boolean.TRUE, grow.letters().c());
+        assertEquals(Boolean.TRUE, grow.letters().a());
+        assertEquals(Boolean.TRUE, grow.letters().i());
+        assertEquals(CanSlimSignal.BUY_BREAKOUT, grow.signal(), "strong earnings and a breakout is a buy");
+
+        assertEquals(Boolean.FALSE, bySymbol.get("DULL").letters().c());
+        assertEquals(CanSlimSignal.NONE, bySymbol.get("DULL").signal(), "same chart, weak earnings");
+        assertNull(bySymbol.get("NOPAGE").letters().c());
+        assertEquals(CanSlimSignal.NONE, bySymbol.get("NOPAGE").signal(), "no fundamentals, so sell-only");
+        assertTrue(report.fundamentalsNotice().contains("3 fetched"), report.fundamentalsNotice());
+    }
+
+    @Test
+    @DisplayName("fundamentals are reused for the cache window, so the site is not read every night")
+    void pagesAreCached() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "GROW", TestBars.from(100).trend(120, 112).build());
+        CanSlimService service = service(noSession(), pages(Map.of("GROW", STRONG)), prices, List.of(),
+                List.of("GROW"));
+
+        service.scan("q");
+        CanSlimReport second = service.scan("q");
+
+        assertEquals(List.of("GROW"), pagesRead, "read once, not once per scan");
+        assertTrue(second.fundamentalsNotice().contains("1 reused"), second.fundamentalsNotice());
+        assertEquals(Boolean.TRUE, second.scores().getFirst().letters().c(), "and still known from the cache");
+    }
+
+    @Test
+    @DisplayName("a rejected session is reported, but holdings are still scored for sell signals")
+    void expiredSessionDegrades() {
+        ScreenerClient expired = new ScreenerClient() {
+            @Override
+            public List<ScreenedStock> screen(String query) {
+                throw new ScreenerException("screener.in did not accept the session (HTTP 302)", true);
+            }
+        };
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "HELD", TestBars.from(100).trend(120, 100).trend(108, 12).build());
+
+        CanSlimReport report = service(expired, prices,
+                List.of(new OpenPosition("HELD", Product.CNC, 10, 121.0, 0)), List.of()).scan("q");
+
+        assertTrue(report.screenerFailed());
+        assertTrue(report.needsLogin());
+        assertTrue(report.screenerNotice().contains("did not accept the session"));
+        assertEquals(CanSlimSignal.SELL_STOP_LOSS, report.scores().getFirst().signal());
+    }
+
+    @Test
+    @DisplayName("being rate limited stops further page reads instead of asking again")
+    void rateLimitStopsFetching() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "A", TestBars.from(100).trend(120, 112).build(),
+                "B", TestBars.from(100).trend(120, 112).build(),
+                "C", TestBars.from(100).trend(120, 112).build());
+        CompanyFundamentalsClient limited = symbol -> {
+            pagesRead.add(symbol);
+            if (symbol.equals("B")) {
+                throw new ScreenerException("screener.in is rate limiting (HTTP 429)", false);
+            }
+            return Optional.of(STRONG);
+        };
+
+        CanSlimReport report = service(noSession(), limited, prices, List.of(), List.of("A", "B", "C")).scan("q");
+
+        assertEquals(List.of("A", "B"), pagesRead, "C was never asked for");
+        assertTrue(report.fundamentalsNotice().contains("stopped early"), report.fundamentalsNotice());
+        assertEquals(3, report.scores().size(), "all three still scored on their charts");
+    }
+
     private CanSlimService service(ScreenerClient screener, Map<String, List<DailyBar>> prices,
                                    List<OpenPosition> held, List<String> universe) {
+        return service(screener, pages(Map.of()), prices, held, universe);
+    }
+
+    private CanSlimService service(ScreenerClient screener, CompanyFundamentalsClient companyPages,
+                                   Map<String, List<DailyBar>> prices, List<OpenPosition> held,
+                                   List<String> universe) {
         CandleDataClient candles = (symbol, exchange, segment, start, end, interval) -> {
             List<DailyBar> bars = prices.get(symbol);
             if (bars == null) {
@@ -135,11 +277,12 @@ class CanSlimServiceTest {
                 return held;
             }
         };
-        return new CanSlimService(screener, candles, new SqliteInstrumentRepository(database),
+        return new CanSlimService(screener, companyPages, new SqliteFundamentalsCacheRepository(database),
+                candles, new SqliteInstrumentRepository(database),
                 new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database), positions,
                 MARKET, Clock.fixed(Instant.parse("2025-08-01T13:00:00Z"), ZoneOffset.UTC), executor,
                 CanSlimCriteria.defaults(),
-                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe));
+                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7));
     }
 
     private int count(String sql) {

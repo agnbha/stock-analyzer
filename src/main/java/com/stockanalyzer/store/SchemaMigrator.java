@@ -83,6 +83,7 @@ public final class SchemaMigrator {
         all.put(15, v15());
         all.put(16, v16());
         all.put(17, v17());
+        all.put(18, v18());
         return all;
     }
 
@@ -230,6 +231,21 @@ public final class SchemaMigrator {
                        w200 AS (PARTITION BY b.instrument_id ORDER BY b.session_date
                                 ROWS BETWEEN 199 PRECEDING AND CURRENT ROW)""");
         return ddl;
+    }
+
+    /**
+     * v18: fundamentals read from screener.in company pages. They change once a
+     * quarter, so a fetch is kept for days rather than repeated every night. An
+     * empty ratio set is kept too: it records that the page had nothing (an ETF),
+     * so that is not asked again either.
+     */
+    private List<String> v18() {
+        return List.of("""
+                CREATE TABLE screener_fundamentals (
+                  instrument_id INTEGER PRIMARY KEY REFERENCES instrument(id),
+                  fetched_at INTEGER NOT NULL,
+                  ratios_json TEXT NOT NULL
+                )""");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

@@ -13,6 +13,7 @@ import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
 import com.stockanalyzer.canslim.CanSlimCriteria;
 import com.stockanalyzer.canslim.CanSlimService;
+import com.stockanalyzer.canslim.ScreenerCompanyClient;
 import com.stockanalyzer.canslim.ScreenerInClient;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.CandleDataClients;
@@ -69,6 +70,7 @@ import com.stockanalyzer.store.jdbc.SqliteTradeReasonRepository;
 import com.stockanalyzer.store.jdbc.SqliteCalendarRepository;
 import com.stockanalyzer.store.jdbc.SqliteCanSlimRepository;
 import com.stockanalyzer.store.jdbc.SqliteDailyBarRepository;
+import com.stockanalyzer.store.jdbc.SqliteFundamentalsCacheRepository;
 import com.stockanalyzer.store.jdbc.SqliteCandleRepository;
 import com.stockanalyzer.store.jdbc.SqliteGainOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteHeartbeatRepository;
@@ -416,10 +418,14 @@ public final class AppContext implements AutoCloseable {
                 (int) config.canSlim("distribution.correction", d.distributionCorrection()));
         CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
                 config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
-                config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of());
+                config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
+                config.canSlimFundamentalsCacheDays());
         return new CanSlimService(
                 new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull(),
                         config.screenerMaxPages(), config.screenerRequestIntervalMillis()),
+                new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                        config.screenerRequestIntervalMillis()),
+                new SqliteFundamentalsCacheRepository(database),
                 wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
                 new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
                 executor, criteria, settings);

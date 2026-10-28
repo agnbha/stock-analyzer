@@ -5,6 +5,7 @@ import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.OpenPosition;
 import com.stockanalyzer.store.CanSlimRepository;
 import com.stockanalyzer.store.DailyBarRepository;
+import com.stockanalyzer.store.FundamentalsCacheRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.util.MarketClock;
@@ -20,7 +21,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -48,12 +51,16 @@ public final class CanSlimService {
      * @param historyDays   calendar days of daily bars to fetch: a year of sessions plus room for the 200-day average
      * @param maxCandidates the most screened companies to price in one scan
      * @param universe      extra symbols to price for RS ranking and sell signals
+     * @param fundamentalsCacheDays how long fundamentals read from company pages are reused; 0 reads them
+     *                      every scan
      */
     public record Settings(String exchange, String segment, String indexSymbol, int historyDays,
-                           int maxCandidates, List<String> universe) {
+                           int maxCandidates, List<String> universe, int fundamentalsCacheDays) {
     }
 
     private final ScreenerClient screener;
+    private final CompanyFundamentalsClient companyFundamentals;
+    private final FundamentalsCacheRepository fundamentalsCache;
     private final CandleDataClient dailyClient;
     private final InstrumentRepository instruments;
     private final DailyBarRepository dailyBars;
@@ -67,11 +74,14 @@ public final class CanSlimService {
     private final PriceActionAnalyzer priceActionAnalyzer;
     private final CanSlimEvaluator evaluator;
 
-    public CanSlimService(ScreenerClient screener, CandleDataClient dailyClient, InstrumentRepository instruments,
-                          DailyBarRepository dailyBars, CanSlimRepository runs, RealizedLotRepository positions,
-                          MarketClock marketClock, Clock clock, ExecutorService executor,
-                          CanSlimCriteria criteria, Settings settings) {
+    public CanSlimService(ScreenerClient screener, CompanyFundamentalsClient companyFundamentals,
+                          FundamentalsCacheRepository fundamentalsCache, CandleDataClient dailyClient,
+                          InstrumentRepository instruments, DailyBarRepository dailyBars, CanSlimRepository runs,
+                          RealizedLotRepository positions, MarketClock marketClock, Clock clock,
+                          ExecutorService executor, CanSlimCriteria criteria, Settings settings) {
         this.screener = screener;
+        this.companyFundamentals = companyFundamentals;
+        this.fundamentalsCache = fundamentalsCache;
         this.dailyClient = dailyClient;
         this.instruments = instruments;
         this.dailyBars = dailyBars;
@@ -88,18 +98,37 @@ public final class CanSlimService {
 
     /**
      * @param query the screener query; null skips screening, which leaves only
-     *              holdings and the universe - sell signals without new candidates
+     *              holdings and the universe - sell signals, and buy signals for
+     *              any of them whose own fundamentals qualify
      */
     public CanSlimReport scan(String query) {
         Map<String, ScreenedStock> screened = new LinkedHashMap<>();
         int screenedCount = 0;
+        String screenerNotice = null;
+        boolean screenerFailed = false;
+        boolean needsLogin = false;
         if (query != null) {
-            List<ScreenedStock> results = screener.screen(query);
-            screenedCount = results.size();
-            results.stream().limit(settings.maxCandidates()).forEach(s -> screened.put(s.symbol(), s));
-            if (results.size() > settings.maxCandidates()) {
-                log.warn("The query returned {} companies; scoring the first {}. Tighten the query or raise "
-                        + "canslim.max.candidates.", results.size(), settings.maxCandidates());
+            if (!screener.hasSession()) {
+                screenerNotice = "No screener.in session (SCREENER_SESSION_ID), so the query was not run: "
+                        + "no new candidates were screened. Holdings and the configured symbols were scored "
+                        + "from their public screener.in company pages.";
+            } else {
+                try {
+                    List<ScreenedStock> results = screener.screen(query);
+                    screenedCount = results.size();
+                    results.stream().limit(settings.maxCandidates()).forEach(s -> screened.put(s.symbol(), s));
+                    if (results.size() > settings.maxCandidates()) {
+                        log.warn("The query returned {} companies; scoring the first {}. Tighten the query or "
+                                + "raise canslim.max.candidates.", results.size(), settings.maxCandidates());
+                    }
+                } catch (ScreenerException e) {
+                    // The rest of the scan does not depend on the query, and holdings' sell signals must not
+                    // wait on a login: record why, carry on, and let the caller decide how loudly to fail.
+                    screenerNotice = e.getMessage();
+                    screenerFailed = true;
+                    needsLogin = e.needsLogin();
+                    log.warn("The screener query did not run: {}", e.getMessage());
+                }
             }
         }
 
@@ -108,6 +137,13 @@ public final class CanSlimService {
         screened.keySet().forEach(symbol -> sources.put(symbol, CanSlimScore.Source.SCREENER));
         holdingCosts.keySet().forEach(symbol -> sources.putIfAbsent(symbol, CanSlimScore.Source.HOLDING));
         settings.universe().forEach(symbol -> sources.putIfAbsent(symbol, CanSlimScore.Source.UNIVERSE));
+
+        // The query's own columns carry C, A and I for what it returned. Everything else is read
+        // from the company pages, so those letters are known rather than blank.
+        List<String> needFundamentals = sources.keySet().stream()
+                .filter(symbol -> !screened.containsKey(symbol) && !symbol.equals(settings.indexSymbol()))
+                .toList();
+        FundamentalsResult pageFundamentals = pageFundamentals(needFundamentals);
 
         List<String> toPrice = new ArrayList<>(sources.keySet());
         if (!sources.containsKey(settings.indexSymbol())) {
@@ -145,14 +181,73 @@ public final class CanSlimService {
         Map<Long, CanSlimScore> scores = new LinkedHashMap<>();
         for (Map.Entry<String, CanSlimScore.Source> entry : sources.entrySet()) {
             String symbol = entry.getKey();
-            CanSlimScore score = evaluator.evaluate(symbol, entry.getValue(), screened.get(symbol),
+            ScreenedStock fundamentals = screened.containsKey(symbol)
+                    ? screened.get(symbol) : pageFundamentals.stocks().get(symbol);
+            CanSlimScore score = evaluator.evaluate(symbol, entry.getValue(), fundamentals,
                     actions.get(symbol), rsRatings.get(symbol), market, holdingCosts.get(symbol));
             scores.put(instruments.findOrCreate(symbol, settings.exchange(), settings.segment()), score);
         }
 
         long runId = runs.saveRun(clock.instant().getEpochSecond(), query, screenedCount, market, scores);
         List<CanSlimScore> ordered = scores.values().stream().sorted(REPORT_ORDER).toList();
-        return new CanSlimReport(runId, query, screenedCount, market, ordered, failures);
+        return new CanSlimReport(runId, query, screenedCount, market, ordered, failures, screenerNotice,
+                screenerFailed, needsLogin, pageFundamentals.notice());
+    }
+
+    private record FundamentalsResult(Map<String, ScreenedStock> stocks, String notice) {
+    }
+
+    /**
+     * C, A and I for symbols the query did not return, from their public
+     * company pages. Anything fetched in the last {@code fundamentalsCacheDays}
+     * is reused, so the nightly scan reads the site only when a quarter's
+     * numbers may have changed. A failed fetch leaves that stock's letters
+     * unknown; a rate limit stops the fetching altogether rather than asking
+     * again, and the rest is picked up on a later run.
+     */
+    private FundamentalsResult pageFundamentals(List<String> symbols) {
+        Map<String, ScreenedStock> stocks = new LinkedHashMap<>();
+        if (symbols.isEmpty()) {
+            return new FundamentalsResult(stocks, null);
+        }
+        long now = clock.instant().getEpochSecond();
+        long maxAge = settings.fundamentalsCacheDays() * 86_400L;
+        int cached = 0;
+        int fetched = 0;
+        int unavailable = 0;
+        String stopped = null;
+        for (String symbol : symbols) {
+            long instrumentId = instruments.findOrCreate(symbol, settings.exchange(), settings.segment());
+            Optional<FundamentalsCacheRepository.Cached> hit = fundamentalsCache.find(instrumentId);
+            Map<String, Double> ratios;
+            if (hit.isPresent() && now - hit.get().fetchedAtEpoch() < maxAge) {
+                ratios = hit.get().ratios();
+                cached++;
+            } else if (stopped != null) {
+                ratios = hit.map(FundamentalsCacheRepository.Cached::ratios).orElse(Map.of());
+            } else {
+                try {
+                    ratios = companyFundamentals.fetch(symbol).orElse(Map.of());
+                    fundamentalsCache.upsert(instrumentId, now, ratios);
+                    fetched++;
+                } catch (ScreenerException e) {
+                    log.warn("Could not read fundamentals for {}: {}", symbol, e.getMessage());
+                    stopped = e.getMessage();
+                    ratios = hit.map(FundamentalsCacheRepository.Cached::ratios).orElse(Map.of());
+                }
+            }
+            if (ratios.isEmpty()) {
+                unavailable++;
+            } else {
+                stocks.put(symbol, new ScreenedStock(symbol, symbol, ratios));
+            }
+        }
+        String notice = String.format(Locale.ROOT, "Fundamentals for %d symbols from public screener.in company "
+                        + "pages: %d fetched, %d reused (under %d days old), %d with none available%s",
+                symbols.size(), fetched, cached, settings.fundamentalsCacheDays(), unavailable,
+                stopped == null ? "" : "; stopped early: " + stopped);
+        log.info(notice);
+        return new FundamentalsResult(stocks, notice);
     }
 
     /** Sells first, then buys, then setups; within a signal the strongest by letters and RS. */

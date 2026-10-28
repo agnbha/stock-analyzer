@@ -12,4 +12,9 @@ import java.util.List;
 public interface ScreenerClient {
 
     List<ScreenedStock> screen(String query);
+
+    /** Whether a query can be attempted at all. False means the account's session was never configured. */
+    default boolean hasSession() {
+        return true;
+    }
 }

@@ -25,6 +25,13 @@ public final class CanSlimReporter {
     public void report(CanSlimReport report, boolean all) {
         out.printf(Locale.ROOT, "%nCAN SLIM scan #%d%n", report.runId());
         out.printf(Locale.ROOT, "Market (M): %s - %s%n", report.market().state(), report.market().note());
+        if (report.screenerNotice() != null) {
+            out.printf(Locale.ROOT, "Screener%s: %s%n", report.screenerFailed() ? " FAILED" : "",
+                    report.screenerNotice());
+        }
+        if (report.fundamentalsNotice() != null) {
+            out.println(report.fundamentalsNotice());
+        }
 
         Map<CanSlimScore.Source, Long> bySource = report.scores().stream()
                 .collect(Collectors.groupingBy(CanSlimScore::source, Collectors.counting()));

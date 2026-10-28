@@ -139,7 +139,8 @@ java -cp $CP com.stockanalyzer.CanSlimMain scan
 java -cp $CP com.stockanalyzer.CanSlimMain scan --query "Return on equity > 20 AND YOY Quarterly profit growth > 30"
 java -cp $CP com.stockanalyzer.CanSlimMain scan --all          # list every scored stock, not just signals
 
-# no screener: check holdings and the configured symbols for sell signals only
+# skip the query: score only holdings and the configured symbols (the nightly job does this when no
+# session is set, with their fundamentals read from public screener.in company pages)
 java -cp $CP com.stockanalyzer.CanSlimMain scan --no-screener
 ```
 
@@ -283,7 +284,11 @@ dashboard query executed against a real migrated database.
 
 ## Important caveats
 
-- **CAN SLIM reads screener.in through your browser session.** Custom queries
+- **CAN SLIM works without a screener.in session, with less reach.** The
+  fundamentals for your holdings and configured symbols are read from screener.in's
+  public company pages, so they are scored with or without a login. Only the query
+  - finding candidates outside those symbols - needs one.
+- **CAN SLIM reads the query through your browser session.** Custom queries
   need a signed-in account, and screener.in signs in through Google in a
   browser - a flow a batch job cannot complete, and should not hold the
   credentials for. So the scan sends the `sessionid` cookie you copy from a

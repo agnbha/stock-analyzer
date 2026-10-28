@@ -57,6 +57,11 @@ public final class ScreenerInClient implements ScreenerClient {
     }
 
     @Override
+    public boolean hasSession() {
+        return sessionCookie != null;
+    }
+
+    @Override
     public List<ScreenedStock> screen(String query) {
         if (sessionCookie == null) {
             throw new ScreenerException("No screener.in session configured. Sign in at "

@@ -378,6 +378,11 @@ public final class AppConfig {
         return Boolean.parseBoolean(get("canslim.include.universe", "true"));
     }
 
+    /** How long fundamentals read from company pages are reused; they change once a quarter. */
+    public int canSlimFundamentalsCacheDays() {
+        return Integer.parseInt(get("canslim.fundamentals.cache.days", "7"));
+    }
+
     public double canSlim(String key, double fallback) {
         return Double.parseDouble(get("canslim." + key, String.valueOf(fallback)));
     }

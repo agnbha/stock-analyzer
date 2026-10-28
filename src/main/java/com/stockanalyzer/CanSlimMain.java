@@ -1,7 +1,6 @@
 package com.stockanalyzer;
 
 import com.stockanalyzer.canslim.CanSlimReport;
-import com.stockanalyzer.canslim.ScreenerException;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.report.CanSlimReporter;
 import com.stockanalyzer.util.Args;
@@ -17,8 +16,10 @@ import com.stockanalyzer.util.Args;
  *   ... --all                  list every scored stock, not only those with a signal
  * </pre>
  *
- * Exit status 3 means the screener.in session needs renewing - the one failure
- * a scheduled run cannot fix by retrying.
+ * Without a screener.in session the query is skipped (noted in the report), and
+ * holdings and the configured symbols are scored from public company pages.
+ * Exit status 3 means a configured session was rejected and needs renewing; 1,
+ * that the query failed for another reason. Either way the rest of the scan ran.
  */
 public final class CanSlimMain {
 
@@ -42,9 +43,11 @@ public final class CanSlimMain {
         try (AppContext context = new AppContext(config)) {
             CanSlimReport report = context.canSlimService().scan(query);
             new CanSlimReporter(System.out).report(report, parsed.flag("all"));
-        } catch (ScreenerException e) {
-            System.err.println(e.getMessage());
-            System.exit(e.needsLogin() ? 3 : 1);
+            // The scan has been stored and printed either way. A query that failed after a session was
+            // configured is the one thing a person has to act on, so it leaves a status behind.
+            if (report.screenerFailed()) {
+                System.exit(report.needsLogin() ? 3 : 1);
+            }
         }
     }
 }

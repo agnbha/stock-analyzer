@@ -11,11 +11,15 @@ approximated.
 1. **Screen.** The `canslim.screener.query` query runs on screener.in. It is the
    fundamental filter, because quarterly and annual results live there. Every
    ratio it mentions comes back as a column, which is how the letters below get
-   their numbers.
+   their numbers. This needs a signed-in session (see the last section); without
+   one the step is skipped, the report says so, and the scan carries on at step 2.
 2. **Widen.** Open positions and the configured `symbols.txt` universe join the
-   screened companies. They are not buy candidates (they did not pass the
-   screen), but they are checked for sell signals and widen the field the RS
-   rating is ranked against.
+   screened companies. They are checked for sell signals and widen the field the
+   RS rating is ranked against. Their own C, A and I come from their public
+   screener.in company pages (cached for `canslim.fundamentals.cache.days`, 7 by
+   default, since the numbers change once a quarter), so they are scored like any
+   other stock - and a held or universe stock whose fundamentals pass both C and
+   A is a buy candidate too, not just a sell check.
 3. **Price.** About a year of daily candles per symbol, plus the market proxy
    (`NIFTYBEES`). The daily interval allows years per request, so this is one
    request per symbol, through the same rate limiter as everything else. A
@@ -29,17 +33,18 @@ approximated.
 ## The letters
 
 A letter is **passed**, **failed**, or **unknown** when its data was not
-available. Unknown is not the same as failed: holdings and universe stocks have
-no screener ratios, so their C, A and I are always unknown.
+available. Unknown is not the same as failed: an ETF has no earnings, and a
+company page may lack a figure (a new listing without five quarters of results has
+no year-on-year growth).
 
 | Letter | Rule | Default | From |
 |---|---|---|---|
-| **C** Current earnings | latest quarter's profit vs the same quarter last year; sales too, so it is not one-off cost cutting | profit ≥ 25%, sales ≥ 20% | screener.in |
-| **A** Annual earnings | three-year profit CAGR, and return on equity | ≥ 25%, ROE ≥ 17% | screener.in |
+| **C** Current earnings | latest quarter's profit vs the same quarter last year (four columns back); sales too, so it is not one-off cost cutting. A loss-making base has no growth rate and is unknown | profit ≥ 25%, sales ≥ 20% | screener.in query, or company page |
+| **A** Annual earnings | three-year profit CAGR, and return on equity | ≥ 25%, ROE ≥ 17% | screener.in query, or company page |
 | **N** New highs | close within this far of the 52-week high | ≤ 15% below | daily bars |
 | **S** Supply and demand | volume on up days over volume on down days, last 50 sessions | ≥ 1.0 | daily bars |
 | **L** Leader | RS rating: percentile of a weighted 12-month return (40% on the latest quarter, 20% on each earlier one) | ≥ 80 | daily bars |
-| **I** Institutional sponsorship | FII + DII holding change last quarter | > 0 | screener.in |
+| **I** Institutional sponsorship | FII + DII holding change last quarter | > 0 | screener.in query, or company page |
 | **M** Market direction | the market proxy's state, below | confirmed uptrend | daily bars |
 
 All thresholds are `canslim.*` properties.
@@ -101,6 +106,12 @@ In an uptrend under pressure, buy signals stand but say so.
   not checked.
 
 ## The screener.in session
+
+Only the **query** needs a session; the company pages the fundamentals fall back
+on are public. Without one, the scan still runs and the report says "No
+screener.in session"; what is missing is new candidates from outside your own
+symbols. A session that is configured but rejected is a failure: the scan
+finishes and stores its results, then exits with status 3.
 
 Custom queries need a signed-in screener.in account, and screener.in signs in
 through Google in a browser - a flow a scheduled job cannot complete and should
