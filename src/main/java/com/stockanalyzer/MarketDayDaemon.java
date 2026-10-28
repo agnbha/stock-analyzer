@@ -2,6 +2,7 @@ package com.stockanalyzer;
 
 import com.stockanalyzer.alert.AlertEngine;
 import com.stockanalyzer.alert.AlertPolicy;
+import com.stockanalyzer.alert.AlertScope;
 import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.live.MarketMonitor;
@@ -19,6 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Parts 3 and 4: the market-hours process. Polls for new candles, keeps the
@@ -63,13 +65,16 @@ public final class MarketDayDaemon {
         try (AppContext context = new AppContext(config)) {
             LocalDate sessionDate = args.date("date", LocalDate.now(context.clock().zone()));
 
+            AlertScope alertScope = context.alertScope(sessionDate);
+            logAlertScope(alertScope, config);
+
             AlertEngine alertEngine = args.flag("dry-run")
                     ? new AlertEngine(
                             new AlertPolicy(context.alertRepository(), config.alertCooldownMinutes(),
-                                    config.alertMaxPerSymbolPerDay(), config.alertMaxPerDay()),
+                                    config.alertMaxPerSymbolPerDay(), config.alertMaxPerDay(), alertScope),
                             new ConsoleAlertSink(context.clock()),
                             context.alertRepository())
-                    : context.alertEngine();
+                    : context.alertEngine(alertScope);
 
             MarketMonitor monitor = new MarketMonitor(
                     context.candleDataClient(),
@@ -80,7 +85,7 @@ public final class MarketDayDaemon {
                     alertEngine,
                     context.alertRepository(),
                     context.heartbeatRepository(),
-                    context.alertPlanner(),
+                    context.alertPlanner(alertScope),
                     context.instrumentRepository(),
                     context.liveCandleRepository(),
                     context.liveOpportunityRepository(),
@@ -102,6 +107,26 @@ public final class MarketDayDaemon {
             warnIfSessionExceedsDailyBudget(context, config);
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
             monitor.run(sessionDate);
+        }
+    }
+
+    /**
+     * Said once at start-up, because "why did nothing alert on X" is otherwise a
+     * question about a set that was computed an hour before anyone asked.
+     */
+    private static void logAlertScope(AlertScope scope, AppConfig config) {
+        if (scope.isEverything()) {
+            log.info("Alerting on all {} tracked symbols (alerts.symbols={})",
+                    config.stockSymbols().size(), config.alertSymbolKinds());
+            return;
+        }
+        List<String> alertable = config.stockSymbols().stream().filter(scope::includes).sorted().toList();
+        log.info("Alerting on {} of {} tracked symbols (alerts.symbols={}): {}",
+                alertable.size(), config.stockSymbols().size(), config.alertSymbolKinds(),
+                String.join(", ", alertable));
+        if (alertable.isEmpty()) {
+            log.warn("No tracked symbol is in the alert scope, so only market-wide alerts will fire. "
+                    + "Daily history may be too short for the bullish test (it needs 20 sessions).");
         }
     }
 

@@ -43,6 +43,7 @@ public final class SessionAlertPlanner {
     private final double minLowerBound;
     private final int skipOpeningMinutes;
     private final int maxHotWindowAlerts;
+    private final AlertScope scope;
 
     /**
      * @param skipOpeningMinutes windows starting within this many minutes of the open are not alerted on:
@@ -53,6 +54,14 @@ public final class SessionAlertPlanner {
     public SessionAlertPlanner(HotWindowRepository hotWindowRepository, MarketClock clock, int bucketMinutes,
                                int lookbackDays, int leadTimeMinutes, int minSessions, double minLowerBound,
                                int skipOpeningMinutes, int maxHotWindowAlerts) {
+        this(hotWindowRepository, clock, bucketMinutes, lookbackDays, leadTimeMinutes, minSessions,
+                minLowerBound, skipOpeningMinutes, maxHotWindowAlerts, AlertScope.everything());
+    }
+
+    /** @param scope hot windows are planned only for symbols in it, so the daily cap is spent inside it */
+    public SessionAlertPlanner(HotWindowRepository hotWindowRepository, MarketClock clock, int bucketMinutes,
+                               int lookbackDays, int leadTimeMinutes, int minSessions, double minLowerBound,
+                               int skipOpeningMinutes, int maxHotWindowAlerts, AlertScope scope) {
         this.hotWindowRepository = hotWindowRepository;
         this.clock = clock;
         this.bucketMinutes = bucketMinutes;
@@ -62,6 +71,7 @@ public final class SessionAlertPlanner {
         this.minLowerBound = minLowerBound;
         this.skipOpeningMinutes = skipOpeningMinutes;
         this.maxHotWindowAlerts = maxHotWindowAlerts;
+        this.scope = scope;
     }
 
     public List<ScheduledAlert> plan(LocalDate sessionDate, List<String> symbols) {
@@ -92,6 +102,9 @@ public final class SessionAlertPlanner {
         }
         List<Candidate> candidates = new ArrayList<>();
         for (String symbol : symbols) {
+            if (!scope.includes(symbol)) {
+                continue;
+            }
             for (HotWindow window : hotWindowRepository.find(symbol, bucketMinutes, lookbackDays)) {
                 if (window.symbol() == null || window.sessions() < minSessions
                         || window.hitRateLcb() < minLowerBound

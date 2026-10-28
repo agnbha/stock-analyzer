@@ -237,6 +237,17 @@ public final class AppConfig {
                 .toList();
     }
 
+    /**
+     * Which symbols may alert: any of {@code bullish}, {@code holdings}, or {@code all} for no filter.
+     * Everything is still tracked; this only decides what is allowed to interrupt.
+     */
+    public List<String> alertSymbolKinds() {
+        return List.of(get("alerts.symbols", "bullish,holdings").split(",")).stream()
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
+    }
+
     /** The least severe alert that becomes a desktop notification: INFO, NOTABLE or URGENT. */
     public String alertDesktopMinSeverity() {
         return get("alerts.desktop.min-severity", "NOTABLE").trim().toUpperCase();

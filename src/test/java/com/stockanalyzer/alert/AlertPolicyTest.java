@@ -95,4 +95,31 @@ class AlertPolicyTest {
         assertFalse(engine.fire(alert("RELIANCE", "hotwindow.approaching", NOON + 500, "k6")));
         assertEquals(5, delivered.size());
     }
+
+    @Test
+    @DisplayName("a symbol outside the scope never fires, and never uses up the daily cap")
+    void scopeKeepsOutsidersOutOfTheCaps() {
+        AlertEngine scoped = new AlertEngine(
+                new AlertPolicy(alertRepository, 15, 3, 2, AlertScope.of(java.util.Set.of("TCS"))),
+                delivered::add, alertRepository);
+
+        assertFalse(scoped.fire(alert("RELIANCE", "event.vwap_loss", NOON, "k1")));
+        assertFalse(scoped.fire(alert("INFY", "event.vwap_loss", NOON + 10, "k2")));
+        assertTrue(scoped.fire(alert("TCS", "event.vwap_loss", NOON + 20, "k3")));
+        assertTrue(scoped.fire(alert("TCS", "event.vwap_reclaim", NOON + 30, "k4")),
+                "the two-a-day cap was spent only on TCS, not on the two that were turned away");
+        assertEquals(2, delivered.size());
+        assertEquals(2, alertRepository.countFiredToday(DAY, null));
+    }
+
+    @Test
+    @DisplayName("a market-wide alert is not tied to any symbol, so the scope lets it through")
+    void scopeLetsMarketWideAlertsThrough() {
+        AlertEngine scoped = new AlertEngine(
+                new AlertPolicy(alertRepository, 15, 3, 5, AlertScope.of(java.util.Set.of())),
+                delivered::add, alertRepository);
+
+        assertTrue(scoped.fire(alert(null, "session.open", NOON, "k1")));
+        assertFalse(scoped.fire(alert("TCS", "event.vwap_loss", NOON + 10, "k2")));
+    }
 }

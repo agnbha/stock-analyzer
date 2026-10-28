@@ -98,6 +98,29 @@ java -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only, no not
 java -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
 ```
 
+**Which symbols alert.** Every tracked symbol is still polled, charted and
+scored; `alerts.symbols` only decides which of them may interrupt you. It takes
+any of `bullish`, `holdings` and `all`, and they add up. The default is
+`bullish,holdings`:
+
+- `bullish` - the Watchlist page's "reading bullish" test: the last close and
+  the 5-day average both above the 20-day average. It is worked out once, from
+  sessions before today, when the daemon starts, so the set does not move during
+  the day (a restart at noon gives the same list as one at 09:00). A symbol with
+  fewer than 20 sessions of history is left out.
+- `holdings` - what the broker reports you hold, plus long open positions in the
+  trade journal, so an exit signal on a position is never filtered away. A
+  negative journal quantity (a sell with no matching buy in the imported history)
+  does not count as holding anything.
+- `all` - no filter.
+
+A symbol outside the scope never fires and never uses up the daily cap, and the
+hot-window plan spends its 20-a-day budget inside the scope. Market-wide
+lifecycle alerts are unaffected. The daemon logs the resolved list at start-up
+("Alerting on N of 54 tracked symbols: ..."), so the answer to "why no alert on
+X" is in `logs/market-day-*.err.log`. Like the other settings it is read at
+launch.
+
 **Desktop notifications.** Alerts go to the console and, on macOS, to a
 notification banner (`alerts.sinks=console,macos`). Per-symbol alerts
 (`NOTABLE`) show a silent banner; `URGENT` ones also play a sound; the session

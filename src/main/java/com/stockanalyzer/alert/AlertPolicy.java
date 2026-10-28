@@ -17,16 +17,27 @@ public final class AlertPolicy {
     private final int cooldownMinutes;
     private final int maxPerSymbolPerDay;
     private final int maxPerDay;
+    private final AlertScope scope;
 
     public AlertPolicy(AlertRepository alertRepository, int cooldownMinutes,
                        int maxPerSymbolPerDay, int maxPerDay) {
+        this(alertRepository, cooldownMinutes, maxPerSymbolPerDay, maxPerDay, AlertScope.everything());
+    }
+
+    /** @param scope symbols outside it never fire, and never count towards the caps */
+    public AlertPolicy(AlertRepository alertRepository, int cooldownMinutes,
+                       int maxPerSymbolPerDay, int maxPerDay, AlertScope scope) {
         this.alertRepository = alertRepository;
         this.cooldownMinutes = cooldownMinutes;
         this.maxPerSymbolPerDay = maxPerSymbolPerDay;
         this.maxPerDay = maxPerDay;
+        this.scope = scope;
     }
 
     public Decision evaluate(Alert alert) {
+        if (!scope.includes(alert.symbol())) {
+            return new Decision(false, "outside the alert scope");
+        }
         if (alertRepository.alreadyFired(alert.idempotencyKey())) {
             return new Decision(false, "already sent");
         }

@@ -26,6 +26,11 @@ class SessionAlertPlannerTest {
     }
 
     private SessionAlertPlanner planner(Map<String, List<HotWindow>> windows, int skipOpening, int max) {
+        return planner(windows, skipOpening, max, AlertScope.everything());
+    }
+
+    private SessionAlertPlanner planner(Map<String, List<HotWindow>> windows, int skipOpening, int max,
+                                        AlertScope scope) {
         HotWindowRepository repository = new HotWindowRepository() {
             @Override
             public void replaceAll(int bucketMinutes, int lookbackDays, List<HotWindow> w) {
@@ -41,7 +46,7 @@ class SessionAlertPlannerTest {
                 return List.of();
             }
         };
-        return new SessionAlertPlanner(repository, CLOCK, 5, 60, 2, 30, 0.10, skipOpening, max);
+        return new SessionAlertPlanner(repository, CLOCK, 5, 60, 2, 30, 0.10, skipOpening, max, scope);
     }
 
     private static List<ScheduledAlert> hotWindows(List<ScheduledAlert> plan) {
@@ -101,5 +106,28 @@ class SessionAlertPlannerTest {
                 new HotWindow(null, 50, 5, 60, 900, 2000, 0.45, 0.43, 1.0, 1.0)));
 
         assertTrue(hotWindows(planner(windows, 5, 20).plan(DAY, List.of("AAA"))).isEmpty());
+    }
+
+    @Test
+    @DisplayName("the daily cap is spent inside the scope, not on symbols that would be turned away")
+    void capIsSpentInsideTheScope() {
+        Map<String, List<HotWindow>> windows = Map.of(
+                "OUTSIDE", List.of(window("OUTSIDE", 30, 0.90), window("OUTSIDE", 60, 0.80)),
+                "INSIDE", List.of(window("INSIDE", 30, 0.30), window("INSIDE", 60, 0.20)));
+
+        List<ScheduledAlert> alerts = hotWindows(planner(windows, 5, 2, AlertScope.of(java.util.Set.of("INSIDE")))
+                .plan(DAY, List.of("OUTSIDE", "INSIDE")));
+
+        assertEquals(2, alerts.size(), "both slots go to the symbol in scope, though OUTSIDE is stronger");
+        assertTrue(alerts.stream().allMatch(a -> "INSIDE".equals(a.symbol())));
+    }
+
+    @Test
+    @DisplayName("the session lifecycle is planned whatever the scope")
+    void lifecycleIgnoresTheScope() {
+        List<ScheduledAlert> plan = planner(Map.of(), 5, 20, AlertScope.of(java.util.Set.of()))
+                .plan(DAY, List.of("AAA"));
+
+        assertEquals(5, plan.size());
     }
 }
