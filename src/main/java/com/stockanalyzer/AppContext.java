@@ -464,11 +464,12 @@ public final class AppContext implements AutoCloseable {
         CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
                 config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
                 config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
-                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays());
+                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays(),
+                config.canSlimFundamentalsMaxPagesPerRun());
         return new CanSlimService(
                 new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
                 new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
-                        config.screenerRequestIntervalMillis()),
+                        config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
                 new SqliteFundamentalsCacheRepository(database),
                 wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
                 new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),

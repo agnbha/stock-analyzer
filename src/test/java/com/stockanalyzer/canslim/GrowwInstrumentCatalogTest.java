@@ -137,7 +137,8 @@ class GrowwInstrumentCatalogTest {
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> GrowwInstrumentCatalog.parse(
                 new StringReader("exchange,trading_symbol\nNSE,X\n"), MAIN_BOARD));
 
-        assertTrue(failure.getMessage().contains("isin"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("has no '") && failure.getMessage()
+                .contains("Columns: [exchange, trading_symbol]"), failure.getMessage());
     }
 
     private AtomicInteger serve(int status) throws IOException {

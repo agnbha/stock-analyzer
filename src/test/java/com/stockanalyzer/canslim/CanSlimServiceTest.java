@@ -136,6 +136,9 @@ class CanSlimServiceTest {
     private final List<String> pagesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final List<String> pricedOn = new java.util.concurrent.CopyOnWriteArrayList<>();
 
+    /** Pages one scan may read; generous unless a test is about the limit. */
+    private int pageBudget = 1_000;
+
     /** Company pages by symbol; a symbol not in the map has no page. Every page read is recorded. */
     private CompanyFundamentalsClient pages(Map<String, Map<String, Double>> byLabel) {
         return symbol -> {
@@ -431,6 +434,32 @@ class CanSlimServiceTest {
     }
 
     @Test
+    @DisplayName("a scan reads no more pages than its budget, and spends it on the strongest RS first")
+    void pageBudgetGoesToTheStrongest() {
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        pageBudget = 1;
+        Map<String, List<DailyBar>> prices = new java.util.HashMap<>();
+        prices.put("IDX", TestBars.from(100).trend(130, 130).build());
+        for (int i = 1; i <= 6; i++) {
+            prices.put("S" + i, TestBars.from(100).trend(100 + 40 * i, 130).build());
+        }
+        MarketScan six = new MarketScan(List.of(listing("S1", "NSE", "S1"), listing("S2", "NSE", "S2"),
+                listing("S3", "NSE", "S3"), listing("S4", "NSE", "S4"), listing("S5", "NSE", "S5"),
+                listing("S6", "NSE", "S6")), 100, 10.0, 50_000.0, 10, 50, 5);
+        Map<String, Map<String, Double>> pages = new java.util.HashMap<>();
+        prices.keySet().forEach(symbol -> pages.put(symbol, STRONG));
+
+        CanSlimReport report = service(noSession(), pages(pages), prices, List.of(), List.of()).scan("q", six);
+
+        assertEquals(List.of("S6"), pagesRead, "the one page went to the highest RS rating");
+        assertTrue(report.fundamentalsNotice().contains("1-page budget"), report.fundamentalsNotice());
+        assertEquals(Boolean.TRUE, report.scores().stream().filter(s -> s.symbol().equals("S6")).findFirst()
+                .orElseThrow().letters().c());
+        assertNull(report.scores().stream().filter(s -> s.symbol().equals("S5")).findFirst().orElseThrow()
+                .letters().c(), "next in line, not yet read");
+    }
+
+    @Test
     @DisplayName("a rejected session is reported, but holdings are still scored for sell signals")
     void expiredSessionDegrades() {
         ScreenerClient expired = new ScreenerClient() {
@@ -514,7 +543,7 @@ class CanSlimServiceTest {
                 new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database), positions,
                 MARKET, clock, executor,
                 CanSlimCriteria.defaults(),
-                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7, 2));
+                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7, 2, pageBudget));
     }
 
     private int count(String sql) {

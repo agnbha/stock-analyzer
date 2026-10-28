@@ -391,8 +391,19 @@ public final class AppConfig {
         return get("screener.base.url", "https://www.screener.in");
     }
 
+    /** Between two company-page reads. screener.in refuses a faster pace than about one every ten seconds. */
     public long screenerRequestIntervalMillis() {
-        return Long.parseLong(get("canslim.screener.request.interval.ms", "2000"));
+        return Long.parseLong(get("canslim.screener.request.interval.ms", "12000"));
+    }
+
+    /** How long to wait after screener.in answers 429, unless it says how long itself. */
+    public long screenerRateLimitBackoffMillis() {
+        return Long.parseLong(get("canslim.screener.rate.limit.backoff.ms", "60000"));
+    }
+
+    /** The most company pages one scan reads. */
+    public int canSlimFundamentalsMaxPagesPerRun() {
+        return Integer.parseInt(get("canslim.fundamentals.max.pages.per.run", "60"));
     }
 
     /** An index ETF standing in for the market: the candle feed prices tradeable symbols. */

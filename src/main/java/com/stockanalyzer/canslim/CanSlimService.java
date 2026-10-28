@@ -59,10 +59,14 @@ public final class CanSlimService {
      *                      0 reads every page every scan
      * @param fundamentalsSeasonCheckDays how often, in reporting season, to look again at a company that has
      *                      not yet shown the newly ended quarter
+     * @param maxPagesPerRun the most company pages one scan reads, across holdings, the universe and the
+     *                      market's leaders. screener.in admits about one page every ten seconds, so a first
+     *                      scan of hundreds is spread over several nights, strongest RS first, rather than
+     *                      held up for an hour
      */
     public record Settings(String exchange, String segment, String indexSymbol, int historyDays,
                            int maxCandidates, List<String> universe, int fundamentalsCacheDays,
-                           int fundamentalsSeasonCheckDays) {
+                           int fundamentalsSeasonCheckDays, int maxPagesPerRun) {
     }
 
     private final ScreenerClient screener;
@@ -180,7 +184,9 @@ public final class CanSlimService {
                 .filter(symbol -> !screened.containsKey(symbol) && !symbol.equals(settings.indexSymbol())
                         && sources.get(symbol) != CanSlimScore.Source.MARKET)
                 .toList();
-        FundamentalsResult pageFundamentals = pageFundamentals(needFundamentals, exchangeOf, pageKeyOf);
+        java.util.concurrent.atomic.AtomicInteger pageBudget =
+                new java.util.concurrent.atomic.AtomicInteger(settings.maxPagesPerRun());
+        FundamentalsResult pageFundamentals = pageFundamentals(needFundamentals, exchangeOf, pageKeyOf, pageBudget);
 
         List<String> toPrice = new ArrayList<>(sources.keySet());
         if (!sources.containsKey(settings.indexSymbol())) {
@@ -249,8 +255,10 @@ public final class CanSlimService {
                     .map(Map.Entry::getKey)
                     .filter(symbol -> rsRatings.get(symbol) != null
                             && rsRatings.get(symbol) >= wide.fundamentalsMinRs())
+                    // The page budget runs out before the list does on a first scan: spend it on the strongest.
+                    .sorted(Comparator.comparing((String symbol) -> -rsRatings.get(symbol)).thenComparing(symbol -> symbol))
                     .toList();
-            leaderFundamentals = pageFundamentals(leaders, exchangeOf, pageKeyOf);
+            leaderFundamentals = pageFundamentals(leaders, exchangeOf, pageKeyOf, pageBudget);
         }
 
         Map<Long, CanSlimScore> scores = new LinkedHashMap<>();
@@ -303,7 +311,8 @@ public final class CanSlimService {
      * later run.
      */
     private FundamentalsResult pageFundamentals(List<String> symbols, Map<String, String> exchangeOf,
-                                               Map<String, String> pageKeyOf) {
+                                               Map<String, String> pageKeyOf,
+                                               java.util.concurrent.atomic.AtomicInteger pageBudget) {
         Map<String, ScreenedStock> stocks = new LinkedHashMap<>();
         if (symbols.isEmpty()) {
             return new FundamentalsResult(stocks, null);
@@ -324,6 +333,11 @@ public final class CanSlimService {
                 fundamentals = hit.get().fundamentals();
                 reused++;
             } else if (stopped != null) {
+                fundamentals = hit.map(FundamentalsCacheRepository.Cached::fundamentals)
+                        .orElse(CompanyFundamentals.NONE);
+            } else if (pageBudget.getAndDecrement() <= 0) {
+                stopped = "the " + settings.maxPagesPerRun() + "-page budget for one scan is spent; the rest "
+                        + "follow on later runs";
                 fundamentals = hit.map(FundamentalsCacheRepository.Cached::fundamentals)
                         .orElse(CompanyFundamentals.NONE);
             } else {
