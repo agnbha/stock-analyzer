@@ -136,7 +136,7 @@ public final class GrowwAccountClient implements AccountDataClient {
             if (payload == null) {
                 continue;
             }
-            payload.fields().forEachRemaining(entry -> {
+            payload.properties().forEach(entry -> {
                 String symbol = entry.getKey().startsWith(prefix)
                         ? entry.getKey().substring(prefix.length())
                         : entry.getKey();
