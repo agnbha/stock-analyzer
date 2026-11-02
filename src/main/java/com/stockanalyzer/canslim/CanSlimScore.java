@@ -5,7 +5,8 @@ import java.util.Map;
 /**
  * One stock's CAN SLIM reading from one scan.
  *
- * @param source     why it was evaluated: it passed the screen, it is held, or it is in the configured universe
+ * @param source     why it was evaluated: it passed the screen, it is held, it is in the configured universe,
+ *                   or it is one of the market's listed companies
  * @param priceAction null when no daily bars could be fetched
  * @param buyPoint   the price the sell rules measure from: the holding's cost, else the latest breakout's pivot
  * @param ratios     every ratio the screener returned for it, for the record
@@ -27,7 +28,7 @@ public record CanSlimScore(
         Map<String, Double> ratios) {
 
     public enum Source {
-        SCREENER, HOLDING, UNIVERSE
+        SCREENER, HOLDING, UNIVERSE, MARKET
     }
 
     /**

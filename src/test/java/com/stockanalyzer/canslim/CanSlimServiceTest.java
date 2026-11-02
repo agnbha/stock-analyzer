@@ -134,6 +134,10 @@ class CanSlimServiceTest {
     }
 
     private final List<String> pagesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<String> pricedOn = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Pages one scan may read; generous unless a test is about the limit. */
+    private int pageBudget = 1_000;
 
     /** Company pages by symbol; a symbol not in the map has no page. Every page read is recorded. */
     private CompanyFundamentalsClient pages(Map<String, Map<String, Double>> byLabel) {
@@ -282,6 +286,227 @@ class CanSlimServiceTest {
         assertFalse(report.screenerFailed());
     }
 
+    private static List<DailyBar> thinlyTraded(List<DailyBar> bars) {
+        return bars.stream().map(b -> new DailyBar(b.date(), b.open(), b.high(), b.low(), b.close(), 10)).toList();
+    }
+
+    private static MarketListing listing(String symbol, String exchange, String screenerKey) {
+        return new MarketListing(symbol, exchange, symbol + " Ltd", "INE" + symbol, "EQ", screenerKey);
+    }
+
+    private static final double FLOOR = 1000;
+
+    /** Strong figures for a company of the given market capitalisation, in rupees crore. */
+    private static Map<String, Double> withCap(double capCr) {
+        Map<String, Double> figures = new java.util.HashMap<>(STRONG);
+        figures.put(ScreenerRatios.MARKET_CAP, capCr);
+        return figures;
+    }
+
+    /** Thirteen months of data would be realistic; the tests need only enough for the rules to run. */
+    private Map<String, List<DailyBar>> marketPrices() {
+        Map<String, List<DailyBar>> prices = new java.util.HashMap<>();
+        prices.put("IDX", TestBars.from(100).trend(130, 130).build());
+        prices.put("BSEONLY", TestBars.from(100).trend(260, 130).build());
+        prices.put("LEAD", TestBars.from(100).trend(200, 130).build());
+        prices.put("MID", TestBars.from(100).trend(150, 130).build());
+        prices.put("WEAK", TestBars.from(100).trend(80, 130).build());
+        prices.put("FELL", TestBars.from(100).trend(150, 70).range(138, 146, 38).add(152, 2000).trend(130, 20).build());
+        prices.put("THIN", thinlyTraded(TestBars.from(100).trend(300, 130).build()));
+        prices.put("NEWIPO", TestBars.from(100).trend(400, 40).build());
+        return prices;
+    }
+
+    /** Ranked by return: BSEONLY 99, LEAD 75, MID 50, FELL 26, WEAK 1 - until a small company leaves the field. */
+    private MarketScan wholeMarket(int keepRuns, int fundamentalsMinRs) {
+        return new MarketScan(List.of(
+                listing("LEAD", "NSE", "LEAD"), listing("MID", "NSE", "MID"), listing("WEAK", "NSE", "WEAK"),
+                listing("FELL", "NSE", "FELL"), listing("THIN", "NSE", "THIN"), listing("NEWIPO", "NSE", "NEWIPO"),
+                listing("DEAD", "NSE", "DEAD"), listing("BSEONLY", "BSE", "500001")),
+                100, 10.0, 50_000.0, 10, fundamentalsMinRs, keepRuns, FLOOR);
+    }
+
+    private MarketScan wholeMarket(int keepRuns) {
+        return wholeMarket(keepRuns, 50);
+    }
+
+    private CanSlimService marketService(Map<String, Map<String, Double>> pages) {
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        return service(noSession(), pages(pages), marketPrices(), List.of(), List.of());
+    }
+
+    private static CanSlimScore score(CanSlimReport report, String symbol) {
+        return report.scores().stream().filter(s -> s.symbol().equals(symbol)).findFirst().orElse(null);
+    }
+
+    @Test
+    @DisplayName("only companies confirmed above the market-cap floor are selected; the rest are dropped or left unchecked")
+    void marketScanSelectsOnlyConfirmedLargeCompanies() {
+        CanSlimReport report = marketService(Map.of(
+                "500001", withCap(5000), "LEAD", withCap(800), "MID", withCap(1500)))
+                .scan("q", wholeMarket(5));
+
+        Map<String, CanSlimScore> bySymbol = report.scores().stream()
+                .collect(java.util.stream.Collectors.toMap(CanSlimScore::symbol, Function.identity()));
+        assertEquals(java.util.Set.of("BSEONLY", "MID"), bySymbol.keySet(),
+                "LEAD is under 1,000 Cr, and FELL and WEAK rank too low for their size to have been checked");
+        assertTrue(bySymbol.values().stream().allMatch(s -> s.source() == CanSlimScore.Source.MARKET));
+        assertEquals(List.of("500001", "LEAD", "MID"), pagesRead, "strongest RS first, one page each");
+
+        MarketSummary summary = report.marketSummary();
+        assertEquals(8, summary.listed());
+        assertEquals(1, summary.failed(), "DEAD has no candles");
+        assertEquals(5, summary.ranked(), "the field: liquid listings with enough history");
+        assertEquals(2, summary.selected());
+        assertEquals(2, summary.unchecked(), "FELL and WEAK: ranked, but their size was never looked up");
+        assertEquals(Map.of("illiquid", 1, "short history", 1, "market cap at or under 1,000 Cr", 1),
+                summary.unranked());
+    }
+
+    @Test
+    @DisplayName("a company found to be small leaves the field, so the ratings that remain are against the larger ones")
+    void foundSmallCompaniesAreRankedOut() {
+        CanSlimReport report = marketService(Map.of(
+                "500001", withCap(5000), "LEAD", withCap(800), "MID", withCap(1500)))
+                .scan("q", wholeMarket(5));
+
+        assertEquals(99, score(report, "BSEONLY").rsRating());
+        assertEquals(66, score(report, "MID").rsRating(),
+                "third of five (50) before LEAD left; second of four (66) after");
+    }
+
+    @Test
+    @DisplayName("a size learned once is remembered: the next scan starts without the small company in the field")
+    void smallCompaniesAreRemembered() {
+        CanSlimService service = marketService(Map.of(
+                "500001", withCap(5000), "LEAD", withCap(800), "MID", withCap(1500)));
+
+        service.scan("q", wholeMarket(5));
+        CanSlimReport second = service.scan("q", wholeMarket(5));
+
+        assertEquals(4, second.marketSummary().ranked(), "LEAD is out of the field before ranking begins");
+        assertEquals(1, second.marketSummary().unranked().get("market cap at or under 1,000 Cr"));
+        assertEquals(66, score(second, "MID").rsRating());
+        assertEquals(List.of("500001", "LEAD", "MID"), pagesRead, "and nothing is read twice");
+    }
+
+    @Test
+    @DisplayName("a listing whose page has not been read is not selected, however strong it ranks")
+    void unverifiedListingsAreNotSelected() {
+        CanSlimReport report = marketService(Map.of()).scan("q", wholeMarket(5));
+
+        assertTrue(report.scores().isEmpty(), "no page, no market cap, nothing selected");
+        assertEquals(0, report.marketSummary().selected());
+        assertEquals(5, report.marketSummary().unchecked());
+    }
+
+    @Test
+    @DisplayName("a BSE-only listing is priced on BSE and its company page is asked for by scrip code")
+    void bseOnlyListingUsesItsOwnExchangeAndKey() {
+        CanSlimReport report = marketService(Map.of("500001", withCap(5000))).scan("q", wholeMarket(5));
+
+        assertTrue(pricedOn.contains("BSEONLY@BSE"), pricedOn.toString());
+        assertTrue(pricedOn.contains("LEAD@NSE"), pricedOn.toString());
+        assertEquals("BSE", text("SELECT exchange FROM instrument WHERE symbol = 'BSEONLY'"));
+        assertEquals("500001", pagesRead.getFirst());
+        CanSlimScore bseOnly = score(report, "BSEONLY");
+        assertEquals(Boolean.TRUE, bseOnly.letters().c());
+        assertEquals(Boolean.TRUE, bseOnly.letters().l());
+    }
+
+    @Test
+    @DisplayName("only listings that rank above the RS bar have their company page read")
+    void fundamentalsOnlyForLeaders() {
+        CanSlimReport report = marketService(Map.of("500001", withCap(5000), "LEAD", withCap(5000),
+                "MID", withCap(5000))).scan("q", wholeMarket(5, 80));
+
+        assertEquals(List.of("500001"), pagesRead, "one page, not eight: LEAD and MID rank below 80");
+        assertEquals(1, report.marketSummary().fundamentalsRequested());
+        assertTrue(report.fundamentalsNotice().contains("Market leaders (RS 80+)"), report.fundamentalsNotice());
+        assertEquals(java.util.Set.of("BSEONLY"), report.scores().stream().map(CanSlimScore::symbol)
+                .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    @DisplayName("nobody holds a market listing, so a breakout that fell back is not a sell")
+    void listingsNeverGetSellSignals() {
+        Map<String, Map<String, Double>> pages = new java.util.HashMap<>();
+        for (String key : List.of("500001", "LEAD", "MID", "FELL", "WEAK")) {
+            pages.put(key, withCap(5000));
+        }
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        Map<String, List<DailyBar>> prices = marketPrices();
+
+        CanSlimReport asListing = service(noSession(), pages(pages), prices, List.of(), List.of())
+                .scan("q", wholeMarket(5, 1));
+        CanSlimReport asUniverse = service(noSession(), pages(pages), prices, List.of(), List.of("FELL"))
+                .scan("q");
+
+        CanSlimScore listed = score(asListing, "FELL");
+        assertEquals(CanSlimScore.Source.MARKET, listed.source());
+        assertFalse(listed.signal().name().startsWith("SELL"), listed.signal().toString());
+        assertTrue(asUniverse.scores().stream().filter(s -> s.symbol().equals("FELL"))
+                        .anyMatch(s -> s.signal().name().startsWith("SELL")),
+                "the same chart, watched by name, is a sell - which is what the guard is for");
+    }
+
+    @Test
+    @DisplayName("only the newest few scans keep their market-wide scores")
+    void oldMarketScoresArePruned() {
+        CanSlimService service = marketService(Map.of("500001", withCap(5000)));
+
+        for (int i = 0; i < 4; i++) {
+            service.scan("q", wholeMarket(2));
+        }
+
+        assertEquals(2, count("SELECT COUNT(DISTINCT run_id) FROM canslim_score WHERE source = 'MARKET'"));
+        assertEquals(4, count("SELECT COUNT(*) FROM canslim_run"), "the runs themselves are kept");
+    }
+
+    @Test
+    @DisplayName("the report lists the strongest by RS, strongest first, from the whole field")
+    void reporterSortsByRelativeStrength() {
+        CanSlimReport report = marketService(Map.of("500001", withCap(5000), "LEAD", withCap(5000),
+                "MID", withCap(5000))).scan("q", wholeMarket(5));
+
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        new com.stockanalyzer.report.CanSlimReporter(new java.io.PrintStream(bytes, true)).report(report, false, 2);
+        String out = bytes.toString();
+        String strongest = out.substring(out.indexOf("Strongest by relative strength"));
+
+        assertTrue(strongest.contains("top 2 of 3 rated"), strongest);
+        int bseOnly = strongest.indexOf("BSEONLY");
+        int lead = strongest.indexOf("LEAD");
+        assertTrue(bseOnly > 0 && bseOnly < lead, strongest);
+        assertFalse(strongest.contains("MID"), "only the top two are listed");
+        assertTrue(out.contains("Market-wide: 8 listed equities; 5 in the RS field, 1 could not be priced; "
+                + "3 selected"), out);
+    }
+
+    @Test
+    @DisplayName("a scan reads no more pages than its budget, and spends it on the strongest RS first")
+    void pageBudgetGoesToTheStrongest() {
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        pageBudget = 1;
+        Map<String, List<DailyBar>> prices = new java.util.HashMap<>();
+        prices.put("IDX", TestBars.from(100).trend(130, 130).build());
+        for (int i = 1; i <= 6; i++) {
+            prices.put("S" + i, TestBars.from(100).trend(100 + 40 * i, 130).build());
+        }
+        MarketScan six = new MarketScan(List.of(listing("S1", "NSE", "S1"), listing("S2", "NSE", "S2"),
+                listing("S3", "NSE", "S3"), listing("S4", "NSE", "S4"), listing("S5", "NSE", "S5"),
+                listing("S6", "NSE", "S6")), 100, 10.0, 50_000.0, 10, 50, 5, FLOOR);
+        Map<String, Map<String, Double>> pages = new java.util.HashMap<>();
+        prices.keySet().forEach(symbol -> pages.put(symbol, withCap(5000)));
+
+        CanSlimReport report = service(noSession(), pages(pages), prices, List.of(), List.of()).scan("q", six);
+
+        assertEquals(List.of("S6"), pagesRead, "the one page went to the highest RS rating");
+        assertTrue(report.fundamentalsNotice().contains("1-page budget"), report.fundamentalsNotice());
+        assertEquals(Boolean.TRUE, score(report, "S6").letters().c());
+        assertNull(score(report, "S5"), "next in line: not read yet, so its size is not confirmed and it is not selected");
+    }
+
     @Test
     @DisplayName("a rejected session is reported, but holdings are still scored for sell signals")
     void expiredSessionDegrades() {
@@ -336,6 +561,7 @@ class CanSlimServiceTest {
                                    Map<String, List<DailyBar>> prices, List<OpenPosition> held,
                                    List<String> universe) {
         CandleDataClient candles = (symbol, exchange, segment, start, end, interval) -> {
+            pricedOn.add(symbol + "@" + exchange);
             List<DailyBar> bars = prices.get(symbol);
             if (bars == null) {
                 throw new IllegalStateException("unknown symbol " + symbol);
@@ -365,7 +591,7 @@ class CanSlimServiceTest {
                 new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database), positions,
                 MARKET, clock, executor,
                 CanSlimCriteria.defaults(),
-                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7, 2));
+                new CanSlimService.Settings("NSE", "CASH", "IDX", 400, 150, universe, 7, 2, pageBudget));
     }
 
     private int count(String sql) {

@@ -79,9 +79,18 @@ public final class CanSlimEvaluator {
 
     private Decision decide(CanSlimScore.Source source, CanSlimScore.Letters letters, PriceAction pa,
                             Double buyPoint, boolean held, MarketAssessment market) {
-        Decision sell = sellDecision(pa, buyPoint, held);
+        // Nobody holds a market-wide listing, so there is nothing for it to be sold from: a breakout
+        // that fell back is just a stock, not a position gone wrong.
+        boolean listing = source == CanSlimScore.Source.MARKET;
+        Decision sell = listing ? null : sellDecision(pa, buyPoint, held);
         if (sell != null) {
             return sell;
+        }
+        if (listing && !(Boolean.TRUE.equals(letters.c()) && Boolean.TRUE.equals(letters.a()))) {
+            return new Decision(CanSlimSignal.NONE, Boolean.FALSE.equals(letters.l())
+                    ? "below the RS bar, so its earnings were not looked up"
+                    : letters.c() == null && letters.a() == null ? "no fundamentals available"
+                    : "earnings do not qualify (C " + passFail(letters.c()) + ", A " + passFail(letters.a()) + ")");
         }
         // A screener result already passed the earnings query. Anything else is a buy candidate only
         // if its own fundamentals show both C and A passing - not merely nothing failing.

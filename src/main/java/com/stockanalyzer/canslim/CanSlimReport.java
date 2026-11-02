@@ -14,8 +14,10 @@ import java.util.List;
  *                       case a person has to act on - as opposed to simply not having a session
  * @param needsLogin     true when the failure is an expired or rejected session
  * @param fundamentalsNotice how the C, A and I letters were sourced for the stocks the query did not return
+ * @param marketSummary  the whole-market part of the scan, or null when it was not run
  */
 public record CanSlimReport(long runId, String query, int screened, MarketAssessment market,
                             List<CanSlimScore> scores, List<String> failures, String screenerNotice,
-                            boolean screenerFailed, boolean needsLogin, String fundamentalsNotice) {
+                            boolean screenerFailed, boolean needsLogin, String fundamentalsNotice,
+                            MarketSummary marketSummary) {
 }

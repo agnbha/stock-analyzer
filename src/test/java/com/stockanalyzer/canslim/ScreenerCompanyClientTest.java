@@ -41,7 +41,7 @@ class ScreenerCompanyClientTest {
 
     private ScreenerCompanyClient client() {
         return new ScreenerCompanyClient(HttpClient.newHttpClient(),
-                "http://localhost:" + server.getAddress().getPort(), 0);
+                "http://localhost:" + server.getAddress().getPort(), 0, 0);
     }
 
     private void serve(java.util.function.Function<String, Integer> statusFor) throws IOException {
@@ -91,6 +91,19 @@ class ScreenerCompanyClientTest {
         ScreenerException e = assertThrows(ScreenerException.class, () -> client().fetch("ITC"));
         assertTrue(e.getMessage().contains("429"));
         assertFalse(e.needsLogin());
+        assertEquals(2, requested.size(), "it paused and asked once more before giving up");
+    }
+
+    @Test
+    @DisplayName("a 429 that clears after a pause is retried, so one throttled read does not end the run")
+    void retriesAfterAPause() throws IOException {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        serve(path -> calls.incrementAndGet() == 1 ? 429 : 200);
+
+        Optional<CompanyFundamentals> found = client().fetch("ITC");
+
+        assertTrue(found.isPresent());
+        assertEquals(List.of("/company/ITC/consolidated/", "/company/ITC/consolidated/"), requested);
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

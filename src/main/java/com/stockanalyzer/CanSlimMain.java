@@ -14,6 +14,10 @@ import com.stockanalyzer.util.Args;
  *   scan --query "..."         a different query for this run
  *   scan --no-screener         holdings and the configured universe only: sell signals, no new candidates
  *   ... --all                  list every scored stock, not only those with a signal
+ *   ... --market               also price and rank every listed NSE/BSE equity (canslim.market.enabled=true
+ *                              does this on every scan; --no-market skips it for one)
+ *   ... --limit N              with --market, only about N listings spread through the list: a trial run
+ *   ... --top N                list the N strongest stocks by RS rating (50 for a market scan)
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -28,7 +32,7 @@ public final class CanSlimMain {
         String command = parsed.command("scan");
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
-            System.err.println("Try: scan [--query \"...\"] [--no-screener] [--all]");
+            System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]");
             System.exit(2);
         }
 
@@ -40,9 +44,12 @@ public final class CanSlimMain {
             System.exit(2);
         }
 
+        boolean market = parsed.flag("market") || (config.canSlimMarketEnabled() && !parsed.flag("no-market"));
         try (AppContext context = new AppContext(config)) {
-            CanSlimReport report = context.canSlimService().scan(query);
-            new CanSlimReporter(System.out).report(report, parsed.flag("all"));
+            CanSlimReport report = context.canSlimService().scan(query,
+                    market ? context.canSlimMarket(parsed.integer("limit", 0)) : null);
+            new CanSlimReporter(System.out).report(report, parsed.flag("all"),
+                    parsed.integer("top", market ? config.canSlimMarketTop() : 0));
             // The scan has been stored and printed either way. A query that failed after a session was
             // configured is the one thing a person has to act on, so it leaves a status behind.
             if (report.screenerFailed()) {

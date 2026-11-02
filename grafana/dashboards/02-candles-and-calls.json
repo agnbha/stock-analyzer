@@ -772,15 +772,15 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
-          "queryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
+          "rawQueryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       w.volume AS volume,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
+          "queryText": "SELECT w.ts_epoch AS time,\n       w.open  AS open,\n       w.high  AS high,\n       w.low   AS low,\n       w.close AS close,\n       w.volume AS volume,\n       b.price AS \"Buy\",\n       s.price AS \"Sell\"\nFROM v_weekly_candles w\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'BUY' GROUP BY week, symbol) b\n       ON b.week = w.week AND b.symbol = w.symbol\nLEFT JOIN (SELECT strftime('%Y-%W', session_date) AS week, symbol, AVG(price) AS price\n             FROM v_trade_markers WHERE side = 'SELL' GROUP BY week, symbol) s\n       ON s.week = w.week AND s.symbol = w.symbol\nWHERE w.symbol = '$symbol'\n  AND w.session_date >= date($__from/1000, 'unixepoch', '+5 hours', '+30 minutes', '-6 days')\nORDER BY w.session_date",
           "timeColumns": [
             "time"
           ]
         }
       ],
       "options": {
-        "mode": "candles",
+        "mode": "candles+volume",
         "candleStyle": "candles",
         "colorStrategy": "open-close",
         "colors": {
@@ -855,10 +855,34 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Volume"
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
           }
         ]
       },
-      "description": "Always the last 6 months, whatever range the rest of the page is showing.\n\nThe **Buy** and **Sell** dots are your fills, averaged over the week the trade happened in.",
+      "description": "Always the last 6 months, whatever range the rest of the page is showing.\n\nThe **Buy** and **Sell** dots are your fills, averaged over the week the trade happened in.\n\n- **Volume** — shares traded in the week, on the right-hand axis.",
       "timeFrom": "now-6M"
     }
   ]
