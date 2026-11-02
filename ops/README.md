@@ -55,14 +55,19 @@ mvn clean package
 
 # Credentials live outside the repo so nothing secret can be committed.
 cat > ~/.stock-analyzer.env <<'ENV'
-GROWW_API_KEY=...
 GROWW_AUTH_MODE=checksum        # or totp
+GROWW_API_KEY=...               # checksum mode: the API key. totp mode: the TOTP token Groww issues
 GROWW_API_SECRET=...            # checksum mode
-# GROWW_TOTP_SECRET=...         # totp mode
+# GROWW_TOTP_SECRET=...         # totp mode: the Base32 seed shown next to the token
 # SCREENER_SESSION_ID=...       # optional: screener.in 'sessionid' cookie, for CAN SLIM screening
 DB_URL=jdbc:sqlite:/Users/you/projects/stock-analyzer/data/stock-analyzer.db
 ENV
 chmod 600 ~/.stock-analyzer.env
+# To run a command by hand with the same settings the jobs use:
+#   set -a; source ~/.stock-analyzer.env; set +a
+#   java -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain ...
+# These are the only place the Groww credentials live: application.properties carries none,
+# and a test fails the build if a real value is put back there.
 
 cp ops/launchd/*.plist ~/Library/LaunchAgents/
 for job in marketday evening weekly monthly; do
