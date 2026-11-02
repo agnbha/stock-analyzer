@@ -40,8 +40,8 @@ public final class FundamentalsExportMain {
         TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
         GrowwAuthenticator authenticator = GrowwAuthenticators.create(config.growwAuthMode(),
-                httpClient, config.growwBaseUrl(), config.growwApiKey(),
-                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull(),
+                httpClient, config.growwBaseUrl(), config.growwApiKeyOrNull(),
+                config.growwApiSecretOrNull(), config.growwTotpTokenOrNull(), config.growwTotpSecretOrNull(),
                 new FileTokenCache(Path.of(config.tokenCachePath())), rateLimiter);
 
         // Sourced from historical candles (GET /v1/historical/candle/range), which needs only

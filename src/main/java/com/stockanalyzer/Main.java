@@ -35,8 +35,8 @@ public final class Main {
         TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
         GrowwAuthenticator authenticator = GrowwAuthenticators.create(config.growwAuthMode(),
-                httpClient, config.growwBaseUrl(), config.growwApiKey(),
-                config.growwApiSecretOrNull(), config.growwTotpSecretOrNull(),
+                httpClient, config.growwBaseUrl(), config.growwApiKeyOrNull(),
+                config.growwApiSecretOrNull(), config.growwTotpTokenOrNull(), config.growwTotpSecretOrNull(),
                 new FileTokenCache(java.nio.file.Path.of(config.tokenCachePath())), rateLimiter);
 
         CandleDataClient candleDataClient = CandleDataClients.rateLimited(httpClient, authenticator,

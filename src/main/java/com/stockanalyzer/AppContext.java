@@ -210,8 +210,8 @@ public final class AppContext implements AutoCloseable {
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
 
         this.authenticator = memoize(() -> GrowwAuthenticators.create(config.growwAuthMode(), httpClient,
-                config.growwBaseUrl(), config.growwApiKey(), config.growwApiSecretOrNull(),
-                config.growwTotpSecretOrNull(),
+                config.growwBaseUrl(), config.growwApiKeyOrNull(), config.growwApiSecretOrNull(),
+                config.growwTotpTokenOrNull(), config.growwTotpSecretOrNull(),
                 new FileTokenCache(Path.of(config.tokenCachePath())), this.rateLimiter));
 
         this.candleDataClient = memoize(() -> CandleDataClients.rateLimited(httpClient, authenticator.get(),

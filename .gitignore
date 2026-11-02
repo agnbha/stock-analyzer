@@ -14,3 +14,7 @@ data/stock-analyzer.db
 
 # Cached access token (a live bearer credential)
 data/.groww-token.json
+
+# Credentials belong in ~/.stock-analyzer.env; these keep a copy from being committed by accident
+.stock-analyzer.env
+*.env

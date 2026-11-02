@@ -50,15 +50,14 @@ public final class AppConfig {
         return value;
     }
 
-    public String growwApiKey() {
-        return require("groww.api.key");
-    }
-
     public String growwApiSecret() {
         return require("groww.api.secret");
     }
 
-    /** {@code checksum} (API key + secret) or {@code totp} (API key + authenticator code). */
+    /**
+     * {@code checksum} (Groww's API key + API secret) or {@code totp} (Groww's TOTP token + TOTP
+     * secret).
+     */
     public String growwAuthMode() {
         return get("groww.auth.mode", "checksum");
     }
@@ -68,11 +67,20 @@ public final class AppConfig {
      * null rather than throwing; the authenticator factory reports whichever
      * one is actually missing.
      */
+    public String growwApiKeyOrNull() {
+        return get("groww.api.key", null);
+    }
+
     public String growwApiSecretOrNull() {
         return get("groww.api.secret", null);
     }
 
-    /** Base32 seed from the broker's two-factor setup screen. */
+    /** Groww's "TOTP token": what its SDK passes as api_key in the TOTP flow. */
+    public String growwTotpTokenOrNull() {
+        return get("groww.totp.token", null);
+    }
+
+    /** Groww's "TOTP secret": the Base32 seed the six-digit code is generated from. */
     public String growwTotpSecretOrNull() {
         return get("groww.totp.secret", null);
     }
