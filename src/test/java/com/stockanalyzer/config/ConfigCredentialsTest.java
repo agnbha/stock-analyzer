@@ -34,8 +34,8 @@ class ConfigCredentialsTest {
         Properties properties = new Properties();
         properties.load(new java.io.StringReader(shippedText()));
 
-        for (String key : new String[]{"groww.api.key", "groww.api.secret", "groww.totp.secret",
-                "screener.session.id"}) {
+        for (String key : new String[]{"groww.api.key", "groww.api.secret", "groww.totp.token",
+                "groww.totp.secret", "screener.session.id"}) {
             String value = properties.getProperty(key, "");
             assertTrue(value.isBlank(), key + " has a value in application.properties; move it to "
                     + "~/.stock-analyzer.env (the value is not repeated here)");

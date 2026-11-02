@@ -27,25 +27,34 @@ The full design, including why each decision was made, is in
 
 Two flows, selected with `groww.auth.mode`:
 
-```properties
-# API key + secret, signed as SHA-256(secret + timestamp)
-groww.auth.mode=checksum
-groww.api.key=...
-groww.api.secret=...
+Each flow uses the pair Groww issues for it, under Groww's own names
+([groww.in/trade-api/api-keys](https://groww.in/trade-api/api-keys)):
 
-# API key + a current six-digit authenticator code
+| Flow | Groww calls them | Setting | Environment variable |
+|---|---|---|---|
+| `checksum` | API key | `groww.api.key` | `GROWW_API_KEY` |
+| | API secret | `groww.api.secret` | `GROWW_API_SECRET` |
+| `totp` | TOTP token | `groww.totp.token` | `GROWW_TOTP_TOKEN` |
+| | TOTP secret | `groww.totp.secret` | `GROWW_TOTP_SECRET` |
+
+```properties
+# API key + API secret, signed as SHA-256(secret + timestamp). Groww wants a fresh
+# approval of the key each day.
+groww.auth.mode=checksum
+
+# TOTP token + a current six-digit code made from the TOTP secret. The token is what
+# Groww's SDK passes as api_key. No daily approval.
 groww.auth.mode=totp
-groww.api.key=...
-groww.totp.secret=JBSWY3DPEHPK3PXP     # the Base32 seed, not a code
 ```
 
-`groww.totp.secret` is the seed shown when two-factor authentication was enabled
-— the string an authenticator app scans — not the six digits it displays. Codes
-are minted per request and never cached, so **the machine's clock has to be
-roughly right**: on a server, keep NTP running, or tokens will be rejected with
-what looks like a bad-credential error. Prefer environment variables
-(`GROWW_API_KEY`, `GROWW_API_SECRET`, `GROWW_TOTP_SECRET`) over the properties
-file for all three.
+The values go in `~/.stock-analyzer.env`, not in the properties file, which is committed
+to the repository and bundled into the jar (a test fails the build if one is put back there).
+The TOTP secret is the Base32 seed shown next to the token — the string an authenticator
+app scans — not the six digits it displays, and it is never sent. Codes are minted per
+request and never cached, so **the machine's clock has to be roughly right**: on a server,
+keep NTP running, or tokens will be rejected with what looks like a bad-credential error.
+A TOTP setup from before `groww.totp.token` existed, with the token in `groww.api.key`,
+still works while the new setting is blank.
 
 ## Requirements
 
@@ -231,10 +240,9 @@ environment variable (dots become underscores, uppercased — e.g.
 
 | Key | Purpose |
 |---|---|
-| `groww.api.key` | Groww API key (needed by both auth flows) |
-| `groww.auth.mode` | `checksum` (API key + secret, the default) or `totp` (API key + authenticator code) |
-| `groww.api.secret` | Required when `groww.auth.mode=checksum` |
-| `groww.totp.secret` | Required when `groww.auth.mode=totp` — the Base32 seed from two-factor setup |
+| `groww.auth.mode` | `checksum` (API key + API secret, the default) or `totp` (TOTP token + TOTP secret) |
+| `groww.api.key`, `groww.api.secret` | Groww's "API key" and "API secret"; required when `groww.auth.mode=checksum` |
+| `groww.totp.token`, `groww.totp.secret` | Groww's "TOTP token" and "TOTP secret" (the Base32 seed); required when `groww.auth.mode=totp` |
 | `groww.exchange`, `groww.segment` | Defaults to `NSE` / `CASH` |
 | `groww.candle.interval.minutes` | `1440` = daily candles |
 | `groww.lookback.days` | How far back to fetch (default 30) |

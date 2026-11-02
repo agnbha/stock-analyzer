@@ -55,10 +55,11 @@ mvn clean package
 
 # Credentials live outside the repo so nothing secret can be committed.
 cat > ~/.stock-analyzer.env <<'ENV'
-GROWW_AUTH_MODE=checksum        # or totp
-GROWW_API_KEY=...               # checksum mode: the API key. totp mode: the TOTP token Groww issues
-GROWW_API_SECRET=...            # checksum mode
-# GROWW_TOTP_SECRET=...         # totp mode: the Base32 seed shown next to the token
+GROWW_AUTH_MODE=totp            # or checksum
+GROWW_TOTP_TOKEN=...            # totp mode: Groww's "TOTP token"
+GROWW_TOTP_SECRET=...           # totp mode: Groww's "TOTP secret", the Base32 seed shown next to it
+# GROWW_API_KEY=...             # checksum mode: Groww's "API key"
+# GROWW_API_SECRET=...          # checksum mode: Groww's "API secret"
 # SCREENER_SESSION_ID=...       # optional: screener.in 'sessionid' cookie, for CAN SLIM screening
 DB_URL=jdbc:sqlite:/Users/you/projects/stock-analyzer/data/stock-analyzer.db
 ENV
