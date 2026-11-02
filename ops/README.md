@@ -66,7 +66,7 @@ ENV
 chmod 600 ~/.stock-analyzer.env
 # To run a command by hand with the same settings the jobs use:
 #   set -a; source ~/.stock-analyzer.env; set +a
-#   java -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain ...
+#   java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain ...
 # These are the only place the Groww credentials live: application.properties carries none,
 # and a test fails the build if a real value is put back there.
 
@@ -102,7 +102,7 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 - **Every symbol fails → the job exits non-zero.** That is not a quiet market
   day; it means credentials, connectivity or an API entitlement is broken, and
   it is deliberately loud so a scheduled run cannot fail silently.
-- **Check the daemon is alive:** `java -cp target/stock-analyzer.jar
+- **Check the daemon is alive:** `java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar
   com.stockanalyzer.MarketDayDaemon status` prints the last heartbeat and warns
   when it is more than ten minutes old.
 - **Where the logs are.** The daemon writes two streams and they are kept
@@ -119,15 +119,16 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 
 ## CAN SLIM, the whole market, and the screener.in session
 
-The nightly scan also covers every listed NSE and BSE equity once `canslim.market.enabled=true`
-(or run `CanSlimMain scan --market` by hand). That is about 2,800 daily-candle requests through
+The nightly scan covers every listed NSE and BSE equity: `evening.sh` runs
+`CanSlimMain scan --market` (the library default, `canslim.market.enabled`, stays false so a
+hand-run `scan` is still quick). That is about 2,800 daily-candle requests through
 the rate limiter, 20-45 minutes the first time, so run it in the evening and not during market
 hours; start with `scan --market --limit 50` to see it work. Only companies above ₹1,000 Cr of market
 cap are selected, and that figure is read from each company's screener.in page, so the selected list
 grows over the first nights as the page budget allows. The list of symbols is
 `data/instruments.csv`, downloaded from Groww and refreshed daily.
 
-`evening.sh` ends with a CAN SLIM scan (`CanSlimMain scan`). Its fundamental
+`evening.sh` ends with that CAN SLIM scan. Its fundamental
 filter runs on screener.in, which needs a signed-in session: sign in at
 https://www.screener.in in a browser (Google sign-in is fine), open the
 developer tools' cookie list for `www.screener.in`, and put the `sessionid`
@@ -168,22 +169,22 @@ rolling 14-day window for anything that slipped through.
 
 ```bash
 # Seed history the first time
-java -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
      backfill --from 2026-01-01 --to 2026-08-30
 
 # After changing the detector rules - writes a parallel, comparable series
-java -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
      recompute --from 2026-01-01
 
 # After changing the charge schedule
-java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain pnl --rebuild
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain pnl --rebuild
 
 # Read the balance from the broker. evening.sh does this nightly; run it by hand
 # to refresh the account value mid-day, or after depositing or withdrawing funds.
-java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain trades balance
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain trades balance
 
 # Only when the API cannot be reached - stored as 'manual', and the dashboards say so
-java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain \
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain \
      trades balance --cash 250000 --invested 50000
 ```
 

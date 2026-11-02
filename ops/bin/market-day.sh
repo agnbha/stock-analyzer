@@ -19,4 +19,4 @@ ERR_FILE="${LOG_FILE%.log}.err.log"
 exec >>"$LOG_FILE" 2>>"$ERR_FILE"
 
 log "starting MarketDayDaemon (view -> $LOG_FILE, log -> $ERR_FILE)" >&2
-exec java -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@"
+exec java "${JAVA_FLAGS[@]}" -cp "$JAR" com.stockanalyzer.MarketDayDaemon "$@"

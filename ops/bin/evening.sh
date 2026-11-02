@@ -42,6 +42,10 @@ run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$
 # Without a screener.in session the query is skipped and the scan says so; holdings
 # and the configured symbols are still scored (fundamentals from public company
 # pages). Exit status 3 means a configured session was rejected: sign in again.
-run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan
+# --market also prices every listed NSE/BSE equity and ranks them together for RS. That is
+# ~2,800 candle requests at the ingest rate limit (about 25 minutes), plus up to
+# canslim.fundamentals.max.pages.per.run company pages at 12 s each for the RS leaders, so
+# it runs last. Leaders whose page is not read tonight are picked up on later nights.
+run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan --market
 
 finish

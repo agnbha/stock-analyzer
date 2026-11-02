@@ -17,6 +17,6 @@ run_step "export statement" com.stockanalyzer.TradeJournalMain statement \
     --out "$STATEMENT"
 
 log "reminder: record the account balance so the equity curve stays honest -"
-log "  java -cp \$JAR com.stockanalyzer.TradeJournalMain trades balance --cash <amount>"
+log "  java --enable-native-access=ALL-UNNAMED -cp \$JAR com.stockanalyzer.TradeJournalMain trades balance --cash <amount>"
 
 finish

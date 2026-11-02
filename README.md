@@ -79,35 +79,37 @@ Everything writes to one SQLite file, `data/stock-analyzer.db` by default.
 
 ```bash
 CP=target/stock-analyzer.jar
+# JDK 24+ warns about sqlite-jdbc's native library unless it is allowed (the scheduled jobs pass this too)
+JOPTS=--enable-native-access=ALL-UNNAMED
 
 # yesterday's session for every configured symbol
-java -cp $CP com.stockanalyzer.DailyAnalysisMain daily
-java -cp $CP com.stockanalyzer.DailyAnalysisMain daily --date 2026-08-27
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain daily
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain daily --date 2026-08-27
 
 # seed the previous months (same code path, just a wider range)
-java -cp $CP com.stockanalyzer.DailyAnalysisMain backfill --from 2026-06-01 --to 2026-08-27
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain backfill --from 2026-06-01 --to 2026-08-27
 
 # re-run a changed detector over stored candles, no API calls
-java -cp $CP com.stockanalyzer.DailyAnalysisMain recompute --from 2026-06-01
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain recompute --from 2026-06-01
 
 # read the accumulated history back
-java -cp $CP com.stockanalyzer.DailyAnalysisMain report --symbol RELIANCE --months 6
-java -cp $CP com.stockanalyzer.DailyAnalysisMain export --from 2026-06-01 --out opportunities.csv
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain report --symbol RELIANCE --months 6
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain export --from 2026-06-01 --out opportunities.csv
 ```
 
 ### Part 2 - the time-of-day prior
 
 ```bash
-java -cp $CP com.stockanalyzer.DailyAnalysisMain hot-windows --lookback 60
-java -cp $CP com.stockanalyzer.DailyAnalysisMain evaluate --date 2026-08-27
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain hot-windows --lookback 60
+java $JOPTS -cp $CP com.stockanalyzer.DailyAnalysisMain evaluate --date 2026-08-27
 ```
 
 ### Parts 3 and 4 - alerts and live monitoring
 
 ```bash
-java -cp $CP com.stockanalyzer.MarketDayDaemon            # run for today
-java -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only, no notifications
-java -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
+java $JOPTS -cp $CP com.stockanalyzer.MarketDayDaemon            # run for today
+java $JOPTS -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only, no notifications
+java $JOPTS -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
 ```
 
 **Which symbols alert.** Every tracked symbol is still polled, charted and
@@ -156,21 +158,21 @@ change takes effect on the next launch.
 ### Part 5 - the trade journal
 
 ```bash
-java -cp $CP com.stockanalyzer.TradeJournalMain trades import --broker --from 2026-08-01 --to 2026-08-28
-java -cp $CP com.stockanalyzer.TradeJournalMain trades import --csv contract-notes.csv
-java -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIANCE --side BUY \
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades import --broker --from 2026-08-01 --to 2026-08-28
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades import --csv contract-notes.csv
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIANCE --side BUY \
      --qty 10 --price 1418.20 --at 2026-08-28T09:47 --product MIS --reason "VWAP reclaim"
-java -cp $CP com.stockanalyzer.TradeJournalMain trades balance                    # read it from the broker
-java -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000        # fallback: enter it by hand
-java -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance                    # read it from the broker
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000        # fallback: enter it by hand
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
 
-java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28
-java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period week  --of    2026-08-28
-java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period month --month 2026-08
-java -cp $CP com.stockanalyzer.TradeJournalMain pnl --period fy    --year  2026-27
-java -cp $CP com.stockanalyzer.TradeJournalMain pnl --rebuild
-java -cp $CP com.stockanalyzer.TradeJournalMain statement --from 2026-04-01 --out statement.csv
-java -cp $CP com.stockanalyzer.TradeJournalMain capture --month 2026-08
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period week  --of    2026-08-28
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period month --month 2026-08
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period fy    --year  2026-27
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --rebuild
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain statement --from 2026-04-01 --out statement.csv
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain capture --month 2026-08
 ```
 
 ### Part 6 - dashboards
@@ -187,13 +189,13 @@ See [grafana/README.md](grafana/README.md).
 export SCREENER_SESSION_ID=...      # the 'sessionid' cookie from a signed-in screener.in browser session
 
 # screen with the configured query, then read every candidate's daily chart
-java -cp $CP com.stockanalyzer.CanSlimMain scan
-java -cp $CP com.stockanalyzer.CanSlimMain scan --query "Return on equity > 20 AND YOY Quarterly profit growth > 30"
-java -cp $CP com.stockanalyzer.CanSlimMain scan --all          # list every scored stock, not just signals
+java $JOPTS -cp $CP com.stockanalyzer.CanSlimMain scan
+java $JOPTS -cp $CP com.stockanalyzer.CanSlimMain scan --query "Return on equity > 20 AND YOY Quarterly profit growth > 30"
+java $JOPTS -cp $CP com.stockanalyzer.CanSlimMain scan --all          # list every scored stock, not just signals
 
 # skip the query: score only holdings and the configured symbols (the nightly job does this when no
 # session is set, with their fundamentals read from public screener.in company pages)
-java -cp $CP com.stockanalyzer.CanSlimMain scan --no-screener
+java $JOPTS -cp $CP com.stockanalyzer.CanSlimMain scan --no-screener
 ```
 
 screener.in runs the fundamental filter - **C**urrent and **A**nnual earnings

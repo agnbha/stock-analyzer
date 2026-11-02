@@ -28,6 +28,11 @@ log() {
   echo "$(date '+%F %T') $*"
 }
 
+# Flags for every java launch. sqlite-jdbc loads its native library through System.load, which JDK 24+
+# flags with four WARNING lines on each start unless native access is granted to the class path.
+# (The jar's manifest carries the same grant, but a manifest is read only for 'java -jar'.)
+JAVA_FLAGS=(--enable-native-access=ALL-UNNAMED)
+
 # Runs one CLI step, logs it, and remembers a failure without aborting the rest
 # of the batch: a broken trade import must not cost you the night's analysis.
 FAILED_STEPS=()
@@ -35,7 +40,7 @@ run_step() {
   local label="$1"
   shift
   log "-> $label"
-  if java -cp "$JAR" "$@"; then
+  if java "${JAVA_FLAGS[@]}" -cp "$JAR" "$@"; then
     log "   ok"
   else
     local status=$?
