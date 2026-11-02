@@ -19,9 +19,24 @@ import java.util.List;
  * @param fundamentalsMinRs the RS rating from which screener.in is asked for a company's figures: a stock
  *                          below the L bar cannot become a buy, so its earnings are not worth a page load
  * @param keepRuns          how many scans of market-wide scores to keep; older ones are dropped
+ * @param minMarketCapCr    a listing is selected only with a market capitalisation above this, in rupees
+ *                          crore. No bulk source of market caps exists, so the figure comes from each
+ *                          company's screener.in page, read for the stocks that rank high enough to be a
+ *                          buy; a listing whose page has not been read yet is not selected, and one found
+ *                          at or below the floor is remembered and dropped from the ranking
  */
 public record MarketScan(List<MarketListing> listings, int minSessions, double minPrice, double minTurnover,
-                         int maxStaleDays, int fundamentalsMinRs, int keepRuns) {
+                         int maxStaleDays, int fundamentalsMinRs, int keepRuns, double minMarketCapCr) {
+
+    /** True when the figure is known and does not clear the floor. An unknown one is not "below". */
+    boolean belowFloor(Double marketCapCr) {
+        return marketCapCr != null && marketCapCr <= minMarketCapCr;
+    }
+
+    /** The reason given for a listing left out for its size, with the floor in it so the report says what it was. */
+    String belowFloorReason() {
+        return String.format(java.util.Locale.ROOT, "market cap at or under %,.0f Cr", minMarketCapCr);
+    }
 
     /** Why a priced symbol is not ranked, or null when it is fit to be. */
     String unrankedReason(int sessions, double lastClose, double avgTurnover, LocalDate lastBar, LocalDate today) {

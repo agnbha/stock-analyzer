@@ -54,7 +54,20 @@ percentile of the *market*, not of a hand-picked field.
    thousands of listings that barely trade would sit in the field, and everything real would look
    strong for having beaten them. The report counts what was left out and why.
 4. **Re-evaluate.** With the full field ranked, every symbol is scored again with its RS rating.
-5. **Fundamentals, for the leaders only.** screener.in is asked for a company's figures only once
+5. **Size floor, then fundamentals, for the leaders only.** Only companies with a market
+   capitalisation **above `canslim.market.min.market.cap.cr` (1,000 Cr)** are selected. There is
+   no bulk source of market caps (Groww's list has none, and NSE's snapshot leaves the field empty),
+   so the figure comes from each company's screener.in page - the same page that supplies C, A and I,
+   and read for the same stocks:
+   - a listing whose page has not been read is **not selected**, however strong its chart;
+   - one found at or under the floor is dropped, remembered with its cached page, and left out of the
+     RS field from then on. On the scan that finds it, the field is re-ranked without it, so ratings
+     are against the companies above the floor;
+   - a listing below the RS bar is never read, so it is never selected either.
+   High-RS stocks are disproportionately small ones, so the first nights spend their page budget
+   confirming that; the list of selected companies grows as the pages are read, strongest first.
+
+   **Fundamentals, for the leaders only.** screener.in is asked for a company's figures only once
    it reaches `fundamentals.min.rs` (the L bar, 80): below it the stock cannot be a buy whatever its
    earnings say, so the page load would buy nothing. That is a few hundred pages the first time and
    a handful a night after, refreshed by the calendar (see *When a page is read again*).
@@ -64,7 +77,8 @@ percentile of the *market*, not of a hand-picked field.
    first scans therefore fill in over several nights: holdings and the universe first, then the
    leaders, strongest RS first. Until a leader's page has been read its C, A and I show '?'.
 6. **Report.** The usual signals, then the strongest stocks by RS rating, strongest first (`--top
-   N`, 50 by default). The CAN SLIM dashboard's last table is ordered the same way.
+   N`, 50 by default). The CAN SLIM dashboard's last table is ordered the same way. The report says how many
+   listings are in the RS field, how many are selected, and how many are not yet checked.
 
 Differences from the rest of the scan: a market listing is **never given a sell signal** - nobody
 holds it, so a breakout that fell back is only a stock - and it is a buy candidate only if its own

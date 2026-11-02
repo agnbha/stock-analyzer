@@ -497,7 +497,8 @@ public final class AppContext implements AutoCloseable {
         }
         return new MarketScan(listings, config.canSlimMarketMinSessions(), config.canSlimMarketMinPrice(),
                 config.canSlimMarketMinTurnover(), config.canSlimMarketMaxStaleDays(),
-                config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns());
+                config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns(),
+                config.canSlimMarketMinMarketCapCr());
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {

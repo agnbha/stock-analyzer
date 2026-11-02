@@ -20,6 +20,8 @@ public final class ScreenerRatios {
     public static final String FII_CHANGE = "Change in FII holding";
     /** I: the same for domestic institutions. */
     public static final String DII_CHANGE = "Change in DII holding";
+    /** Market capitalisation, in rupees crore: the size floor of the whole-market scan. */
+    public static final String MARKET_CAP = "Market Capitalization";
 
     private ScreenerRatios() {
     }

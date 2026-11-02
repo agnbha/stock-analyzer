@@ -95,14 +95,16 @@ public final class CanSlimReporter {
     }
 
     private void printMarket(MarketSummary summary) {
-        out.printf(Locale.ROOT, "Market-wide: %d listed equities; %d ranked, %d could not be priced",
-                summary.listed(), summary.ranked(), summary.failed());
+        out.printf(Locale.ROOT, "Market-wide: %d listed equities; %d in the RS field, %d could not be priced; "
+                        + "%d selected (market cap confirmed above %,.0f Cr from the company page), "
+                        + "%d not yet checked (below the RS bar, or waiting on the page budget)",
+                summary.listed(), summary.ranked(), summary.failed(), summary.selected(),
+                summary.minMarketCapCr(), summary.unchecked());
         if (!summary.unranked().isEmpty()) {
             out.print("; left out of the ranking: " + summary.unranked().entrySet().stream()
                     .map(e -> e.getValue() + " " + e.getKey()).collect(Collectors.joining(", ")));
         }
-        out.printf(Locale.ROOT, "; %d had their company page read (RS high enough to be a buy)%n",
-                summary.fundamentalsRequested());
+        out.println();
     }
 
     /** Everything that has a rating, strongest first: the order is the point of the list. */

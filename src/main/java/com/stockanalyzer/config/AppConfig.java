@@ -506,6 +506,11 @@ public final class AppConfig {
                 String.valueOf((int) canSlim("min.rs.rating", 80))));
     }
 
+    /** A market listing is selected only with a market cap above this, in rupees crore. */
+    public double canSlimMarketMinMarketCapCr() {
+        return Double.parseDouble(get("canslim.market.min.market.cap.cr", "1000"));
+    }
+
     public int canSlimMarketKeepRuns() {
         return Integer.parseInt(get("canslim.market.keep.runs", "30"));
     }

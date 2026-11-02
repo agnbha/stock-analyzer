@@ -78,7 +78,7 @@ public final class ScreenerCompanyParser {
         Map<String, Double> ratios = new LinkedHashMap<>();
 
         Map<String, Double> top = topRatios(section(html, "top-ratios"));
-        put(ratios, "Market Capitalization", top.get("Market Cap"));
+        put(ratios, ScreenerRatios.MARKET_CAP, top.get("Market Cap"));
         put(ratios, ScreenerRatios.ROE, top.get("ROE"));
 
         String quarters = section(html, "quarters");

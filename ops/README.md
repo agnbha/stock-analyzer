@@ -116,7 +116,9 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 The nightly scan also covers every listed NSE and BSE equity once `canslim.market.enabled=true`
 (or run `CanSlimMain scan --market` by hand). That is about 2,800 daily-candle requests through
 the rate limiter, 20-45 minutes the first time, so run it in the evening and not during market
-hours; start with `scan --market --limit 50` to see it work. The list of symbols is
+hours; start with `scan --market --limit 50` to see it work. Only companies above ₹1,000 Cr of market
+cap are selected, and that figure is read from each company's screener.in page, so the selected list
+grows over the first nights as the page budget allows. The list of symbols is
 `data/instruments.csv`, downloaded from Groww and refreshed daily.
 
 `evening.sh` ends with a CAN SLIM scan (`CanSlimMain scan`). Its fundamental

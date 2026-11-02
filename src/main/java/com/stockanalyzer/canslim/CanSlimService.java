@@ -21,11 +21,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -226,6 +228,8 @@ public final class CanSlimService {
         Map<String, PriceAction> actions = new HashMap<>();
         Map<String, Double> weightedReturns = new HashMap<>();
         Map<String, String> unranked = new LinkedHashMap<>();
+        // What an earlier scan already learned about a listing's size is kept with its company page.
+        Map<String, Double> knownCap = wide == null ? Map.of() : knownMarketCaps(sources, exchangeOf);
         for (String symbol : sources.keySet()) {
             Priced p = priced.get(symbol);
             PriceAction action = p == null ? null : p.action();
@@ -233,6 +237,9 @@ public final class CanSlimService {
             if (listed) {
                 String reason = action == null ? "no prices"
                         : wide.unrankedReason(p.sessions(), action.close(), p.avgTurnover(), p.lastBar(), today);
+                if (reason == null && wide.belowFloor(knownCap.get(symbol))) {
+                    reason = wide.belowFloorReason();
+                }
                 if (reason != null) {
                     unranked.put(symbol, reason);
                     continue;
@@ -249,7 +256,13 @@ public final class CanSlimService {
         // are worth a page load; the rest cannot pass L, whatever their numbers say.
         FundamentalsResult leaderFundamentals = new FundamentalsResult(Map.of(), null);
         List<String> leaders = List.of();
+        Set<String> selected = new HashSet<>();
+        Set<String> foundSmall = new HashSet<>();
+        int fieldSize = 0;
         if (wide != null) {
+            fieldSize = (int) sources.entrySet().stream()
+                    .filter(e -> e.getValue() == CanSlimScore.Source.MARKET && actions.containsKey(e.getKey()))
+                    .count();
             leaders = sources.entrySet().stream()
                     .filter(e -> e.getValue() == CanSlimScore.Source.MARKET && actions.containsKey(e.getKey()))
                     .map(Map.Entry::getKey)
@@ -259,6 +272,30 @@ public final class CanSlimService {
                     .sorted(Comparator.comparing((String symbol) -> -rsRatings.get(symbol)).thenComparing(symbol -> symbol))
                     .toList();
             leaderFundamentals = pageFundamentals(leaders, exchangeOf, pageKeyOf, pageBudget);
+            for (String symbol : leaders) {
+                ScreenedStock page = leaderFundamentals.stocks().get(symbol);
+                Double cap = page == null ? null : page.ratio(ScreenerRatios.MARKET_CAP);
+                if (cap == null) {
+                    continue;
+                }
+                if (wide.belowFloor(cap)) {
+                    foundSmall.add(symbol);
+                    unranked.put(symbol, wide.belowFloorReason());
+                } else {
+                    selected.add(symbol);
+                }
+            }
+        }
+
+        // Companies just found to be under the floor leave the field, so a rating means "against the
+        // companies above it" even on the scan that learned they were small.
+        Map<String, Integer> ratings = rsRatings;
+        if (!foundSmall.isEmpty()) {
+            foundSmall.forEach(symbol -> {
+                weightedReturns.remove(symbol);
+                actions.remove(symbol);
+            });
+            ratings = RelativeStrength.ratings(weightedReturns);
         }
 
         Map<Long, CanSlimScore> scores = new LinkedHashMap<>();
@@ -267,11 +304,14 @@ public final class CanSlimService {
             if (unranked.containsKey(symbol)) {
                 continue;
             }
+            if (entry.getValue() == CanSlimScore.Source.MARKET && !selected.contains(symbol)) {
+                continue;
+            }
             ScreenedStock fundamentals = screened.containsKey(symbol) ? screened.get(symbol)
                     : pageFundamentals.stocks().containsKey(symbol) ? pageFundamentals.stocks().get(symbol)
                     : leaderFundamentals.stocks().get(symbol);
             CanSlimScore score = evaluator.evaluate(symbol, entry.getValue(), fundamentals,
-                    actions.get(symbol), rsRatings.get(symbol), market, holdingCosts.get(symbol));
+                    actions.get(symbol), ratings.get(symbol), market, holdingCosts.get(symbol));
             scores.put(instruments.findOrCreate(symbol, exchangeOf.getOrDefault(symbol, settings.exchange()),
                     settings.segment()), score);
         }
@@ -283,9 +323,9 @@ public final class CanSlimService {
             Map<String, Integer> byReason = new java.util.TreeMap<>();
             unranked.values().stream().filter(reason -> !reason.equals("no prices"))
                     .forEach(reason -> byReason.merge(reason, 1, Integer::sum));
-            long ranked = scores.values().stream().filter(sc -> sc.source() == CanSlimScore.Source.MARKET).count();
-            summary = new MarketSummary(wide.listings().size(), marketFailed, (int) ranked, byReason,
-                    leaders.size());
+            summary = new MarketSummary(wide.listings().size(), marketFailed, fieldSize, selected.size(),
+                    fieldSize - selected.size() - foundSmall.size(), byReason, leaders.size(),
+                    wide.minMarketCapCr());
         }
         List<CanSlimScore> ordered = scores.values().stream().sorted(REPORT_ORDER).toList();
         String fundamentalsNotice = pageFundamentals.notice();
@@ -296,6 +336,23 @@ public final class CanSlimService {
         }
         return new CanSlimReport(runId, query, screenedCount, market, ordered, failures, screenerNotice,
                 screenerFailed, needsLogin, fundamentalsNotice, summary);
+    }
+
+    /** The market capitalisation (rupees crore) that a cached company page recorded, by symbol, for market listings. */
+    private Map<String, Double> knownMarketCaps(Map<String, CanSlimScore.Source> sources,
+                                                Map<String, String> exchangeOf) {
+        Map<String, Double> known = new HashMap<>();
+        for (Map.Entry<String, CanSlimScore.Source> entry : sources.entrySet()) {
+            if (entry.getValue() != CanSlimScore.Source.MARKET) {
+                continue;
+            }
+            long instrumentId = instruments.findOrCreate(entry.getKey(),
+                    exchangeOf.getOrDefault(entry.getKey(), settings.exchange()), settings.segment());
+            fundamentalsCache.find(instrumentId)
+                    .map(cached -> cached.fundamentals().ratios().get(ScreenerRatios.MARKET_CAP))
+                    .ifPresent(cap -> known.put(entry.getKey(), cap));
+        }
+        return known;
     }
 
     private record FundamentalsResult(Map<String, ScreenedStock> stocks, String notice) {
