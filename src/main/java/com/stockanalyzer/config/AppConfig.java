@@ -487,6 +487,13 @@ public final class AppConfig {
         return series;
     }
 
+    /** Trading symbols never priced in a market scan; the catalog spells them in capitals. */
+    public java.util.Set<String> canSlimMarketExcluded() {
+        return csvSet("canslim.market.exclude", "").stream()
+                .map(symbol -> symbol.toUpperCase(java.util.Locale.ROOT))
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
     public boolean canSlimMarketIncludeSme() {
         return Boolean.parseBoolean(get("canslim.market.include.sme", "false"));
     }

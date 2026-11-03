@@ -132,6 +132,29 @@ class GrowwInstrumentCatalogTest {
     }
 
     @Test
+    @DisplayName("an excluded symbol is never listed, and the rest of the market is untouched")
+    void excludedSymbolsAreDropped() throws IOException {
+        List<String> symbols = parse(withExcluded(Set.of("BSEONLY", "BZSTOCK"))).stream()
+                .map(MarketListing::symbol).toList();
+
+        assertEquals(List.of("RELIANCE", "TATASTEEL"), symbols);
+    }
+
+    @Test
+    @DisplayName("excluding a company's NSE listing does not bring its BSE twin in")
+    void exclusionIsNotUndoneByTheOtherExchange() throws IOException {
+        List<MarketListing> listings = parse(withExcluded(Set.of("RELIANCE")));
+
+        assertTrue(listings.stream().noneMatch(l -> l.isin().equals("INE002A01018")),
+                "BSE's RELIANCE has the same ISIN and must not take the place of the NSE one");
+    }
+
+    private static GrowwInstrumentCatalog.Settings withExcluded(Set<String> excluded) {
+        return new GrowwInstrumentCatalog.Settings("u", Path.of("unused"), Duration.ofHours(1),
+                Set.of("NSE", "BSE"), Set.of("EQ", "BE", "BZ"), Set.of("A", "B", "T", "Z", "P"), excluded);
+    }
+
+    @Test
     @DisplayName("a changed format is reported by name, not as an empty market")
     void missingColumn() {
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> GrowwInstrumentCatalog.parse(

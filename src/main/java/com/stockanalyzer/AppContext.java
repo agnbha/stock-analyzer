@@ -487,7 +487,8 @@ public final class AppContext implements AutoCloseable {
         List<MarketListing> listings = new GrowwInstrumentCatalog(httpClient, new GrowwInstrumentCatalog.Settings(
                 config.canSlimCatalogUrl(), java.nio.file.Path.of(config.canSlimCatalogCache()),
                 Duration.ofHours(config.canSlimCatalogMaxAgeHours()), config.canSlimMarketExchanges(),
-                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries())).listings();
+                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries(),
+                config.canSlimMarketExcluded())).listings();
         if (limit > 0 && limit < listings.size()) {
             List<MarketListing> sample = new ArrayList<>(limit);
             for (int i = 0; i < limit; i++) {
