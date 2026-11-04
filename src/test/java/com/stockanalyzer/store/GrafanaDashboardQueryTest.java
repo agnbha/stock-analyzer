@@ -191,6 +191,25 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
+    @DisplayName("Candles and Calls offers 'Today's trading hours' and no ranges shorter than two days")
+    void candlesAndCallsTimePicker() throws Exception {
+        JsonNode root = JsonMapper.INSTANCE.readTree(
+                Files.readString(DASHBOARDS.resolve("02-candles-and-calls.json")));
+        List<String> offered = new ArrayList<>();
+        for (JsonNode range : root.path("timepicker").path("quick_ranges")) {
+            offered.add(range.path("display").asText());
+        }
+
+        assertEquals("Today's trading hours", offered.getFirst());
+        for (String minutesOrHours : List.of("Last 5 minutes", "Last 15 minutes", "Last 30 minutes", "Last 1 hour",
+                "Last 3 hours", "Last 6 hours", "Last 12 hours", "Last 24 hours")) {
+            assertFalse(offered.contains(minutesOrHours),
+                    minutesOrHours + " is of no use on a chart of whole sessions");
+        }
+        assertTrue(offered.contains("Last 2 days") && offered.contains("Last 90 days"), offered.toString());
+    }
+
+    @Test
     @DisplayName("dashboards point at the provisioned datasource")
     void dashboardsUseTheProvisionedDatasource() throws Exception {
         for (Path file : dashboardFiles()) {
