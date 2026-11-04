@@ -93,21 +93,62 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
-    @DisplayName("Candles and Calls does not draw Grafana's own annotations over the chart")
-    void candlesAndCallsHidesBuiltInAnnotations() throws Exception {
-        // A note added by clicking on a chart is drawn as a dashed blue vertical line with a marker. Without an
-        // explicit annotation block Grafana switches its built-in layer on, so stray notes appear on the candles.
-        JsonNode root = JsonMapper.INSTANCE.readTree(
-                Files.readString(DASHBOARDS.resolve("02-candles-and-calls.json")));
-        JsonNode builtIn = null;
-        for (JsonNode annotation : root.path("annotations").path("list")) {
-            if (annotation.path("builtIn").asInt() == 1) {
-                builtIn = annotation;
+    @DisplayName("every dashboard with a time chart shows buy and sell calls, and nothing else Grafana annotates")
+    void chartsShowBuyAndSellCalls() throws Exception {
+        // A note added by clicking on a chart is drawn as a dashed vertical line with a marker. Without an explicit
+        // annotation block Grafana switches its built-in layer on, so stray notes appear on the candles. Calls are
+        // pulled in by tag instead - across dashboards, so a note made on one chart shows on the others - and in
+        // the dashboards that have a symbol picker only for the symbol picked.
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            boolean hasTimeChart = false;
+            for (JsonNode panel : root.path("panels")) {
+                String type = panel.path("type").asText();
+                hasTimeChart |= type.equals("timeseries") || type.equals("candlestick");
             }
+            if (!hasTimeChart) {
+                continue;
+            }
+            checked++;
+            boolean hasSymbol = false;
+            for (JsonNode variable : root.path("templating").path("list")) {
+                hasSymbol |= variable.path("name").asText().equals("symbol");
+            }
+            JsonNode builtIn = null;
+            JsonNode buy = null;
+            JsonNode sell = null;
+            for (JsonNode annotation : root.path("annotations").path("list")) {
+                if (annotation.path("builtIn").asInt() == 1) {
+                    builtIn = annotation;
+                } else if (annotation.path("name").asText().equals("Buy calls")) {
+                    buy = annotation;
+                } else if (annotation.path("name").asText().equals("Sell calls")) {
+                    sell = annotation;
+                }
+            }
+            String name = file.getFileName().toString();
+            assertTrue(builtIn != null && !builtIn.path("enable").asBoolean(true),
+                    name + ": the built-in annotation layer must be declared and switched off");
+            assertTrue(buy != null && sell != null, name + ": needs a Buy calls and a Sell calls annotation query");
+            assertTagged(name, buy, "BUY", hasSymbol);
+            assertTagged(name, sell, "SELL", hasSymbol);
         }
+        assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
+    }
 
-        assertTrue(builtIn != null, "the built-in annotation query must be declared, or Grafana adds it enabled");
-        assertFalse(builtIn.path("enable").asBoolean(true), "and switched off");
+    private static void assertTagged(String name, JsonNode annotation, String tag, boolean symbolScoped) {
+        JsonNode target = annotation.path("target");
+        List<String> tags = new ArrayList<>();
+        target.path("tags").forEach(t -> tags.add(t.asText()));
+        assertTrue(annotation.path("enable").asBoolean(false), name + ": " + tag + " calls are switched off");
+        assertTrue(target.path("type").asText().equals("tags"),
+                name + ": " + tag + " calls must be found by tag, not by dashboard, to show on every dashboard");
+        assertFalse(target.path("matchAny").asBoolean(true), name + ": every tag must match, not any");
+        assertTrue(tags.contains(tag), name + ": " + tag + " calls need the " + tag + " tag, got " + tags);
+        assertTrue(tags.contains("$symbol") == symbolScoped, name + (symbolScoped
+                ? ": with a symbol picker, calls must be limited to the symbol picked"
+                : ": without one, calls must not be limited to a symbol"));
     }
 
     @Test

@@ -16,6 +16,56 @@
     "from": "now-6M",
     "to": "now"
   },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": false,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "iconColor": "#73BF69",
+        "name": "Buy calls",
+        "target": {
+          "limit": 200,
+          "matchAny": false,
+          "tags": [
+            "BUY"
+          ],
+          "type": "tags"
+        }
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "iconColor": "#F2495C",
+        "name": "Sell calls",
+        "target": {
+          "limit": 200,
+          "matchAny": false,
+          "tags": [
+            "SELL"
+          ],
+          "type": "tags"
+        }
+      }
+    ]
+  },
   "templating": {
     "list": []
   },
@@ -434,7 +484,7 @@
         },
         "overrides": []
       },
-      "description": "Two different claims, plotted together on purpose.\n\n- **Account value** — what the broker reported that evening: cash plus holdings at market.\n- **Cumulative net P&L** — derived from closed lots. Ignores deposits, withdrawals, and anything traded outside this journal.\n\nBefore the first broker reading, the value line falls back to the derived one."
+      "description": "Two different claims, plotted together on purpose.\n\n- **Account value** — what the broker reported that evening: cash plus holdings at market.\n- **Cumulative net P&L** — derived from closed lots. Ignores deposits, withdrawals, and anything traded outside this journal.\n\nBefore the first broker reading, the value line falls back to the derived one.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for."
     },
     {
       "id": 21,
