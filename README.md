@@ -170,6 +170,9 @@ java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIA
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance                    # read it from the broker
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000        # fallback: enter it by hand
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades note --symbol BHARTIARTL --side BUY \
+     --sentiment BULLISH --text "Results beat; sector strong. Plan: sell half at +1%"
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades notes --date 2026-11-04
 
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period week  --of    2026-08-28
@@ -179,6 +182,53 @@ java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --rebuild
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain statement --from 2026-04-01 --out statement.csv
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain capture --month 2026-08
 ```
+
+**Documenting a call.** Calls are made by hand, so what you were thinking when you made one is
+worth writing down while you remember it. `trades note` records a sentiment and some words against
+a call:
+
+```bash
+trades note --symbol BHARTIARTL --side BUY --sentiment BULLISH --text "Results beat; sector strong"
+trades note --symbol BHARTIARTL --side BUY --at 09:45 --sentiment NERVOUS     # the second purchase only
+trades note --symbol BHARTIARTL --side SELL --order ORDER_ID --text "Took it at +0.6%"
+trades note --symbol BHARTIARTL --side BUY --at 09:45 --clear                 # take a note off again
+trades notes --date 2026-11-04                                                 # what you have noted
+```
+
+- A call is usually many fills (one order arrives as dozens), so the note is written against every
+  fill of the call. `--symbol`, `--side` and the day (`--date`, default today) pick the call; `--at
+  HH:MM` (fills within three minutes of it) or `--order` narrows it when the day had more than one. If
+  you do not narrow it, every purchase that day gets the note, and the command lists which ones.
+- The sentiment is a label of your choosing, upper-cased (`BULLISH`, `BEARISH`, `NERVOUS`, `CALM`).
+  The text is free. Give either, or both. Writing a note again replaces it.
+- Notes live in the journal, so they survive re-importing fills. They appear in three places:
+  - **On the candle charts**, as a dashed marker at the time of the call - light blue for a buy, orange for a
+    sell, matching "Your buy" and "Your sell". Hover it for `WIPRO BUY 5000 @ 195.55 - BULLISH: your words`.
+    They show on Candles and Calls, Stock Trend and CAN SLIM for that symbol, and on Account Overview and
+    Decision Reasons for every symbol. The pencil and bin in the hover box belong to Grafana's own notes and do
+    nothing here: change a note by running `trades note` again.
+  - **Beside each fill** in the *every call* table on Candles and Calls (Sentiment and Note columns).
+  - **As a reason** in Decision Reasons, which shows how often you acted on each sentiment and whether those
+    trades paid.
+  A marker appears for a call as soon as you have noted it, so there is no need to also annotate the chart by
+  hand; chart notes (click the chart, **Add annotation**, tag the symbol) remain for marking a moment you have not
+  traded on.
+
+**Notes written on the charts.** Notes you write on a Grafana chart (click the chart, **Add annotation**) live in
+Grafana's own file. `chartnotes sync` copies them into this database so they are kept with the journal; `evening.sh`
+runs it every night.
+
+```bash
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes sync            # copy them in (repeatable)
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes list --symbol WIPRO
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes assign --id 3 --symbol BHARTIARTL
+```
+
+Tag a note with its symbol and a generic sentiment: `BULLISH`, `BEARISH` or `NEUTRAL`. Labels you used before count as
+the generic one they stand for (`UP` is `BULLISH`, `DOWN` is `BEARISH`, `LEVEL` is `NEUTRAL`; see
+`notes.sentiment.aliases`), and the same mapping applies to `trades note --sentiment`. A note with no symbol tag is
+stored without a symbol until you give it one with `chartnotes assign`. `grafana.db.path` says where Grafana's database
+is (under Docker, point it at a copy). The *notes written on the charts* table on Candles and Calls lists them.
 
 ### Part 6 - dashboards
 

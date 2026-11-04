@@ -55,7 +55,8 @@ class BrokerFillSyncTest {
                 new FifoLotMatcher(), new GrowwChargeModel(ChargeRates.defaults()), new PeriodAggregator(),
                 new PeriodBounds(4), false, "NSE", "CASH");
         ReasonAttributor attributor = new ReasonAttributor(new SqliteMarketEventRepository(database),
-                new SqliteAlertRepository(database), instruments, "NSE", "CASH", 15);
+                new SqliteAlertRepository(database), new com.stockanalyzer.store.jdbc.SqliteTradeNoteRepository(database),
+                instruments, "NSE", "CASH", 15);
         sync = new BrokerFillSync(journal, trades, reasons, attributor);
     }
 

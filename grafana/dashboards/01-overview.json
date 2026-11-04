@@ -24,44 +24,76 @@
           "type": "grafana",
           "uid": "-- Grafana --"
         },
-        "enable": false,
+        "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
-        "type": "dashboard"
-      },
-      {
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "iconColor": "#73BF69",
-        "name": "Buy calls",
+        "type": "dashboard",
         "target": {
           "limit": 200,
-          "matchAny": false,
+          "matchAny": true,
           "tags": [
-            "BUY"
+            "BUY",
+            "SELL"
           ],
           "type": "tags"
         }
       },
       {
         "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
         },
         "enable": true,
-        "iconColor": "#F2495C",
-        "name": "Sell calls",
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
         "target": {
-          "limit": 200,
-          "matchAny": false,
-          "tags": [
-            "SELL"
-          ],
-          "type": "tags"
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Saved notes",
+        "target": {
+          "queryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "rawQueryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
         }
       }
     ]
@@ -82,7 +114,7 @@
         "x": 0,
         "y": 0,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "targets": [
         {
@@ -140,7 +172,7 @@
         "x": 4,
         "y": 0,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "targets": [
         {
@@ -198,7 +230,7 @@
         "x": 8,
         "y": 0,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "targets": [
         {
@@ -256,7 +288,7 @@
         "x": 12,
         "y": 0,
         "w": 4,
-        "h": 4
+        "h": 5
       },
       "targets": [
         {
@@ -312,7 +344,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 0,
+        "y": 1,
         "w": 4,
         "h": 4
       },
@@ -382,7 +414,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 0,
+        "y": 1,
         "w": 4,
         "h": 4
       },
@@ -440,7 +472,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 5,
         "w": 24,
         "h": 8
       },
@@ -484,7 +516,7 @@
         },
         "overrides": []
       },
-      "description": "Two different claims, plotted together on purpose.\n\n- **Account value** — what the broker reported that evening: cash plus holdings at market.\n- **Cumulative net P&L** — derived from closed lots. Ignores deposits, withdrawals, and anything traded outside this journal.\n\nBefore the first broker reading, the value line falls back to the derived one.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for."
+      "description": "Two different claims, plotted together on purpose.\n\n- **Account value** — what the broker reported that evening: cash plus holdings at market.\n- **Cumulative net P&L** — derived from closed lots. Ignores deposits, withdrawals, and anything traded outside this journal.\n\nBefore the first broker reading, the value line falls back to the derived one.\n\n**Notes** (cyan dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to read the note and see which symbol it was for.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`, for every symbol. Hover a marker for the symbol, the sentiment and your note."
     },
     {
       "id": 21,
@@ -496,7 +528,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -549,7 +581,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 12,
+        "y": 13,
         "w": 12,
         "h": 8
       },
@@ -601,7 +633,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 20,
+        "y": 21,
         "w": 24,
         "h": 7
       },
@@ -660,7 +692,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 28,
         "w": 24,
         "h": 12
       },
@@ -770,7 +802,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 40,
         "w": 24,
         "h": 10
       },
@@ -929,6 +961,61 @@
           "timeColumns": []
         }
       ]
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "",
+      "description": "The newest of: the last fill imported, the last account balance recorded, and the last time the reasons for trades were worked out. The daemon pulls fills every few minutes while the market is open and the evening batch reads the balance, so this is how old the figures on this page can be.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 1
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(imported_at) AS t FROM trade\n  UNION ALL SELECT MAX(recorded_at) FROM account_balance\n  UNION ALL SELECT MAX(recorded_at) FROM trade_reason)",
+          "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(imported_at) AS t FROM trade\n  UNION ALL SELECT MAX(recorded_at) FROM account_balance\n  UNION ALL SELECT MAX(recorded_at) FROM trade_reason)",
+          "timeColumns": []
+        }
+      ],
+      "transparent": true
     }
   ]
 }

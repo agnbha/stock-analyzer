@@ -288,6 +288,25 @@ public final class AppConfig {
         return Integer.parseInt(get("alerts.max.age.minutes", "10"));
     }
 
+    // ---- Notes written on the charts ----------------------------------------------------
+
+    /** Where Grafana's own database is, for {@code chartnotes sync}. */
+    public String grafanaDbPath() {
+        return get("grafana.db.path", "grafana/.runtime/data/grafana.db");
+    }
+
+    /** The generic sentiments a note is counted under. */
+    public java.util.Set<String> noteSentiments() {
+        return csvSet("notes.sentiments", "BULLISH,BEARISH,NEUTRAL");
+    }
+
+    /** Home-made labels that stand for a generic sentiment, as {@code UP=BULLISH,...}. */
+    public java.util.Map<String, String> noteSentimentAliases() {
+        return com.stockanalyzer.note.SentimentVocabulary.parseAliases(get("notes.sentiment.aliases",
+                "UP=BULLISH,UPTREND=BULLISH,LONG=BULLISH,DOWN=BEARISH,DOWNTREND=BEARISH,SHORT=BEARISH,"
+                        + "LEVEL=NEUTRAL,FLAT=NEUTRAL,SIDEWAYS=NEUTRAL,RANGE=NEUTRAL"));
+    }
+
     public String holidaysFile() {
         return get("alerts.holidays.file", "nse-holidays-2026.txt");
     }

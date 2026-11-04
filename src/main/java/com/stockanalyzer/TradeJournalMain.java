@@ -17,11 +17,14 @@ import com.stockanalyzer.trade.CsvTradeImporter;
 import com.stockanalyzer.trade.ExecutionDataClient;
 import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.TradeIds;
+import com.stockanalyzer.trade.TradeNoteService;
 import com.stockanalyzer.store.TradeReasonRepository;
 import com.stockanalyzer.util.Args;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -38,8 +41,17 @@ import java.util.stream.Collectors;
  *   trades import --csv FILE                  import a CSV or contract note
  *   trades add --symbol S --side BUY --qty N --price P --at TS [--product MIS] [--reason "..."]
  *   trades reasons [--month YYYY-MM]          attribute why each trade was taken
+ *   trades note --symbol S --side BUY|SELL [--sentiment BULLISH] [--text "..."]
+ *               [--date D] [--at HH:MM] [--order ID] [--clear]
+ *                                             record what you thought when you took a call
+ *   trades notes [--date D | --from D --to D] [--symbol S]
+ *                                             list the calls you have noted
  *   trades balance [--date D]                 read the balance from the broker
  *   trades balance --cash X [--date D]        record it by hand instead
+ *   chartnotes sync                           copy the notes written on the Grafana charts into this database
+ *   chartnotes list [--symbol S]              the notes written on the charts, with their symbol and sentiment
+ *   chartnotes assign --id N[,N...] --symbol S
+ *                                             give notes that carry no symbol tag a symbol, by hand
  *   pnl --period day|week|month|fy [--date D | --of D | --month YYYY-MM | --year YYYY-YY]
  *   pnl --rebuild                             re-match every stored trade
  *   statement --from D --to D --out FILE      one row per realized lot
@@ -55,12 +67,13 @@ public final class TradeJournalMain {
         try (AppContext context = new AppContext(AppConfig.load())) {
             switch (command) {
                 case "trades" -> trades(context, parsed);
+                case "chartnotes" -> chartNotes(context, parsed);
                 case "pnl" -> pnl(context, parsed);
                 case "statement" -> statement(context, parsed);
                 case "capture" -> capture(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
-                    System.err.println("Try: trades | pnl | statement | capture");
+                    System.err.println("Try: trades | chartnotes | pnl | statement | capture");
                     System.exit(2);
                 }
             }
@@ -76,6 +89,14 @@ public final class TradeJournalMain {
             }
             case "reasons" -> {
                 reasons(context, args);
+                return;
+            }
+            case "note" -> {
+                note(context, args);
+                return;
+            }
+            case "notes" -> {
+                notes(context, args);
                 return;
             }
             case "balance" -> {
@@ -123,6 +144,129 @@ public final class TradeJournalMain {
         context.tradeJournalService().rebuild();
         attributeReasons(context, trade.sessionDate(), trade.sessionDate());
         System.out.println(inserted == 1 ? "Added." : "Already recorded; nothing changed.");
+    }
+
+    /**
+     * Records the sentiment and the thinking behind a call, against every fill of it. Notes live in the
+     * journal, so they survive re-imports, show next to the fill on the Candles and Calls dashboard, and
+     * count as a reason on Decision Reasons ("did BULLISH calls pay?").
+     */
+    private static void note(AppContext context, Args args) {
+        LocalDate date = args.date("date", LocalDate.now(context.clock().zone()));
+        TradeNoteService.Selection selection = new TradeNoteService.Selection(
+                args.require("symbol").toUpperCase(Locale.ROOT),
+                Side.valueOf(args.require("side").toUpperCase(Locale.ROOT)), date,
+                args.value("at").map(LocalTime::parse).orElse(null), args.value("order").orElse(null));
+        TradeNoteService service = context.tradeNoteService();
+        boolean clearing = args.flag("clear");
+
+        TradeNoteService.Result result;
+        try {
+            result = clearing
+                    ? service.clear(selection)
+                    : service.note(selection, args.value("sentiment").orElse(null), args.value("text").orElse(null),
+                            Instant.now().getEpochSecond());
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.exit(2);
+            return;
+        }
+        attributeReasons(context, date, date);
+
+        System.out.printf("%s %d %s fills for %s on %s (%d %s):%n", clearing ? "Cleared the note from" : "Noted",
+                result.fills().size(), selection.side(), selection.symbol(), date, result.calls().size(),
+                result.calls().size() == 1 ? "order" : "orders");
+        for (TradeNoteService.Call call : result.calls()) {
+            System.out.printf("  %s  %d shares at %.2f  (%d fills, order %s)%n",
+                    context.clock().timeOf(call.firstFillAt()).withNano(0), call.quantity(), call.averagePrice(),
+                    call.fills(), call.orderId() == null ? "-" : call.orderId());
+        }
+        if (!clearing) {
+            args.value("sentiment").ifPresent(sentiment -> System.out.println("Sentiment: " + sentiment.toUpperCase(Locale.ROOT)));
+            args.value("text").ifPresent(text -> System.out.println("Note: " + text));
+        }
+        if (result.calls().size() > 1 && !args.has("at") && !args.has("order")) {
+            System.out.println("That was more than one order. To note just one, add --at HH:MM or --order ID "
+                    + "(and --clear removes a note).");
+        }
+    }
+
+    /**
+     * The notes written on the Grafana charts live in Grafana's own database; this keeps a copy with the journal.
+     * A note's symbol comes from a tag that names an instrument, and its sentiment from the first tag that is a
+     * generic one (UP counts as BULLISH); one with no symbol tag can be given a symbol by hand.
+     */
+    private static void chartNotes(AppContext context, Args args) {
+        switch (args.subcommand("list")) {
+            case "sync" -> {
+                try {
+                    var result = context.chartNoteSync().sync(Instant.now().getEpochSecond());
+                    System.out.printf("Chart notes: %d in Grafana (%d new, %d tied to a symbol by a tag), %d no longer there%n",
+                            result.found(), result.added(), result.withSymbol(), result.removed());
+                    if (result.withSymbol() < result.found()) {
+                        System.out.printf("%d have no symbol tag: see them with `chartnotes list`, and give them a symbol with "
+                                + "`chartnotes assign --id N --symbol S`%n", result.found() - result.withSymbol());
+                    }
+                } catch (com.stockanalyzer.note.GrafanaAnnotationSource.Unavailable e) {
+                    // Not an error for a scheduled run: Grafana may simply not be installed on this machine.
+                    System.out.println("Chart notes not synced: " + e.getMessage());
+                }
+            }
+            case "assign" -> {
+                String symbol = args.require("symbol").toUpperCase(Locale.ROOT);
+                String known = context.instrumentRepository().findAll().stream().map(i -> i.symbol())
+                        .filter(s -> s.equalsIgnoreCase(symbol)).findFirst().orElse(null);
+                if (known == null) {
+                    System.err.println("Unknown symbol " + symbol + ": it is not one of the instruments in the database");
+                    System.exit(2);
+                    return;
+                }
+                for (String id : args.require("id").split(",")) {
+                    boolean found = context.chartNoteRepository().assignSymbol(Long.parseLong(id.trim()), known);
+                    System.out.println(found ? "Note " + id.trim() + " is now about " + known
+                            : "No note " + id.trim() + " (run `chartnotes sync` first)");
+                }
+            }
+            default -> {
+                var found = context.chartNoteRepository()
+                        .findLive(args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
+                if (found.isEmpty()) {
+                    System.out.println("No chart notes. Run `chartnotes sync` to copy them from Grafana.");
+                    return;
+                }
+                System.out.printf("%n%-4s %-17s %-12s %-10s %-14s %s%n", "ID", "WHEN (IST)", "SYMBOL", "SENTIMENT", "TAGS", "NOTE");
+                for (var note : found) {
+                    System.out.printf("%-4d %-17s %-12s %-10s %-14s %s%n", note.grafanaId(),
+                            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(
+                                    Instant.ofEpochSecond(note.notedAt()).atZone(context.clock().zone())),
+                            note.symbol() == null ? "(none)" : note.symbol(),
+                            note.sentiment() == null ? "-" : note.sentiment(), String.join(",", note.tags()),
+                            note.note() == null ? "" : note.note().replace('\n', ' '));
+                }
+                System.out.println();
+            }
+        }
+    }
+
+    private static void notes(AppContext context, Args args) {
+        LocalDate to = args.date("to", args.date("date", LocalDate.now(context.clock().zone())));
+        LocalDate from = args.date("from", args.has("date") ? to : to.minusDays(14));
+        List<TradeNoteService.Entry> entries = context.tradeNoteService()
+                .list(from, to, args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
+        if (entries.isEmpty()) {
+            System.out.printf("No noted calls from %s to %s.%n", from, to);
+            return;
+        }
+        System.out.printf("%nNoted calls, %s to %s%n%n", from, to);
+        System.out.printf("%-10s %-8s %-4s %-12s %8s %10s  %-12s %s%n", "DATE", "TIME", "SIDE", "SYMBOL", "SHARES",
+                "AVG PRICE", "SENTIMENT", "NOTE");
+        for (TradeNoteService.Entry entry : entries) {
+            System.out.printf("%-10s %-8s %-4s %-12s %8d %10.2f  %-12s %s%n", entry.date(),
+                    context.clock().timeOf(entry.firstFillAt()).withNano(0), entry.side(), entry.symbol(),
+                    entry.quantity(), entry.averagePrice(), entry.sentiment() == null ? "-" : entry.sentiment(),
+                    entry.note() == null ? "" : entry.note().replace('\n', ' '));
+        }
+        System.out.println();
     }
 
     private static void pnl(AppContext context, Args args) {

@@ -28,25 +28,49 @@ Either way you get the plugin, the datasource and all three dashboards in a
 dashboard can never modify the journal; running locally, open it read-only if
 the daemon is live.
 
-## Recording buy and sell calls
+## Notes on the charts: documenting a call
 
-Notes on a chart are Grafana annotations, kept in Grafana's own database (not in the analyzer's, which the
-dashboards only read). To record a call, **Ctrl/Cmd+click** a candle chart, write the call, and tag it:
+Notes on a chart are Grafana annotations. To write one:
 
-- `BUY` or `SELL`, in capitals, and
-- the symbol, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`).
+1. **Click** a point on a candle chart. The tooltip pins and shows an **Add annotation** button.
+2. Press it, write the note - why you are in or out, what you expect, the plan - and add two **tags**:
+   - the **symbol**, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`), and
+   - a **sentiment**: `BULLISH`, `BEARISH` or `NEUTRAL`. (`BUY` or `SELL` too, if you like; other words such as
+     `NERVOUS` are kept but are not read as a market view.)
+3. **Save.** The note appears at once as a cyan dashed line; hover its marker to read it, and use the pencil and bin
+   in the hover box to edit or delete it.
 
-Grafana suggests tags you have used before, which saves retyping them. Drag with Ctrl/Cmd held to mark a range.
+The symbol tag is what makes a note show: it is drawn on every chart of that symbol - Candles and Calls, Stock
+Trend and CAN SLIM - wherever you wrote it, and on Account Overview and Decision Reasons (which have no symbol
+picker) when it is tagged `BUY` or `SELL`. A note without the symbol tag is saved but not drawn, which keeps another
+symbol's notes off the candles; tags are matched exactly, so `reliance` will not show.
 
-A tagged call is drawn as a green (buy) or red (sell) dashed line with a marker, and appears wherever buy and sell
-decisions are discussed: Candles and Calls, Stock Trend and CAN SLIM for that symbol, and Account Overview and
-Decision Reasons for every symbol (hover a marker for the note and its symbol). The dashboards read the tags, not the
-dashboard a note was made on, so one note shows everywhere.
+**Your notes are kept in the analyzer's database too.** Grafana stores them in its own file, so they were not in the
+journal, and would be lost with Grafana's volume. `chartnotes sync` copies them into the `chart_note` table
+(`evening.sh` runs it each night; run it by hand to see a note straight away). The table on **Candles and Calls**
+(*notes written on the charts*) lists every note for the symbol, newest first, plus any with no symbol tag, so a note
+can be found even when it is not drawn. A note edited in Grafana is updated on the next sync, and one deleted there is
+marked as deleted, not lost.
 
-Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are kept but not drawn. That is
-deliberate: a note on a candle chart should be a call, not clutter. Tags are matched exactly, so `buy` or `reliance`
-will not show; edit the note (click its marker) to fix the tags. To list or delete every note, use Explore with the
-`-- Grafana --` datasource and the annotations query, or the marker's trash icon.
+**Generic sentiments.** A note is counted under the first tag that is `BULLISH`, `BEARISH` or `NEUTRAL`, and the
+home-made labels that stand for them count as the same: `UP`, `UPTREND` and `LONG` are `BULLISH`; `DOWN`, `DOWNTREND`
+and `SHORT` are `BEARISH`; `LEVEL`, `FLAT`, `SIDEWAYS` and `RANGE` are `NEUTRAL`. The mapping is `notes.sentiment.aliases`.
+Grafana's own tags are never rewritten: a note tagged `UP` stays `UP` there and is stored as `BULLISH` here.
+
+**A note with no symbol tag** (one written before the symbol tag was needed) is not drawn, and cannot be edited from the
+chart. List them with `chartnotes list`, and give each a symbol with `chartnotes assign --id 3 --symbol RELIANCE`: it is
+then drawn on that symbol's charts, from the analyzer's copy.
+
+To record *why* a call was made against the fills themselves, use `trades note` (see the main README). The call is
+drawn on the candle charts for you, as a light-blue (buy) or orange (sell) dashed marker with the sentiment and your
+note on hover; the same words appear on the **every call** table, and the sentiment is a reason on Decision Reasons.
+Those markers come from the journal, so the pencil and bin in their hover box do nothing: run `trades note` again to
+change one.
+
+**Why the built-in annotation layer is the notes layer, and invisible as a switch.** Grafana offers *Add annotation*
+only while a dashboard's built-in "Annotations & Alerts" layer is enabled, and only that layer redraws the moment you
+save. So each dashboard keeps it enabled, hides its switch, and gives it a tag filter (the symbol) instead of "every
+note made on this dashboard". Do not switch it off to tidy the chart: you could no longer annotate.
 
 ## Troubleshooting
 
@@ -120,6 +144,21 @@ the screener.in query), and rallies that have ended (stop losses, heavy-volume
 breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
 full score sheet, letter by letter, is at the bottom.
+
+**Last data refresh** — a one-line label in the top-right corner of every page
+except CAN SLIM (which has its own *Last scan*), showing how long ago the page's
+data was last written. It is a small stat panel without a title, so it takes one
+row and sits beside or above the first panel. What it counts differs by page:
+
+| Page | Newest of |
+|---|---|
+| Account Overview | last fill imported, last balance recorded, last reasons worked out |
+| Candles and Calls | last live candle (daemon, every poll in market hours), last session ingested, last fill imported |
+| Decision Reasons | when the reasons were last worked out (each fill import) |
+| Stock Trend, Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
+
+On Candles and Calls, a figure much older than a few minutes during market hours
+means the daemon is not running or cannot reach Groww.
 
 One number to read carefully: the overview's charges are **all charges paid on
 that day's fills**, while `pnl`'s charges are only those **allocated to lots that

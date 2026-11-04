@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -93,12 +94,13 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
-    @DisplayName("every dashboard with a time chart shows buy and sell calls, and nothing else Grafana annotates")
-    void chartsShowBuyAndSellCalls() throws Exception {
-        // A note added by clicking on a chart is drawn as a dashed vertical line with a marker. Without an explicit
-        // annotation block Grafana switches its built-in layer on, so stray notes appear on the candles. Calls are
-        // pulled in by tag instead - across dashboards, so a note made on one chart shows on the others - and in
-        // the dashboards that have a symbol picker only for the symbol picked.
+    @DisplayName("every dashboard with a time chart lets you annotate, and draws the notes tagged for it at once")
+    void chartsLetYouAnnotateAndShowTaggedNotes() throws Exception {
+        // Grafana offers "Add annotation" on a chart only while its built-in annotation layer is enabled, and only
+        // that layer redraws the moment a note is saved. So the built-in layer is the notes layer: switched on,
+        // its switch hidden, and filtered by tag instead of by dashboard - so a note made on one chart shows on the
+        // others, and in the dashboards with a symbol picker only for the symbol picked. A note that lacks the tag is
+        // saved but not drawn, which keeps another symbol's notes off the candles.
         int checked = 0;
         for (Path file : dashboardFiles()) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
@@ -115,40 +117,130 @@ class GrafanaDashboardQueryTest {
             for (JsonNode variable : root.path("templating").path("list")) {
                 hasSymbol |= variable.path("name").asText().equals("symbol");
             }
+            String name = file.getFileName().toString();
             JsonNode builtIn = null;
-            JsonNode buy = null;
-            JsonNode sell = null;
             for (JsonNode annotation : root.path("annotations").path("list")) {
                 if (annotation.path("builtIn").asInt() == 1) {
                     builtIn = annotation;
-                } else if (annotation.path("name").asText().equals("Buy calls")) {
-                    buy = annotation;
-                } else if (annotation.path("name").asText().equals("Sell calls")) {
-                    sell = annotation;
                 }
+                String layer = annotation.path("name").asText();
+                assertFalse(layer.equals("Buy calls") || layer.equals("Sell calls"),
+                        name + ": a separate buy/sell layer would draw every tagged note a second time");
             }
-            String name = file.getFileName().toString();
-            assertTrue(builtIn != null && !builtIn.path("enable").asBoolean(true),
-                    name + ": the built-in annotation layer must be declared and switched off");
-            assertTrue(buy != null && sell != null, name + ": needs a Buy calls and a Sell calls annotation query");
-            assertTagged(name, buy, "BUY", hasSymbol);
-            assertTagged(name, sell, "SELL", hasSymbol);
+            assertTrue(builtIn != null && builtIn.path("enable").asBoolean(false),
+                    name + ": Grafana only offers 'Add annotation' while the built-in annotation layer is enabled");
+            assertTrue(builtIn.path("hide").asBoolean(false),
+                    name + ": its switch is hidden, because switching it off would stop you annotating");
+            assertTrue(builtIn.path("filter").isMissingNode(),
+                    name + ": a filter would hide a note you have just saved until the next refresh");
+            JsonNode target = builtIn.path("target");
+            List<String> tags = new ArrayList<>();
+            target.path("tags").forEach(t -> tags.add(t.asText()));
+            assertEquals("tags", target.path("type").asText(),
+                    name + ": notes must be found by tag, not by dashboard, to show on every dashboard");
+            if (hasSymbol) {
+                assertEquals(List.of("$symbol"), tags, name + ": with a symbol picker, show the notes tagged with the symbol picked");
+                assertFalse(target.path("matchAny").asBoolean(true), name + ": every tag must match, not any");
+            } else {
+                assertEquals(List.of("BUY", "SELL"), tags, name + ": without one, show the notes tagged BUY or SELL");
+                assertTrue(target.path("matchAny").asBoolean(false), name + ": either tag is enough");
+            }
         }
         assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
     }
 
-    private static void assertTagged(String name, JsonNode annotation, String tag, boolean symbolScoped) {
-        JsonNode target = annotation.path("target");
-        List<String> tags = new ArrayList<>();
-        target.path("tags").forEach(t -> tags.add(t.asText()));
-        assertTrue(annotation.path("enable").asBoolean(false), name + ": " + tag + " calls are switched off");
-        assertTrue(target.path("type").asText().equals("tags"),
-                name + ": " + tag + " calls must be found by tag, not by dashboard, to show on every dashboard");
-        assertFalse(target.path("matchAny").asBoolean(true), name + ": every tag must match, not any");
-        assertTrue(tags.contains(tag), name + ": " + tag + " calls need the " + tag + " tag, got " + tags);
-        assertTrue(tags.contains("$symbol") == symbolScoped, name + (symbolScoped
-                ? ": with a symbol picker, calls must be limited to the symbol picked"
-                : ": without one, calls must not be limited to a symbol"));
+    @Test
+    @DisplayName("every dashboard with a time chart also draws the calls noted in the journal, buys and sells apart")
+    void chartsShowNotedCalls() throws Exception {
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            if (!root.has("annotations")) {
+                continue;
+            }
+            checked++;
+            boolean hasSymbol = false;
+            for (JsonNode variable : root.path("templating").path("list")) {
+                hasSymbol |= variable.path("name").asText().equals("symbol");
+            }
+            String name = file.getFileName().toString();
+            for (String side : new String[]{"BUY", "SELL"}) {
+                JsonNode noted = null;
+                for (JsonNode annotation : root.path("annotations").path("list")) {
+                    if (annotation.path("name").asText().equals("Noted " + side.toLowerCase() + "s")) {
+                        noted = annotation;
+                    }
+                }
+                assertTrue(noted != null, name + ": needs a 'Noted " + side.toLowerCase() + "s' annotation query");
+                assertTrue(noted.path("enable").asBoolean(false), name + ": noted " + side + " calls are switched off");
+                assertTrue(noted.path("hide").asBoolean(false), name + ": the noted " + side + " calls switch is shown, but there is nothing to choose");
+                assertEquals("stock-analyzer-sqlite", noted.path("datasource").path("uid").asText(),
+                        name + ": noted calls come from the journal, so from the SQLite datasource");
+                JsonNode target = noted.path("target");
+                String sql = target.path("queryText").asText();
+                assertEquals(sql, target.path("rawQueryText").asText(),
+                        name + ": the datasource reads rawQueryText and the editor reads queryText; both must hold the SQL");
+                assertTrue(sql.contains("FROM trade_note") && sql.contains("t.side = '" + side + "'"), name + ": " + sql);
+                assertTrue(sql.contains("i.symbol = '$symbol'") == hasSymbol, name + (hasSymbol
+                        ? ": with a symbol picker, noted calls must be limited to the symbol picked"
+                        : ": without one, noted calls must not be limited to a symbol"));
+                assertEquals("time", target.path("timeColumns").get(0).asText(), name + ": the time column must be declared");
+            }
+        }
+        assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
+    }
+
+    @Test
+    @DisplayName("every dashboard with a time chart also draws the notes saved in the journal")
+    void chartsDrawSavedNotes() throws Exception {
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            if (!root.has("annotations")) {
+                continue;
+            }
+            checked++;
+            boolean hasSymbol = false;
+            for (JsonNode variable : root.path("templating").path("list")) {
+                hasSymbol |= variable.path("name").asText().equals("symbol");
+            }
+            JsonNode saved = null;
+            for (JsonNode annotation : root.path("annotations").path("list")) {
+                if (annotation.path("name").asText().equals("Saved notes")) {
+                    saved = annotation;
+                }
+            }
+            String name = file.getFileName().toString();
+            assertTrue(saved != null, name + ": needs a 'Saved notes' annotation query");
+            assertTrue(saved.path("enable").asBoolean(false) && saved.path("hide").asBoolean(false),
+                    name + ": saved notes are drawn, with no switch to show");
+            String sql = saved.path("target").path("queryText").asText();
+            assertEquals(sql, saved.path("target").path("rawQueryText").asText(), name);
+            assertTrue(sql.contains("FROM chart_note") && sql.contains("symbol_source = 'MANUAL'"),
+                    name + ": only notes given a symbol by hand, since a tagged one is already drawn by Grafana: " + sql);
+            assertTrue(sql.contains("n.symbol = '$symbol'") == hasSymbol, name + (hasSymbol
+                    ? ": with a symbol picker, limit to the symbol picked" : ": without one, do not limit to a symbol"));
+        }
+        assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
+    }
+
+    @Test
+    @DisplayName("Candles and Calls offers 'Today's trading hours' and no ranges shorter than two days")
+    void candlesAndCallsTimePicker() throws Exception {
+        JsonNode root = JsonMapper.INSTANCE.readTree(
+                Files.readString(DASHBOARDS.resolve("02-candles-and-calls.json")));
+        List<String> offered = new ArrayList<>();
+        for (JsonNode range : root.path("timepicker").path("quick_ranges")) {
+            offered.add(range.path("display").asText());
+        }
+
+        assertEquals("Today's trading hours", offered.getFirst());
+        for (String minutesOrHours : List.of("Last 5 minutes", "Last 15 minutes", "Last 30 minutes", "Last 1 hour",
+                "Last 3 hours", "Last 6 hours", "Last 12 hours", "Last 24 hours")) {
+            assertFalse(offered.contains(minutesOrHours),
+                    minutesOrHours + " is of no use on a chart of whole sessions");
+        }
+        assertTrue(offered.contains("Last 2 days") && offered.contains("Last 90 days"), offered.toString());
     }
 
     @Test
