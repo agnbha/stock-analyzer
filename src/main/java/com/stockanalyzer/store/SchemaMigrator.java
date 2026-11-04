@@ -86,6 +86,7 @@ public final class SchemaMigrator {
         all.put(18, v18());
         all.put(19, v19());
         all.put(20, v20());
+        all.put(21, v21());
         return all;
     }
 
@@ -278,6 +279,22 @@ public final class SchemaMigrator {
                   times INTEGER NOT NULL,
                   PRIMARY KEY (symbol, exchange)
                 ) WITHOUT ROWID""");
+    }
+
+    /**
+     * v21: what you thought when you took a trade. One row per fill, so a note survives every
+     * re-import and rebuild (fills are insert-if-absent, and nothing here is derived), and the
+     * dashboards can join it to a fill directly. A call is usually many fills of one order, so the
+     * same note is written against each of them.
+     */
+    private List<String> v21() {
+        return List.of("""
+                CREATE TABLE trade_note (
+                  trade_id INTEGER PRIMARY KEY REFERENCES trade(id) ON DELETE CASCADE,
+                  sentiment TEXT,
+                  note TEXT,
+                  noted_at INTEGER NOT NULL
+                )""");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

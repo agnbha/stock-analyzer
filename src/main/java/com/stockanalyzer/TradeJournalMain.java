@@ -17,11 +17,14 @@ import com.stockanalyzer.trade.CsvTradeImporter;
 import com.stockanalyzer.trade.ExecutionDataClient;
 import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.TradeIds;
+import com.stockanalyzer.trade.TradeNoteService;
 import com.stockanalyzer.store.TradeReasonRepository;
 import com.stockanalyzer.util.Args;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -38,6 +41,11 @@ import java.util.stream.Collectors;
  *   trades import --csv FILE                  import a CSV or contract note
  *   trades add --symbol S --side BUY --qty N --price P --at TS [--product MIS] [--reason "..."]
  *   trades reasons [--month YYYY-MM]          attribute why each trade was taken
+ *   trades note --symbol S --side BUY|SELL [--sentiment BULLISH] [--text "..."]
+ *               [--date D] [--at HH:MM] [--order ID] [--clear]
+ *                                             record what you thought when you took a call
+ *   trades notes [--date D | --from D --to D] [--symbol S]
+ *                                             list the calls you have noted
  *   trades balance [--date D]                 read the balance from the broker
  *   trades balance --cash X [--date D]        record it by hand instead
  *   pnl --period day|week|month|fy [--date D | --of D | --month YYYY-MM | --year YYYY-YY]
@@ -76,6 +84,14 @@ public final class TradeJournalMain {
             }
             case "reasons" -> {
                 reasons(context, args);
+                return;
+            }
+            case "note" -> {
+                note(context, args);
+                return;
+            }
+            case "notes" -> {
+                notes(context, args);
                 return;
             }
             case "balance" -> {
@@ -123,6 +139,72 @@ public final class TradeJournalMain {
         context.tradeJournalService().rebuild();
         attributeReasons(context, trade.sessionDate(), trade.sessionDate());
         System.out.println(inserted == 1 ? "Added." : "Already recorded; nothing changed.");
+    }
+
+    /**
+     * Records the sentiment and the thinking behind a call, against every fill of it. Notes live in the
+     * journal, so they survive re-imports, show next to the fill on the Candles and Calls dashboard, and
+     * count as a reason on Decision Reasons ("did BULLISH calls pay?").
+     */
+    private static void note(AppContext context, Args args) {
+        LocalDate date = args.date("date", LocalDate.now(context.clock().zone()));
+        TradeNoteService.Selection selection = new TradeNoteService.Selection(
+                args.require("symbol").toUpperCase(Locale.ROOT),
+                Side.valueOf(args.require("side").toUpperCase(Locale.ROOT)), date,
+                args.value("at").map(LocalTime::parse).orElse(null), args.value("order").orElse(null));
+        TradeNoteService service = context.tradeNoteService();
+        boolean clearing = args.flag("clear");
+
+        TradeNoteService.Result result;
+        try {
+            result = clearing
+                    ? service.clear(selection)
+                    : service.note(selection, args.value("sentiment").orElse(null), args.value("text").orElse(null),
+                            Instant.now().getEpochSecond());
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.exit(2);
+            return;
+        }
+        attributeReasons(context, date, date);
+
+        System.out.printf("%s %d %s fills for %s on %s (%d %s):%n", clearing ? "Cleared the note from" : "Noted",
+                result.fills().size(), selection.side(), selection.symbol(), date, result.calls().size(),
+                result.calls().size() == 1 ? "order" : "orders");
+        for (TradeNoteService.Call call : result.calls()) {
+            System.out.printf("  %s  %d shares at %.2f  (%d fills, order %s)%n",
+                    context.clock().timeOf(call.firstFillAt()).withNano(0), call.quantity(), call.averagePrice(),
+                    call.fills(), call.orderId() == null ? "-" : call.orderId());
+        }
+        if (!clearing) {
+            args.value("sentiment").ifPresent(sentiment -> System.out.println("Sentiment: " + sentiment.toUpperCase(Locale.ROOT)));
+            args.value("text").ifPresent(text -> System.out.println("Note: " + text));
+        }
+        if (result.calls().size() > 1 && !args.has("at") && !args.has("order")) {
+            System.out.println("That was more than one order. To note just one, add --at HH:MM or --order ID "
+                    + "(and --clear removes a note).");
+        }
+    }
+
+    private static void notes(AppContext context, Args args) {
+        LocalDate to = args.date("to", args.date("date", LocalDate.now(context.clock().zone())));
+        LocalDate from = args.date("from", args.has("date") ? to : to.minusDays(14));
+        List<TradeNoteService.Entry> entries = context.tradeNoteService()
+                .list(from, to, args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
+        if (entries.isEmpty()) {
+            System.out.printf("No noted calls from %s to %s.%n", from, to);
+            return;
+        }
+        System.out.printf("%nNoted calls, %s to %s%n%n", from, to);
+        System.out.printf("%-10s %-8s %-4s %-12s %8s %10s  %-12s %s%n", "DATE", "TIME", "SIDE", "SYMBOL", "SHARES",
+                "AVG PRICE", "SENTIMENT", "NOTE");
+        for (TradeNoteService.Entry entry : entries) {
+            System.out.printf("%-10s %-8s %-4s %-12s %8d %10.2f  %-12s %s%n", entry.date(),
+                    context.clock().timeOf(entry.firstFillAt()).withNano(0), entry.side(), entry.symbol(),
+                    entry.quantity(), entry.averagePrice(), entry.sentiment() == null ? "-" : entry.sentiment(),
+                    entry.note() == null ? "" : entry.note().replace('\n', ' '));
+        }
+        System.out.println();
     }
 
     private static void pnl(AppContext context, Args args) {

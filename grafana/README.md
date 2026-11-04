@@ -43,6 +43,10 @@ decisions are discussed: Candles and Calls, Stock Trend and CAN SLIM for that sy
 Decision Reasons for every symbol (hover a marker for the note and its symbol). The dashboards read the tags, not the
 dashboard a note was made on, so one note shows everywhere.
 
+To record *why* a call was made - the sentiment at the time - in a form that is counted and shows beside
+the fill, use `trades note` (see the main README): the same words appear on the **every call** table, and the
+sentiment is a reason on Decision Reasons. Annotations mark the moment on the chart; `trades note` is the record.
+
 Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are kept but not drawn. That is
 deliberate: a note on a candle chart should be a call, not clutter. Tags are matched exactly, so `buy` or `reliance`
 will not show; edit the note (click its marker) to fix the tags. To list or delete every note, use Explore with the

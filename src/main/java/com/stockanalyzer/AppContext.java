@@ -69,6 +69,7 @@ import com.stockanalyzer.client.AccountDataClient;
 import com.stockanalyzer.client.GrowwAccountClient;
 import com.stockanalyzer.store.jdbc.SqliteAccountBalanceRepository;
 import com.stockanalyzer.store.jdbc.SqliteAttributionRepository;
+import com.stockanalyzer.store.jdbc.SqliteTradeNoteRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeReasonRepository;
 import com.stockanalyzer.store.jdbc.SqliteCalendarRepository;
 import com.stockanalyzer.store.jdbc.SqliteCanSlimRepository;
@@ -92,6 +93,7 @@ import com.stockanalyzer.store.jdbc.SqliteTradingDayRepository;
 import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
 import com.stockanalyzer.store.AttributionRepository;
+import com.stockanalyzer.store.TradeNoteRepository;
 import com.stockanalyzer.store.TradeReasonRepository;
 import com.stockanalyzer.trade.BrokerFillSync;
 import com.stockanalyzer.trade.CaptureAnalyzer;
@@ -105,6 +107,7 @@ import com.stockanalyzer.trade.PeriodAggregator;
 import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.ReasonAttributor;
 import com.stockanalyzer.trade.TradeJournalService;
+import com.stockanalyzer.trade.TradeNoteService;
 import com.stockanalyzer.util.MarketClock;
 
 import java.net.http.HttpClient;
@@ -157,6 +160,7 @@ public final class AppContext implements AutoCloseable {
     private final PnlPeriodRepository pnlPeriodRepository;
     private final AttributionRepository attributionRepository;
     private final TradeReasonRepository tradeReasonRepository;
+    private final TradeNoteRepository tradeNoteRepository;
     private final AccountBalanceRepository accountBalanceRepository;
     private final Supplier<AccountDataClient> accountDataClient;
 
@@ -202,6 +206,7 @@ public final class AppContext implements AutoCloseable {
         this.pnlPeriodRepository = new SqlitePnlPeriodRepository(database);
         this.attributionRepository = new SqliteAttributionRepository(database);
         this.tradeReasonRepository = new SqliteTradeReasonRepository(database);
+        this.tradeNoteRepository = new SqliteTradeNoteRepository(database);
         this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
 
         this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
@@ -306,8 +311,13 @@ public final class AppContext implements AutoCloseable {
     }
 
     public ReasonAttributor reasonAttributor() {
-        return new ReasonAttributor(marketEventRepository, alertRepository, instrumentRepository,
+        return new ReasonAttributor(marketEventRepository, alertRepository, tradeNoteRepository, instrumentRepository,
                 config.exchange(), config.segment(), config.reasonLookbackMinutes());
+    }
+
+    /** Records what you thought when you took a trade; see {@code trades note}. */
+    public TradeNoteService tradeNoteService() {
+        return new TradeNoteService(tradeRepository, tradeNoteRepository, clock);
     }
 
     public TradeReasonRepository tradeReasonRepository() {

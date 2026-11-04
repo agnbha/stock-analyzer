@@ -170,6 +170,9 @@ java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades add --symbol RELIA
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance                    # read it from the broker
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades balance --cash 250000        # fallback: enter it by hand
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades reasons --month 2026-08
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades note --symbol BHARTIARTL --side BUY \
+     --sentiment BULLISH --text "Results beat; sector strong. Plan: sell half at +1%"
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain trades notes --date 2026-11-04
 
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period day   --date  2026-08-28
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --period week  --of    2026-08-28
@@ -179,6 +182,29 @@ java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain pnl --rebuild
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain statement --from 2026-04-01 --out statement.csv
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain capture --month 2026-08
 ```
+
+**Documenting a call.** Calls are made by hand, so what you were thinking when you made one is
+worth writing down while you remember it. `trades note` records a sentiment and some words against
+a call:
+
+```bash
+trades note --symbol BHARTIARTL --side BUY --sentiment BULLISH --text "Results beat; sector strong"
+trades note --symbol BHARTIARTL --side BUY --at 09:45 --sentiment NERVOUS     # the second purchase only
+trades note --symbol BHARTIARTL --side SELL --order ORDER_ID --text "Took it at +0.6%"
+trades note --symbol BHARTIARTL --side BUY --at 09:45 --clear                 # take a note off again
+trades notes --date 2026-11-04                                                 # what you have noted
+```
+
+- A call is usually many fills (one order arrives as dozens), so the note is written against every
+  fill of the call. `--symbol`, `--side` and the day (`--date`, default today) pick the call; `--at
+  HH:MM` (fills within three minutes of it) or `--order` narrows it when the day had more than one. If
+  you do not narrow it, every purchase that day gets the note, and the command lists which ones.
+- The sentiment is a label of your choosing, upper-cased (`BULLISH`, `BEARISH`, `NERVOUS`, `CALM`).
+  The text is free. Give either, or both. Writing a note again replaces it.
+- Notes live in the journal, so they survive re-importing fills. They show beside each fill in
+  **Candles and Calls**, and the sentiment counts as a reason in **Decision Reasons**, which shows how
+  often you acted on each one and whether those trades paid. The chart annotations on those dashboards
+  (`BUY` / `SELL` tags) are for marking the moment; this is the record that is counted.
 
 ### Part 6 - dashboards
 

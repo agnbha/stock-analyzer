@@ -752,8 +752,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol' AND m.session_date IN (${session:sqlstring})\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
-          "queryText": "SELECT m.session_date AS \"Date\",\n       time(m.ts_epoch, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       m.side       AS \"Side\",\n       m.product    AS \"Product\",\n       m.quantity   AS \"Qty\",\n       m.price      AS \"Price\",\n       m.bet_amount AS \"Bet amount\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM v_trade_markers m\nLEFT JOIN trade t ON t.executed_ts = m.ts_epoch\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE m.symbol = '$symbol' AND m.session_date IN (${session:sqlstring})\nGROUP BY m.ts_epoch, m.side, m.product, m.quantity, m.price, m.bet_amount, m.session_date\nORDER BY m.ts_epoch DESC\nLIMIT 300",
+          "rawQueryText": "SELECT t.session_date AS \"Date\",\n       time(t.executed_ts, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       t.side       AS \"Side\",\n       t.product    AS \"Product\",\n       t.quantity   AS \"Qty\",\n       t.price      AS \"Price\",\n       t.quantity * t.price AS \"Bet amount\",\n       COALESCE(n.sentiment, '-') AS \"Sentiment\",\n       COALESCE(n.note, '') AS \"Note\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM trade t\nJOIN instrument i ON i.id = t.instrument_id\nLEFT JOIN trade_note n ON n.trade_id = t.id\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE i.symbol = '$symbol' AND t.session_date IN (${session:sqlstring})\nGROUP BY t.id\nORDER BY t.executed_ts DESC, t.id DESC\nLIMIT 300",
+          "queryText": "SELECT t.session_date AS \"Date\",\n       time(t.executed_ts, 'unixepoch', '+5 hours', '+30 minutes') AS \"Time (IST)\",\n       t.side       AS \"Side\",\n       t.product    AS \"Product\",\n       t.quantity   AS \"Qty\",\n       t.price      AS \"Price\",\n       t.quantity * t.price AS \"Bet amount\",\n       COALESCE(n.sentiment, '-') AS \"Sentiment\",\n       COALESCE(n.note, '') AS \"Note\",\n       COALESCE(GROUP_CONCAT(r.reason_code, ', '), '-') AS \"Reason\"\nFROM trade t\nJOIN instrument i ON i.id = t.instrument_id\nLEFT JOIN trade_note n ON n.trade_id = t.id\nLEFT JOIN trade_reason r ON r.trade_id = t.id\nWHERE i.symbol = '$symbol' AND t.session_date IN (${session:sqlstring})\nGROUP BY t.id\nORDER BY t.executed_ts DESC, t.id DESC\nLIMIT 300",
           "timeColumns": []
         }
       ],
@@ -837,7 +837,7 @@
           }
         ]
       },
-      "description": "Your fills in the selected sessions, newest first.\n\n- **Bet amount** — quantity × price, the rupee value of the fill.\n- **Reason** — the note recorded against the trade, or \"-\" if none was."
+      "description": "Your fills in the selected sessions, newest first.\n\n- **Bet amount** — quantity × price, the rupee value of the fill.\n- **Reason** — the note recorded against the trade, or \"-\" if none was.\n- **Sentiment** and **Note** — what you recorded about the call when you took it, with `trades note --symbol S --side BUY --sentiment BULLISH --text \"...\"`. The same note is on every fill of the call, and the sentiment also counts as a reason on the Decision Reasons dashboard."
     },
     {
       "id": 11,

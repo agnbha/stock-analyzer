@@ -4,18 +4,24 @@ import com.stockanalyzer.model.Alert;
 import com.stockanalyzer.model.MarketEvent;
 import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.store.AlertRepository;
+import com.stockanalyzer.store.TradeNoteRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.MarketEventRepository;
 import com.stockanalyzer.store.TradeReasonRepository.TradeReason;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Works out why each trade was taken.
  *
- * <p>A note you typed is taken at face value. Otherwise the trade is matched
+ * <p>A note you typed is taken at face value - the words on a manual trade, and the sentiment and
+ * words recorded against a fill with {@code trades note}. Otherwise the trade is matched
  * against what had just happened: events detected for that symbol shortly
  * before the fill, and alerts that fired for it. A trade with nothing behind it
  * is recorded as UNEXPLAINED rather than left out - "I do not know why I took
@@ -25,6 +31,7 @@ public final class ReasonAttributor {
 
     private final MarketEventRepository marketEventRepository;
     private final AlertRepository alertRepository;
+    private final TradeNoteRepository tradeNoteRepository;
     private final InstrumentRepository instrumentRepository;
     private final String exchange;
     private final String segment;
@@ -32,12 +39,14 @@ public final class ReasonAttributor {
 
     public ReasonAttributor(MarketEventRepository marketEventRepository,
                             AlertRepository alertRepository,
+                            TradeNoteRepository tradeNoteRepository,
                             InstrumentRepository instrumentRepository,
                             String exchange,
                             String segment,
                             int lookbackMinutes) {
         this.marketEventRepository = marketEventRepository;
         this.alertRepository = alertRepository;
+        this.tradeNoteRepository = tradeNoteRepository;
         this.instrumentRepository = instrumentRepository;
         this.exchange = exchange;
         this.segment = segment;
@@ -46,8 +55,17 @@ public final class ReasonAttributor {
 
     public List<TradeReason> attribute(List<Trade> trades) {
         List<TradeReason> reasons = new ArrayList<>();
+        Map<Long, TradeNoteRepository.Noted> noted = notesFor(trades);
         for (Trade trade : trades) {
             List<TradeReason> forTrade = new ArrayList<>();
+
+            TradeNoteRepository.Noted note = noted.get(trade.id());
+            if (note != null) {
+                // The sentiment is the countable part ("did BULLISH calls pay?"); the words ride along as detail.
+                String code = note.sentiment() != null ? note.sentiment() : normalise(note.note());
+                forTrade.add(new TradeReason(trade.id(), code, TradeReason.Source.MANUAL,
+                        note.note() != null ? note.note() : "sentiment: " + note.sentiment()));
+            }
 
             if (trade.notes() != null && !trade.notes().isBlank()) {
                 forTrade.add(new TradeReason(trade.id(), normalise(trade.notes()),
@@ -84,6 +102,17 @@ public final class ReasonAttributor {
             reasons.addAll(forTrade);
         }
         return reasons;
+    }
+
+    private Map<Long, TradeNoteRepository.Noted> notesFor(List<Trade> trades) {
+        if (trades.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate from = trades.stream().map(Trade::sessionDate).min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate to = trades.stream().map(Trade::sessionDate).max(Comparator.naturalOrder()).orElseThrow();
+        Map<Long, TradeNoteRepository.Noted> byTrade = new HashMap<>();
+        tradeNoteRepository.findBetween(from, to, null).forEach(n -> byTrade.put(n.tradeId(), n));
+        return byTrade;
     }
 
     /** Free text becomes a countable code: "VWAP reclaim, strong volume" -> VWAP_RECLAIM_STRONG_VOLUME. */
