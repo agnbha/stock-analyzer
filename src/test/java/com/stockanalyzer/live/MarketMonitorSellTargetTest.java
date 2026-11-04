@@ -200,6 +200,52 @@ class MarketMonitorSellTargetTest {
         assertEquals(2, count("SELECT COUNT(*) FROM event"));
     }
 
+    @Test
+    @DisplayName("a journal that cannot be read costs the sell targets for that tick, not the monitoring")
+    void unreadableJournalDoesNotStopTheTick() {
+        TradeRepository real = trades;
+        trades = new TradeRepository() {
+            @Override
+            public int importAll(List<Trade> fills, String exchange, String segment) {
+                return real.importAll(fills, exchange, segment);
+            }
+
+            @Override
+            public List<Trade> findRange(LocalDate from, LocalDate to) {
+                throw new IllegalStateException("database is locked");
+            }
+
+            @Override
+            public List<Trade> findAllOrdered() {
+                return real.findAllOrdered();
+            }
+
+            @Override
+            public java.util.Optional<Trade> byId(long id) {
+                return real.byId(id);
+            }
+        };
+        MarketMonitor monitor = monitor(List.of(SYMBOL));
+        monitor.prepare(DAY);
+
+        monitor.tick(DAY);
+
+        assertTrue(delivered.isEmpty());
+    }
+
+    @Test
+    @DisplayName("a sink that cannot post does not stop the tick either")
+    void failingSinkDoesNotStopTheTick() {
+        buy(SYMBOL, 100, 100.00, at(9, 20, 10));
+        highs.put(at(9, 31), 100.70);
+        MarketMonitor monitor = monitor(List.of(SYMBOL), alert -> {
+            throw new IllegalStateException("osascript is gone");
+        });
+        monitor.prepare(DAY);
+
+        monitor.tick(DAY);
+    }
+
     private List<String> rules() {
         return delivered.stream().map(Alert::rule).toList();
     }
@@ -211,6 +257,10 @@ class MarketMonitorSellTargetTest {
     }
 
     private MarketMonitor monitor(List<String> tracked) {
+        return monitor(tracked, delivered::add);
+    }
+
+    private MarketMonitor monitor(List<String> tracked, com.stockanalyzer.alert.AlertSink sink) {
         CandleDataClient candles = (symbol, exchange, segment, start, end, interval) -> {
             List<Candle> list = new ArrayList<>();
             for (long ts = at(9, 15); ts + 60 <= now.get(); ts += 60) {
@@ -241,7 +291,7 @@ class MarketMonitorSellTargetTest {
                 return "test";
             }
         };
-        AlertEngine engine = new AlertEngine(new AlertPolicy(alerts), delivered::add, alerts);
+        AlertEngine engine = new AlertEngine(new AlertPolicy(alerts), sink, alerts);
         TradingCalendar weekdays = new TradingCalendar() {
             @Override
             public boolean isTradingDay(LocalDate date) {

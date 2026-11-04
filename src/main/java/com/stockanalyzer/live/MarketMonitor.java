@@ -437,8 +437,13 @@ public final class MarketMonitor {
             if (state == null) {
                 continue;
             }
-            for (Alert alert : sellTargets.due(sessionDate, symbol, fills, state.allCandles(), now)) {
-                deliver(alert);
+            try {
+                for (Alert alert : sellTargets.due(sessionDate, symbol, fills, state.allCandles(), now)) {
+                    deliver(alert);
+                }
+            } catch (RuntimeException e) {
+                // One symbol's trouble, or a sink that cannot post, must never stop the day's monitoring.
+                log.warn("Could not check the sell targets for {}: {}", symbol, e.toString());
             }
         }
     }
