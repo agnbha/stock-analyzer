@@ -112,7 +112,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 3,
         "w": 14,
         "h": 10
       },
@@ -159,7 +159,7 @@
       },
       "gridPos": {
         "x": 14,
-        "y": 0,
+        "y": 3,
         "w": 10,
         "h": 10
       },
@@ -211,7 +211,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 10,
+        "y": 13,
         "w": 14,
         "h": 9
       },
@@ -260,7 +260,7 @@
       },
       "gridPos": {
         "x": 14,
-        "y": 10,
+        "y": 13,
         "w": 10,
         "h": 9
       },
@@ -314,7 +314,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 22,
         "w": 24,
         "h": 11
       },
@@ -444,6 +444,53 @@
         ]
       },
       "description": "Frequency says what you do most; this says whether it works.\n\nA reason used often with a negative net is the one worth arguing with."
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "Last data refresh",
+      "description": "When the reasons for trades were last worked out. They are redone each time fills are imported, which the daemon does every few minutes while the market is open and the evening batch does after the close.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(recorded_at) * 1000 AS \"Last data refresh\" FROM trade_reason",
+          "queryText": "SELECT MAX(recorded_at) * 1000 AS \"Last data refresh\" FROM trade_reason",
+          "timeColumns": []
+        }
+      ]
     }
   ]
 }

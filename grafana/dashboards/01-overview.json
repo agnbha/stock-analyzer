@@ -229,7 +229,7 @@
       "gridPos": {
         "x": 8,
         "y": 0,
-        "w": 4,
+        "w": 3,
         "h": 4
       },
       "targets": [
@@ -285,9 +285,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 12,
+        "x": 11,
         "y": 0,
-        "w": 4,
+        "w": 3,
         "h": 4
       },
       "targets": [
@@ -343,9 +343,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 16,
+        "x": 14,
         "y": 0,
-        "w": 4,
+        "w": 3,
         "h": 4
       },
       "targets": [
@@ -413,9 +413,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 20,
+        "x": 17,
         "y": 0,
-        "w": 4,
+        "w": 3,
         "h": 4
       },
       "targets": [
@@ -958,6 +958,53 @@
           "queryType": "table",
           "rawQueryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
           "queryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
+          "timeColumns": []
+        }
+      ]
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "Last data refresh",
+      "description": "The newest of: the last fill imported, the last account balance recorded, and the last time the reasons for trades were worked out. The daemon pulls fills every few minutes while the market is open and the evening batch reads the balance, so this is how old the figures on this page can be.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(imported_at) AS t FROM trade\n  UNION ALL SELECT MAX(recorded_at) FROM account_balance\n  UNION ALL SELECT MAX(recorded_at) FROM trade_reason)",
+          "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(imported_at) AS t FROM trade\n  UNION ALL SELECT MAX(recorded_at) FROM account_balance\n  UNION ALL SELECT MAX(recorded_at) FROM trade_reason)",
           "timeColumns": []
         }
       ]

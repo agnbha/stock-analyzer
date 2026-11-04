@@ -32,7 +32,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -98,9 +98,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 8,
+        "x": 6,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -148,9 +148,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 16,
+        "x": 12,
         "y": 0,
-        "w": 8,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -788,6 +788,53 @@
           }
         ]
       }
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "Last data refresh",
+      "description": "When a session's data was last written to the history these rankings are read from. That happens after the close - the daemon reconciles the day and evening.sh ingests it - so during the market day this shows that earlier write, not the live session. The 52-week band is a separate snapshot refreshed by hand, with its own as-of date in the table.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
+          "queryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
+          "timeColumns": []
+        }
+      ]
     }
   ]
 }
