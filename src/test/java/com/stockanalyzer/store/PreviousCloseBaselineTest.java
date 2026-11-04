@@ -15,12 +15,13 @@ import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -63,10 +64,25 @@ class PreviousCloseBaselineTest {
         candles(test, D2);
         candles(test, D3);
 
-        Map<String, Double> baseline = baselineBySession(D2, D3);
+        List<Point> points = points(D2, D3);
 
-        assertEquals(100.0, baseline.get(D2), "D2 is measured from D1's close");
-        assertEquals(110.0, baseline.get(D3), "D3 from D2's, so the line steps with the sessions");
+        assertEquals(java.util.Set.of(100.0), levels(points, D2), "D2 is measured from D1's close");
+        assertEquals(java.util.Set.of(110.0), levels(points, D3), "D3 from D2's: one flat level per session");
+    }
+
+    @Test
+    @DisplayName("the line breaks between sessions, so no ramp joins one level to the next")
+    void theLineBreaksBetweenSessions() throws Exception {
+        session(test, D1, 100.0);
+        session(test, D2, 110.0);
+        candles(test, D2);
+        candles(test, D3);
+
+        List<Point> points = points(D2, D3);
+
+        assertEquals(java.util.Arrays.asList(100.0, 100.0, 100.0, null, 110.0, 110.0),
+                points.stream().map(Point::baseline).toList(),
+                "the first candle of D3 is blank; D2's first candle has nothing before it to join to");
     }
 
     @Test
@@ -76,7 +92,7 @@ class PreviousCloseBaselineTest {
         session(other, D1, 50.0);
         candles(test, D2);
 
-        assertNull(baselineBySession(D2).get(D2),
+        assertTrue(levels(points(D2), D2).isEmpty(),
                 "D1 was a trading day (another symbol has it); this symbol's D0 close must not stand in");
     }
 
@@ -86,12 +102,12 @@ class PreviousCloseBaselineTest {
         session(test, D1, 100.0);
         candles(test, D1);
 
-        assertNull(baselineBySession(D1).get(D1));
+        assertTrue(levels(points(D1), D1).isEmpty());
     }
 
     @Test
-    @DisplayName("the panel draws it as a dotted line that steps between sessions")
-    void drawnAsADottedStepLine() throws Exception {
+    @DisplayName("the panel draws it as a dotted line, straight between points, not stepped")
+    void drawnAsADottedLine() throws Exception {
         JsonNode override = StreamSupport.stream(panel().path("fieldConfig").path("overrides").spliterator(), false)
                 .filter(o -> "Previous close".equals(o.path("matcher").path("options").asText()))
                 .findFirst().orElseThrow();
@@ -99,8 +115,10 @@ class PreviousCloseBaselineTest {
         override.path("properties").forEach(p -> properties.put(p.path("id").asText(), p.path("value")));
 
         assertEquals("line", properties.get("custom.drawStyle").asText());
-        assertEquals("dot", properties.get("custom.lineStyle").path("fill").asText());
-        assertEquals("stepAfter", properties.get("custom.lineInterpolation").asText());
+        assertEquals("dash", properties.get("custom.lineStyle").path("fill").asText());
+        assertEquals(2, properties.get("custom.lineStyle").path("dash").get(0).asInt(), "short dashes read as dots");
+        assertTrue(!properties.containsKey("custom.lineInterpolation"),
+                "stepping draws a vertical riser wherever the level changes");
         assertTrue(panel().path("description").asText().contains("Previous close"));
     }
 
@@ -110,8 +128,17 @@ class PreviousCloseBaselineTest {
                 .filter(p -> p.path("id").asInt() == 20).findFirst().orElseThrow();
     }
 
-    /** The panel's own query, with Grafana's variables filled in, run over the seeded sessions. */
-    private Map<String, Double> baselineBySession(String... sessions) throws Exception {
+    private record Point(String session, Double baseline) {
+    }
+
+    /** The values a session's points take, ignoring the blanks. */
+    private static java.util.Set<Double> levels(List<Point> points, String session) {
+        return points.stream().filter(p -> p.session().equals(session)).map(Point::baseline)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+    }
+
+    /** The panel's own query, with Grafana's variables filled in, run over the seeded sessions, in time order. */
+    private List<Point> points(String... sessions) throws Exception {
         String list = String.join("','", sessions);
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + list + "'")
@@ -119,19 +146,15 @@ class PreviousCloseBaselineTest {
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {
-            Map<String, Double> bySession = new LinkedHashMap<>();
+            List<Point> points = new ArrayList<>();
             try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
                 while (rs.next()) {
                     double value = rs.getDouble("Previous close");
                     Double baseline = rs.wasNull() ? null : value;
-                    String session = sessionOf(rs.getLong("time"));
-                    if (bySession.containsKey(session)) {
-                        assertEquals(bySession.get(session), baseline, "one level for the whole session");
-                    }
-                    bySession.put(session, baseline);
+                    points.add(new Point(sessionOf(rs.getLong("time")), baseline));
                 }
             }
-            return bySession;
+            return points;
         });
     }
 
