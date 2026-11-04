@@ -254,6 +254,42 @@
           ],
           "type": "tags"
         }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
       }
     ]
   },
@@ -328,7 +364,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - minute candles for the selected sessions",
-      "description": "One-minute candles at their real timestamps. Select a single session for an uninterrupted day; several sessions leave a gap where the market was shut.\n\n- **VWAP** (purple) — the day's average price, weighted by the volume traded at each price. The institutional \"fair price\" benchmark: above it buyers have had control today, below it sellers.\n- **SMA 10m / 60m** (yellow, blue) — simple moving averages of the last 10 and 60 one-minute closes. The fast line turns with a move; the slow one says whether that move is with or against the hour.\n- **Window entry / exit** (green, red) — the best gain window the detector found. All three windows when a single session is selected.\n- **Your buy / sell** (blue, orange dots) — your own fills.\n- **Previous close** (dotted) — the last session's closing value, the price today's move is measured from. With several sessions selected each session has its own flat line at its own previous close. It is missing for the earliest stored session, and where the previous session was never stored; the market-day daemon backfills yesterday's session when it starts if the evening batch missed it.\n\nBoth averages restart each session and appear only once their window is full, so the 60-minute line begins an hour into the day.\n\n**Volume** (bars, right axis) — shares traded within each one-minute candle.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Ctrl/Cmd+click the chart to add one, write the call, and tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`). It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is not drawn.",
+      "description": "One-minute candles at their real timestamps. Select a single session for an uninterrupted day; several sessions leave a gap where the market was shut.\n\n- **VWAP** (purple) — the day's average price, weighted by the volume traded at each price. The institutional \"fair price\" benchmark: above it buyers have had control today, below it sellers.\n- **SMA 10m / 60m** (yellow, blue) — simple moving averages of the last 10 and 60 one-minute closes. The fast line turns with a move; the slow one says whether that move is with or against the hour.\n- **Window entry / exit** (green, red) — the best gain window the detector found. All three windows when a single session is selected.\n- **Your buy / sell** (blue, orange dots) — your own fills.\n- **Previous close** (dotted) — the last session's closing value, the price today's move is measured from. With several sessions selected each session has its own flat line at its own previous close. It is missing for the earliest stored session, and where the previous session was never stored; the market-day daemon backfills yesterday's session when it starts if the evening batch missed it.\n\nBoth averages restart each session and appear only once their window is full, so the 60-minute line begins an hour into the day.\n\n**Volume** (bars, right axis) — shares traded within each one-minute candle.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Ctrl/Cmd+click the chart to add one, write the call, and tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`). It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

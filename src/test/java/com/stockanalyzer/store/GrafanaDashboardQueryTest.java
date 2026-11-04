@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -133,6 +134,46 @@ class GrafanaDashboardQueryTest {
             assertTrue(buy != null && sell != null, name + ": needs a Buy calls and a Sell calls annotation query");
             assertTagged(name, buy, "BUY", hasSymbol);
             assertTagged(name, sell, "SELL", hasSymbol);
+        }
+        assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
+    }
+
+    @Test
+    @DisplayName("every dashboard with a time chart also draws the calls noted in the journal, buys and sells apart")
+    void chartsShowNotedCalls() throws Exception {
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            if (!root.has("annotations")) {
+                continue;
+            }
+            checked++;
+            boolean hasSymbol = false;
+            for (JsonNode variable : root.path("templating").path("list")) {
+                hasSymbol |= variable.path("name").asText().equals("symbol");
+            }
+            String name = file.getFileName().toString();
+            for (String side : new String[]{"BUY", "SELL"}) {
+                JsonNode noted = null;
+                for (JsonNode annotation : root.path("annotations").path("list")) {
+                    if (annotation.path("name").asText().equals("Noted " + side.toLowerCase() + "s")) {
+                        noted = annotation;
+                    }
+                }
+                assertTrue(noted != null, name + ": needs a 'Noted " + side.toLowerCase() + "s' annotation query");
+                assertTrue(noted.path("enable").asBoolean(false), name + ": noted " + side + " calls are switched off");
+                assertEquals("stock-analyzer-sqlite", noted.path("datasource").path("uid").asText(),
+                        name + ": noted calls come from the journal, so from the SQLite datasource");
+                JsonNode target = noted.path("target");
+                String sql = target.path("queryText").asText();
+                assertEquals(sql, target.path("rawQueryText").asText(),
+                        name + ": the datasource reads rawQueryText and the editor reads queryText; both must hold the SQL");
+                assertTrue(sql.contains("FROM trade_note") && sql.contains("t.side = '" + side + "'"), name + ": " + sql);
+                assertTrue(sql.contains("i.symbol = '$symbol'") == hasSymbol, name + (hasSymbol
+                        ? ": with a symbol picker, noted calls must be limited to the symbol picked"
+                        : ": without one, noted calls must not be limited to a symbol"));
+                assertEquals("time", target.path("timeColumns").get(0).asText(), name + ": the time column must be declared");
+            }
         }
         assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
     }

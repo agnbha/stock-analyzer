@@ -66,6 +66,42 @@
           ],
           "type": "tags"
         }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND i.symbol = '$symbol'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
       }
     ]
   },
@@ -989,7 +1025,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - daily candles, 50/200-day averages and the pivot",
-      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Ctrl/Cmd+click the chart to add one, write the call, and tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`). It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is not drawn.",
+      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Ctrl/Cmd+click the chart to add one, write the call, and tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`). It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

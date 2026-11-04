@@ -201,10 +201,18 @@ trades notes --date 2026-11-04                                                 #
   you do not narrow it, every purchase that day gets the note, and the command lists which ones.
 - The sentiment is a label of your choosing, upper-cased (`BULLISH`, `BEARISH`, `NERVOUS`, `CALM`).
   The text is free. Give either, or both. Writing a note again replaces it.
-- Notes live in the journal, so they survive re-importing fills. They show beside each fill in
-  **Candles and Calls**, and the sentiment counts as a reason in **Decision Reasons**, which shows how
-  often you acted on each one and whether those trades paid. The chart annotations on those dashboards
-  (`BUY` / `SELL` tags) are for marking the moment; this is the record that is counted.
+- Notes live in the journal, so they survive re-importing fills. They appear in three places:
+  - **On the candle charts**, as a dashed marker at the time of the call - light blue for a buy, orange for a
+    sell, matching "Your buy" and "Your sell". Hover it for `WIPRO BUY 5000 @ 195.55 - BULLISH: your words`.
+    They show on Candles and Calls, Stock Trend and CAN SLIM for that symbol, and on Account Overview and
+    Decision Reasons for every symbol. The "Noted buys" / "Noted sells" switches at the top of a dashboard hide
+    them. The pencil and bin in the hover box belong to Grafana's own notes and do nothing here: change a note
+    by running `trades note` again.
+  - **Beside each fill** in the *every call* table on Candles and Calls (Sentiment and Note columns).
+  - **As a reason** in Decision Reasons, which shows how often you acted on each sentiment and whether those
+    trades paid.
+  A marker appears for a call as soon as you have noted it, so there is no need to also annotate the chart by
+  hand; the `BUY` / `SELL` chart annotations remain for marking a moment you have not traded on.
 
 ### Part 6 - dashboards
 

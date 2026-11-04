@@ -63,6 +63,42 @@
           ],
           "type": "tags"
         }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
       }
     ]
   },
@@ -270,7 +306,7 @@
         },
         "overrides": []
       },
-      "description": "How the reasons you record shift over time, one line per reason code.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for."
+      "description": "How the reasons you record shift over time, one line per reason code.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`, for every symbol. Hover a marker for the symbol, the sentiment and your note."
     },
     {
       "id": 14,
