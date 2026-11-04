@@ -39,8 +39,7 @@ class AlertPolicyTest {
         database = TestDatabase.open(directory);
         alertRepository = new SqliteAlertRepository(database);
         delivered = new ArrayList<>();
-        engine = new AlertEngine(new AlertPolicy(alertRepository, 15, 3, 5),
-                delivered::add, alertRepository);
+        engine = new AlertEngine(new AlertPolicy(alertRepository), delivered::add, alertRepository);
     }
 
     @AfterEach
@@ -49,77 +48,41 @@ class AlertPolicyTest {
     }
 
     private static Alert alert(String symbol, String rule, long firedAt, String key) {
-        return new Alert(DAY, firedAt, symbol, rule, AlertSeverity.NOTABLE, rule, "message", key);
+        return new Alert(DAY, firedAt, symbol, rule, AlertSeverity.URGENT, rule, "message", key);
     }
 
     @Test
     @DisplayName("the same alert never fires twice, so a restart is safe")
     void neverFiresTheSameAlertTwice() {
-        assertTrue(engine.fire(alert("RELIANCE", "hotwindow.approaching", NOON, "key-1")));
-        assertFalse(engine.fire(alert("RELIANCE", "hotwindow.approaching", NOON, "key-1")));
+        assertTrue(engine.fire(alert("RELIANCE", "sell.target.0.6", NOON, "key-1")));
+        assertFalse(engine.fire(alert("RELIANCE", "sell.target.0.6", NOON + 150, "key-1")));
+
+        // A fresh engine over the same database is a restarted daemon.
+        AlertEngine restarted = new AlertEngine(new AlertPolicy(alertRepository), delivered::add, alertRepository);
+        assertFalse(restarted.fire(alert("RELIANCE", "sell.target.0.6", NOON + 600, "key-1")));
 
         assertEquals(1, delivered.size());
     }
 
     @Test
-    @DisplayName("a second alert for the same symbol and rule waits out the cooldown")
-    void enforcesCooldown() {
-        engine.fire(alert("RELIANCE", "event.volume_spike", NOON, "key-1"));
-
-        assertFalse(engine.fire(alert("RELIANCE", "event.volume_spike", NOON + 600, "key-2")),
-                "ten minutes later is inside the fifteen minute cooldown");
-        assertTrue(engine.fire(alert("RELIANCE", "event.volume_spike", NOON + 1200, "key-3")));
-    }
-
-    @Test
-    @DisplayName("a symbol cannot flood the day on its own")
-    void capsAlertsPerSymbol() {
-        for (int i = 0; i < 3; i++) {
-            engine.fire(alert("RELIANCE", "rule-" + i, NOON + i * 1000L, "key-" + i));
+    @DisplayName("different alerts are never held back: no cooldown, no daily cap")
+    void nothingIsRationed() {
+        for (int i = 0; i < 40; i++) {
+            assertTrue(engine.fire(alert("RELIANCE", "sell.target.0.6", NOON + i, "key-" + i)), "alert " + i);
         }
 
-        assertFalse(engine.fire(alert("RELIANCE", "rule-4", NOON + 9000, "key-4")));
-        assertTrue(engine.fire(alert("TCS", "rule-4", NOON + 9000, "key-tcs")),
-                "another symbol still has room");
+        assertEquals(40, delivered.size());
+        assertEquals(40, alertRepository.firedOn(DAY).size());
     }
 
     @Test
-    @DisplayName("the daily cap stops everything once reached")
-    void capsAlertsPerDay() {
-        engine.fire(alert(null, "session.open", NOON, "k1"));
-        engine.fire(alert(null, "session.mid", NOON + 100, "k2"));
-        engine.fire(alert(null, "session.closing", NOON + 200, "k3"));
-        engine.fire(alert(null, "session.close", NOON + 300, "k4"));
-        engine.fire(alert(null, "session.extra", NOON + 400, "k5"));
+    @DisplayName("what fired is logged, so a later trade can be attributed to it")
+    void firedAlertsAreLogged() {
+        engine.fire(alert("TCS", "sell.target.1", NOON, "key-tcs"));
 
-        assertFalse(engine.fire(alert("RELIANCE", "hotwindow.approaching", NOON + 500, "k6")));
-        assertEquals(5, delivered.size());
-    }
-
-    @Test
-    @DisplayName("a symbol outside the scope never fires, and never uses up the daily cap")
-    void scopeKeepsOutsidersOutOfTheCaps() {
-        AlertEngine scoped = new AlertEngine(
-                new AlertPolicy(alertRepository, 15, 3, 2, AlertScope.of(java.util.Set.of("TCS"))),
-                delivered::add, alertRepository);
-
-        assertFalse(scoped.fire(alert("RELIANCE", "event.vwap_loss", NOON, "k1")));
-        assertFalse(scoped.fire(alert("INFY", "event.vwap_loss", NOON + 10, "k2")));
-        assertTrue(scoped.fire(alert("TCS", "event.vwap_loss", NOON + 20, "k3")));
-        assertTrue(scoped.fire(alert("TCS", "event.vwap_reclaim", NOON + 30, "k4")),
-                "the two-a-day cap was spent only on TCS, not on the two that were turned away");
-        assertEquals(2, delivered.size());
-        assertEquals(2, alertRepository.countFiredToday(DAY, null));
-    }
-
-    @Test
-    @DisplayName("a market-wide alert is not tied to any symbol, so the scope lets it through")
-    void scopeLetsMarketWideAlertsThrough() {
-        AlertEngine scoped = new AlertEngine(
-                new AlertPolicy(alertRepository, 15, 3, 5, AlertScope.of(java.util.Set.of())),
-                delivered::add, alertRepository);
-
-        assertTrue(scoped.fire(alert(null, "session.open", NOON, "k1")));
-        assertFalse(scoped.fire(alert("TCS", "event.vwap_loss", NOON + 10, "k2")));
+        List<Alert> logged = alertRepository.firedOn(DAY);
+        assertEquals(1, logged.size());
+        assertEquals("TCS", logged.getFirst().symbol());
+        assertEquals("sell.target.1", logged.getFirst().rule());
     }
 }

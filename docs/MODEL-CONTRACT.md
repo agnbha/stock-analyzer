@@ -5,8 +5,8 @@ Part 2's trained model is served over HTTP, exactly like the existing
 and the evaluation, and you bring the model.
 
 `model.enabled=false` by default. With it off, `HotWindowSignalModel` — the
-statistical time-of-day prior — serves every request, so alerts and the live
-monitor work end to end with no service running at all. With it on,
+statistical time-of-day prior — serves every request, so the live monitor's
+predictions work end to end with no service running at all. With it on,
 `FallbackSignalModel` calls your service and silently falls back to that same
 prior whenever the service is unavailable.
 
@@ -43,7 +43,7 @@ the wrong data.
 ```
 
 `signal` is `ENTRY`, `EXIT` or `NEUTRAL`. `reason` is optional and is shown to
-you in alerts, so it is worth filling in. Rows may be omitted; anything not
+you in the live view, so it is worth filling in. Rows may be omitted; anything not
 returned is treated as no signal.
 
 ## The feature contract
@@ -75,12 +75,11 @@ Every prediction is stored in `prediction` with its `model_version`. The nightly
 now-complete tape — the best exit available within the horizon — so accuracy is
 measured against reality rather than assumed.
 
-Two things are worth holding to before letting a model drive alerts:
+Two things are worth holding to before letting a model drive decisions:
 
 - **Validate with purged walk-forward splits.** Labels look forward over the
   horizon, so a random train/test split leaks the future. Train on months 1..k,
   validate on k+1, and drop samples within one horizon of the boundary.
 - **Beat the baseline on a held-out month.** The prior is already serving. A
   model that cannot beat it is a null result — a normal outcome on a few months
-  of one exchange's data — and `alerts.model.min-probability` should stay
-  unreachable until it does.
+  of one exchange's data — and `model.enabled` should stay off until it does.

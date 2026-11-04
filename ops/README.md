@@ -8,11 +8,11 @@ shift the hours in the plists to match a 09:15–15:30 session.
 
 | When | Job | What it runs | Why then |
 |---|---|---|---|
-| **08:58** Mon–Fri | `market-day.sh` | `MarketDayDaemon` | Plans the day's alerts before the 09:00 pre-open alert is due. Exits on its own after the close — this is a daily launch, not a service to keep alive. |
-| 09:15–15:30 | — | the daemon ticks every 150s | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → fire alerts → redraw. Every 5 minutes (`trades.live.import.interval.minutes`, 0 = off) it also pulls the day's fills from the broker, so your buys and sells show on Candles and Calls while you trade. |
+| **08:58** Mon–Fri | `market-day.sh` | `MarketDayDaemon` | Starts before the open, makes sure the previous session is stored, and watches the day's purchases for their sell targets. Exits on its own after the close — this is a daily launch, not a service to keep alive. |
+| 09:15–15:30 | — | the daemon ticks every 150s | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → check purchases against their sell targets → redraw. Every 5 minutes (`trades.live.import.interval.minutes`, 0 = off) it also pulls the day's fills from the broker, so your buys and sells show on Candles and Calls while you trade. |
 | ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
 | **18:30** Mon–Fri | `evening.sh` | ingest → evaluate → import fills → capture → broker balance → day P&L | Fills have settled by evening. |
-| **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, week P&L | The prior has to be current before Monday's open, because the daemon reads it when planning alerts. |
+| **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, week P&L | The prior has to be current before Monday's open, because the daemon's baseline entry signal reads it. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
 
 ## Why the evening order is what it is
@@ -26,7 +26,8 @@ It is dependency-driven, not arbitrary:
 2. **`evaluate`** scores yesterday's predictions against the now-complete tape,
    so it needs step 1 to have finished.
 3. **`trades import`** brings in fills, matches lots, and attributes reasons —
-   reasons come from the events and alerts the daemon recorded during the day.
+   reasons come from the events and alerts the daemon recorded during the day
+   (events are recorded, but only the sell alert alerts).
    This step is why the evening job matters most: the broker's order list only
    serves the current day, so a session missed here cannot be fetched later.
 4. **`capture`** compares step 3 against step 1. It has to be last, or it has
@@ -108,7 +109,7 @@ ops/bin/market-day.sh --dry-run    # alerts to console only
 - **Where the logs are.** The daemon writes two streams and they are kept
   apart: `logs/market-day-YYYY-MM-DD.log` is the live view, reprinted each tick,
   and `logs/market-day-YYYY-MM-DD.err.log` is the record of what happened —
-  alerts fired, events detected, failures. `market-day.sh` redirects itself to
+  sell alerts fired, events detected, failures. `market-day.sh` redirects itself to
   that dated pair, so `logs/marketday.launchd.log` only ever holds bootstrap
   errors from before the redirect. The batch jobs write their own timestamped
   output; their `logs/*.out.log` files are truncated on every run and only ever
@@ -200,5 +201,4 @@ java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stocka
 `src/main/resources/nse-holidays-2026.txt` (or a new file, pointed at by
 `alerts.holidays.file`) and rebuild. The calendar warns at startup when its last
 date is under 30 days away. History self-corrects — a day with no data for any
-symbol is recorded as non-trading — but scheduled alerts look forward and
-cannot.
+symbol is recorded as non-trading — but the calendar looks forward and cannot.

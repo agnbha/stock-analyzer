@@ -28,7 +28,7 @@ public final class HotWindowSignalModel implements IntradaySignalModel {
     private final double minLowerBound;
     private final int skipOpeningMinutes;
 
-    /** @param skipOpeningMinutes windows starting this soon after the open predict nothing; see {@link com.stockanalyzer.alert.SessionAlertPlanner} */
+    /** @param skipOpeningMinutes windows starting this soon after the open predict nothing: the day's low often sits at the open, so the opening bucket is "hot" for nearly every symbol and says nothing about any one */
     public HotWindowSignalModel(HotWindowRepository hotWindowRepository, MarketClock clock, int bucketMinutes,
                                 int lookbackDays, int minSessions, double minLowerBound, int skipOpeningMinutes) {
         this.hotWindowRepository = hotWindowRepository;
