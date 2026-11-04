@@ -64,6 +64,7 @@ class GrafanaDashboardQueryTest {
                         // Multi-value variables are interpolated by Grafana with a
                         // format suffix; the SQL form yields a quoted list.
                         .replace("${session:sqlstring}", "'2026-08-27','2026-08-28'")
+                        .replace("${candles:sqlstring}", "'200'")
                         .replace("$__from/1000", String.valueOf(FROM_EPOCH_SECONDS))
                         .replace("$__to/1000", String.valueOf(TO_EPOCH_SECONDS))
                         .replace("$symbol", "RELIANCE")
@@ -297,6 +298,10 @@ class GrafanaDashboardQueryTest {
             }
         }
         for (JsonNode variable : root.path("templating").path("list")) {
+            // A text box, constant or custom list keeps a value in "query", not SQL.
+            if (!variable.path("type").asText("query").equals("query")) {
+                continue;
+            }
             JsonNode query = variable.path("query");
             if (query.isTextual()) {
                 queries.add(query.asText());
