@@ -132,6 +132,21 @@ marked with the buys (blue) and sells (orange) you actually took, plotted at the
 average fill price for that session or week. Underneath, every call with its
 reason attached.
 
+The minute-candle chart on this page draws at most **200** candles unless you change the **Max candles** box at the
+top (type a number, press Enter). When the sessions you pick hold more minutes than that, minutes are combined into
+longer candles so the chart still covers all of them: 4- to 6-minute candles for two or three days, 2-minute for a
+single session, and about three candles a day (a couple of hours each) across three months. With room to spare it is
+one candle per minute.
+A candle opens where its first minute opened, closes where its last closed, and spans the highest high, lowest low
+and total volume of its minutes; VWAP and the averages are read as they stand at its end, and your buys, sells and the
+detector's windows sit on the candle they fall in (an average, if several do). A candle never spans two sessions, and
+the total never exceeds the number typed. A blank, non-numeric, zero or negative entry means 200. The weekly chart is
+not capped: it draws one candle a week over the time range picked at the top.
+
+One thing the box cannot change: the chart's time axis always spans the time range picked at the top. A single
+session shown on a three-month range is a thin strip at the right edge however many candles it has, so narrow the
+range to the sessions you want to look at.
+
 **Decision Reasons** — how often each reason recurs, where it came from (typed by
 you, an event the detector found, an alert that fired, or the model), buy
 reasons versus sell reasons, and a table of whether each reason actually paid.

@@ -51,6 +51,7 @@ class MinuteChartTooltipOrderTest {
                 .filter(p -> p.path("id").asInt() == 20).findFirst().orElseThrow();
         String sql = panel.path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'2026-11-04'")
+                .replace("${candles:sqlstring}", "'200'")
                 .replace("$symbol", "WIPRO")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
 
