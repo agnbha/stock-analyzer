@@ -93,6 +93,24 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
+    @DisplayName("Candles and Calls does not draw Grafana's own annotations over the chart")
+    void candlesAndCallsHidesBuiltInAnnotations() throws Exception {
+        // A note added by clicking on a chart is drawn as a dashed blue vertical line with a marker. Without an
+        // explicit annotation block Grafana switches its built-in layer on, so stray notes appear on the candles.
+        JsonNode root = JsonMapper.INSTANCE.readTree(
+                Files.readString(DASHBOARDS.resolve("02-candles-and-calls.json")));
+        JsonNode builtIn = null;
+        for (JsonNode annotation : root.path("annotations").path("list")) {
+            if (annotation.path("builtIn").asInt() == 1) {
+                builtIn = annotation;
+            }
+        }
+
+        assertTrue(builtIn != null, "the built-in annotation query must be declared, or Grafana adds it enabled");
+        assertFalse(builtIn.path("enable").asBoolean(true), "and switched off");
+    }
+
+    @Test
     @DisplayName("dashboards point at the provisioned datasource")
     void dashboardsUseTheProvisionedDatasource() throws Exception {
         for (Path file : dashboardFiles()) {
