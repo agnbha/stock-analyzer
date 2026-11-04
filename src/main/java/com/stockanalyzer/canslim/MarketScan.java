@@ -24,9 +24,19 @@ import java.util.List;
  *                          company's screener.in page, read for the stocks that rank high enough to be a
  *                          buy; a listing whose page has not been read yet is not selected, and one found
  *                          at or below the floor is remembered and dropped from the ranking
+ * @param rejectDays        how long a listing that Groww refused (an unknown symbol, or no bars at all) is left
+ *                          unasked before it is tried again; 0 asks about every listing every scan
  */
 public record MarketScan(List<MarketListing> listings, int minSessions, double minPrice, double minTurnover,
-                         int maxStaleDays, int fundamentalsMinRs, int keepRuns, double minMarketCapCr) {
+                         int maxStaleDays, int fundamentalsMinRs, int keepRuns, double minMarketCapCr,
+                         int rejectDays) {
+
+    /** A scan that remembers nothing it was refused. */
+    public MarketScan(List<MarketListing> listings, int minSessions, double minPrice, double minTurnover,
+                      int maxStaleDays, int fundamentalsMinRs, int keepRuns, double minMarketCapCr) {
+        this(listings, minSessions, minPrice, minTurnover, maxStaleDays, fundamentalsMinRs, keepRuns,
+                minMarketCapCr, 0);
+    }
 
     /** True when the figure is known and does not clear the floor. An unknown one is not "below". */
     boolean belowFloor(Double marketCapCr) {

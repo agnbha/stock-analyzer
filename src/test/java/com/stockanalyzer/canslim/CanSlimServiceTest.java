@@ -1,6 +1,7 @@
 package com.stockanalyzer.canslim;
 
 import com.stockanalyzer.client.CandleDataClient;
+import com.stockanalyzer.client.GrowwSymbolRejectedException;
 import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.OpenPosition;
 import com.stockanalyzer.model.Product;
@@ -13,6 +14,7 @@ import com.stockanalyzer.store.jdbc.SqliteCanSlimRepository;
 import com.stockanalyzer.store.jdbc.SqliteDailyBarRepository;
 import com.stockanalyzer.store.jdbc.SqliteFundamentalsCacheRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
+import com.stockanalyzer.store.jdbc.SqliteMarketRejectRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,6 +137,9 @@ class CanSlimServiceTest {
 
     private final List<String> pagesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final List<String> pricedOn = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** Symbols the fake candle API answers GA001 for, and ones it knows but has no bars for. */
+    private final java.util.Set<String> refusedSymbols = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> emptySymbols = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** Pages one scan may read; generous unless a test is about the limit. */
     private int pageBudget = 1_000;
@@ -552,6 +557,140 @@ class CanSlimServiceTest {
         assertEquals(3, report.scores().size(), "all three still scored on their charts");
     }
 
+    private static MarketScan remembering(MarketScan scan, int days) {
+        return new MarketScan(scan.listings(), scan.minSessions(), scan.minPrice(), scan.minTurnover(),
+                scan.maxStaleDays(), scan.fundamentalsMinRs(), scan.keepRuns(), scan.minMarketCapCr(), days);
+    }
+
+    private int timesAsked(String symbol, String exchange) {
+        return java.util.Collections.frequency(pricedOn, symbol + "@" + exchange);
+    }
+
+    @Test
+    @DisplayName("a listing Groww refuses is remembered, and the next scan does not ask about it")
+    void refusedListingIsNotAskedAgain() {
+        refusedSymbols.add("NEWIPO");
+        CanSlimService service = marketService(Map.of("MID", withCap(5000)));
+        MarketScan market = remembering(wholeMarket(5), 30);
+
+        CanSlimReport first = service.scan("q", market);
+        assertEquals(1, first.marketSummary().newlyRejected());
+        assertEquals(0, first.marketSummary().skippedRejected());
+        assertEquals("NEWIPO|NSE|GA001", text("SELECT symbol || '|' || exchange || '|' || reason FROM market_reject"));
+
+        now = now.plusSeconds(86_400L);
+        CanSlimReport second = service.scan("q", market);
+
+        assertEquals(1, timesAsked("NEWIPO", "NSE"), "asked once, then left alone");
+        assertEquals(1, second.marketSummary().skippedRejected());
+        assertEquals(0, second.marketSummary().newlyRejected());
+        assertEquals(2, timesAsked("LEAD", "NSE"), "everything else is asked about every scan");
+
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        new com.stockanalyzer.report.CanSlimReporter(new java.io.PrintStream(bytes, true)).report(second, false, 2);
+        assertTrue(bytes.toString().contains("1 skipped as refused by Groww within the last 30 days"), bytes.toString());
+    }
+
+    @Test
+    @DisplayName("a failure that may pass - an outage, a rate limit - is not taken for a dead listing")
+    void transientFailureIsNotRemembered() {
+        CanSlimService service = marketService(Map.of("MID", withCap(5000)));
+        MarketScan market = remembering(wholeMarket(5), 30);
+
+        service.scan("q", market);
+        service.scan("q", market);
+
+        // DEAD is in the list but unknown to the fake API, which fails it the way a dropped connection would.
+        assertEquals(2, timesAsked("DEAD", "NSE"));
+        assertEquals(0, count("SELECT COUNT(*) FROM market_reject"));
+    }
+
+    @Test
+    @DisplayName("a listing that comes back with no bars is remembered too")
+    void emptyAnswerIsRemembered() {
+        emptySymbols.add("WEAK");
+        CanSlimService service = marketService(Map.of("MID", withCap(5000)));
+
+        service.scan("q", remembering(wholeMarket(5), 30));
+
+        assertEquals("WEAK|NO_CANDLES", text("SELECT symbol || '|' || reason FROM market_reject"));
+    }
+
+    @Test
+    @DisplayName("after the memory runs out the listing is asked about again, and forgotten once it is served")
+    void memoryRunsOut() {
+        refusedSymbols.add("NEWIPO");
+        CanSlimService service = marketService(Map.of("MID", withCap(5000)));
+        MarketScan market = remembering(wholeMarket(5), 30);
+        service.scan("q", market);
+
+        now = now.plusSeconds(29 * 86_400L);
+        service.scan("q", market);
+        assertEquals(1, timesAsked("NEWIPO", "NSE"), "29 days on it is still remembered");
+
+        now = now.plusSeconds(2 * 86_400L);
+        service.scan("q", market);
+        assertEquals(2, timesAsked("NEWIPO", "NSE"), "31 days on it is asked about again");
+        assertEquals("2", text("SELECT times FROM market_reject WHERE symbol = 'NEWIPO'"), "and refused again");
+
+        now = now.plusSeconds(31 * 86_400L);
+        refusedSymbols.clear();
+        service.scan("q", market);
+        assertEquals(3, timesAsked("NEWIPO", "NSE"));
+        assertEquals(0, count("SELECT COUNT(*) FROM market_reject"), "served again, so forgotten");
+    }
+
+    @Test
+    @DisplayName("with the memory set to 0 every listing is asked about every scan")
+    void noMemory() {
+        refusedSymbols.add("NEWIPO");
+        CanSlimService service = marketService(Map.of("MID", withCap(5000)));
+
+        service.scan("q", wholeMarket(5));
+        service.scan("q", wholeMarket(5));
+
+        assertEquals(2, timesAsked("NEWIPO", "NSE"));
+        assertEquals(0, count("SELECT COUNT(*) FROM market_reject"));
+    }
+
+    @Test
+    @DisplayName("a holding or configured symbol is always priced, even when it is also on the refused list")
+    void onlyListingsAreSkipped() {
+        refusedSymbols.add("FELL");
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        CanSlimService service = service(noSession(), pages(Map.of()), marketPrices(), List.of(), List.of("FELL"));
+        MarketScan market = remembering(wholeMarket(5), 30);
+
+        service.scan("q", market);
+        service.scan("q", market);
+
+        assertEquals(2, timesAsked("FELL", "NSE"));
+        assertEquals(0, count("SELECT COUNT(*) FROM market_reject"), "a configured symbol is not a listing");
+    }
+
+    @Test
+    @DisplayName("if far too many listings are refused at once, nothing is remembered: the fault is not theirs")
+    void aSystemicFailureIsNotRemembered() {
+        now = Instant.parse("2025-05-12T13:00:00Z");
+        Map<String, List<DailyBar>> prices = new java.util.HashMap<>();
+        prices.put("IDX", TestBars.from(100).trend(130, 130).build());
+        List<MarketListing> listings = new java.util.ArrayList<>();
+        for (int i = 1; i <= 40; i++) {
+            listings.add(listing("R" + i, "NSE", "R" + i));
+            refusedSymbols.add("R" + i);
+        }
+        for (int i = 1; i <= 10; i++) {
+            listings.add(listing("G" + i, "NSE", "G" + i));
+            prices.put("G" + i, TestBars.from(100).trend(100 + 10 * i, 130).build());
+        }
+        MarketScan market = new MarketScan(listings, 100, 10.0, 50_000.0, 10, 50, 5, FLOOR, 30);
+
+        CanSlimReport report = service(noSession(), pages(Map.of()), prices, List.of(), List.of()).scan("q", market);
+
+        assertEquals(0, report.marketSummary().newlyRejected());
+        assertEquals(0, count("SELECT COUNT(*) FROM market_reject"));
+    }
+
     private CanSlimService service(ScreenerClient screener, Map<String, List<DailyBar>> prices,
                                    List<OpenPosition> held, List<String> universe) {
         return service(screener, pages(Map.of()), prices, held, universe);
@@ -562,6 +701,13 @@ class CanSlimServiceTest {
                                    List<String> universe) {
         CandleDataClient candles = (symbol, exchange, segment, start, end, interval) -> {
             pricedOn.add(symbol + "@" + exchange);
+            if (refusedSymbols.contains(symbol)) {
+                throw new GrowwSymbolRejectedException("Groww candle request for " + symbol
+                        + " failed with status 400: GA001 Please provide correct value of trading symbol", 400);
+            }
+            if (emptySymbols.contains(symbol)) {
+                return new StockCandleSeries(symbol, exchange, segment, List.of());
+            }
             List<DailyBar> bars = prices.get(symbol);
             if (bars == null) {
                 throw new IllegalStateException("unknown symbol " + symbol);
@@ -587,7 +733,7 @@ class CanSlimServiceTest {
             }
         };
         return new CanSlimService(screener, companyPages, new SqliteFundamentalsCacheRepository(database),
-                candles, new SqliteInstrumentRepository(database),
+                new SqliteMarketRejectRepository(database), candles, new SqliteInstrumentRepository(database),
                 new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database), positions,
                 MARKET, clock, executor,
                 CanSlimCriteria.defaults(),

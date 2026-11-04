@@ -86,6 +86,7 @@ import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository;
 import com.stockanalyzer.store.jdbc.SqliteLiveOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteMarketEventRepository;
+import com.stockanalyzer.store.jdbc.SqliteMarketRejectRepository;
 import com.stockanalyzer.store.jdbc.SqlitePnlPeriodRepository;
 import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
@@ -470,7 +471,7 @@ public final class AppContext implements AutoCloseable {
                 new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
                 new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
                         config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
-                new SqliteFundamentalsCacheRepository(database),
+                new SqliteFundamentalsCacheRepository(database), new SqliteMarketRejectRepository(database),
                 wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
                 new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
                 executor, criteria, settings);
@@ -499,7 +500,7 @@ public final class AppContext implements AutoCloseable {
         return new MarketScan(listings, config.canSlimMarketMinSessions(), config.canSlimMarketMinPrice(),
                 config.canSlimMarketMinTurnover(), config.canSlimMarketMaxStaleDays(),
                 config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns(),
-                config.canSlimMarketMinMarketCapCr());
+                config.canSlimMarketMinMarketCapCr(), config.canSlimMarketRejectDays());
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {

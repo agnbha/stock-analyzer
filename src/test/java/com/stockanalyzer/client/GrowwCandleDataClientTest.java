@@ -93,6 +93,39 @@ class GrowwCandleDataClientTest {
         assertEquals(1785123960L, candles.getFirst().epochSeconds());
     }
 
+    private static final String UNKNOWN_SYMBOL = "{\"status\":\"FAILURE\",\"error\":{\"code\":\"GA001\","
+            + "\"message\":\"Please provide correct value of trading symbol\",\"metadata\":null}}";
+
+    @Test
+    @DisplayName("a 400 that says the trading symbol is wrong is told apart from other failures")
+    void unknownSymbolHasItsOwnException() throws IOException {
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/historical/candle/range", exchange -> respond(exchange, 400, UNKNOWN_SYMBOL));
+        server.start();
+
+        GrowwApiException failure = assertThrows(GrowwApiException.class, () -> client().fetchCandles(
+                "ZZZZ", "BSE", "CASH", START, START.plusDays(1), 1440));
+
+        assertTrue(failure instanceof GrowwSymbolRejectedException, failure.getClass().getName());
+        assertTrue(failure.getMessage().contains("ZZZZ") && failure.getMessage().contains("GA001"));
+        assertEquals(400, failure.statusCode());
+    }
+
+    @Test
+    @DisplayName("GA001 about something else, or a 400 without the code, does not blame the symbol")
+    void onlyAnUnknownSymbolIsBlamedOnTheSymbol() {
+        String otherParameter = "{\"status\":\"FAILURE\",\"error\":{\"code\":\"GA001\","
+                + "\"message\":\"Please provide correct value of start time\"}}";
+
+        assertTrue(GrowwCandleDataClient.rejectsSymbol(400, UNKNOWN_SYMBOL));
+        assertEquals(false, GrowwCandleDataClient.rejectsSymbol(400, otherParameter));
+        assertEquals(false, GrowwCandleDataClient.rejectsSymbol(429, UNKNOWN_SYMBOL));
+        assertEquals(false, GrowwCandleDataClient.rejectsSymbol(400, "not json at all"));
+        assertEquals(false, GrowwCandleDataClient.rejectsSymbol(400, null));
+        assertEquals(false, GrowwCandleDataClient.rejectsSymbol(400,
+                "{\"error\":{\"code\":\"GA003\",\"message\":\"Unable to serve trading symbol\"}}"));
+    }
+
     private String baseUrl() {
         return "http://localhost:" + server.getAddress().getPort();
     }

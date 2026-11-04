@@ -494,6 +494,11 @@ public final class AppConfig {
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
+    /** Days a listing Groww refused (unknown symbol, no bars) is left unasked; 0 asks about it every scan. */
+    public int canSlimMarketRejectDays() {
+        return Integer.parseInt(get("canslim.market.reject.days", "30"));
+    }
+
     public boolean canSlimMarketIncludeSme() {
         return Boolean.parseBoolean(get("canslim.market.include.sme", "false"));
     }

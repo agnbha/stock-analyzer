@@ -85,6 +85,7 @@ public final class SchemaMigrator {
         all.put(17, v17());
         all.put(18, v18());
         all.put(19, v19());
+        all.put(20, v20());
         return all;
     }
 
@@ -258,6 +259,25 @@ public final class SchemaMigrator {
         return List.of(
                 "ALTER TABLE screener_fundamentals ADD COLUMN results_quarter TEXT",
                 "ALTER TABLE screener_fundamentals ADD COLUMN holding_quarter TEXT");
+    }
+
+    /**
+     * v20: listings the candle API refuses or has no bars for. The instrument list names thousands of
+     * symbols and says nothing about which ones the API will serve, so a market scan learns it by being
+     * refused; this keeps what it learned. Keyed by symbol and exchange, not by instrument, because a
+     * refused listing has no reason to become one.
+     */
+    private List<String> v20() {
+        return List.of("""
+                CREATE TABLE market_reject (
+                  symbol TEXT NOT NULL,
+                  exchange TEXT NOT NULL,
+                  reason TEXT NOT NULL,
+                  first_rejected_at INTEGER NOT NULL,
+                  last_rejected_at INTEGER NOT NULL,
+                  times INTEGER NOT NULL,
+                  PRIMARY KEY (symbol, exchange)
+                ) WITHOUT ROWID""");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

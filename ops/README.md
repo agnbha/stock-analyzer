@@ -128,6 +128,14 @@ cap are selected, and that figure is read from each company's screener.in page, 
 grows over the first nights as the page budget allows. The list of symbols is
 `data/instruments.csv`, downloaded from Groww and refreshed daily.
 
+The list names symbols that Groww's candle API will not serve (HTTP 400 `GA001`, or no bars at all). A
+scan remembers each one in the `market_reject` table and does not ask about it again for
+`canslim.market.reject.days` (30; 0 turns the memory off), then tries it once more and forgets it if it is
+served. The report says how many were skipped and how many are new; `SELECT * FROM market_reject` lists
+them. Outages, rate limits and token failures are never remembered, nor are holdings or configured symbols
+skipped, and a scan that is refused far more listings than dead symbols could explain remembers none.
+`canslim.market.exclude` is the manual, permanent version: a symbol named there is never asked about.
+
 `evening.sh` ends with that CAN SLIM scan. Its fundamental
 filter runs on screener.in, which needs a signed-in session: sign in at
 https://www.screener.in in a browser (Google sign-in is fine), open the
