@@ -7,6 +7,7 @@ import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.live.LiveFillImporter;
 import com.stockanalyzer.live.MarketMonitor;
+import com.stockanalyzer.live.PriorSessionBackfill;
 import com.stockanalyzer.live.SessionReconciler;
 import com.stockanalyzer.live.TerminalLiveView;
 import com.stockanalyzer.store.HeartbeatRepository;
@@ -106,6 +107,10 @@ public final class MarketDayDaemon {
                             config.alertMaxAgeMinutes()));
 
             warnIfSessionExceedsDailyBudget(context, config);
+            // Yesterday's close is today's baseline: if the evening batch missed it, fetch it now.
+            new PriorSessionBackfill(context.ingestionService(), context.tradingCalendar())
+                    .ensure(sessionDate, config.stockSymbols(), config.exchange(), config.segment(),
+                            config.intradayIntervalMinutes());
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
             try (LiveFillImporter fills = new LiveFillImporter(
                     () -> context.brokerFillSync().sync(context.brokerExecutionClient(), sessionDate, sessionDate),
