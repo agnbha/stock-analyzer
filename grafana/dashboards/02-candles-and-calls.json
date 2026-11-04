@@ -324,7 +324,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 3,
+        "y": 1,
         "w": 24,
         "h": 11
       },
@@ -622,7 +622,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 12,
         "w": 11,
         "h": 7
       },
@@ -729,7 +729,7 @@
       },
       "gridPos": {
         "x": 11,
-        "y": 14,
+        "y": 12,
         "w": 13,
         "h": 7
       },
@@ -838,7 +838,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 21,
+        "y": 19,
         "w": 24,
         "h": 9
       },
@@ -973,7 +973,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 30,
+        "y": 28,
         "w": 24,
         "h": 8
       },
@@ -1008,17 +1008,17 @@
     {
       "id": 90,
       "type": "stat",
-      "title": "Last data refresh",
+      "title": "",
       "description": "Updated by the market-day daemon every poll while the market is open, by the evening batch after the close. It is the newest of: the last live candle written, the last session ingested, and the last fill imported. If it is much older than a few minutes during market hours, the daemon is not running or cannot reach Groww.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 18,
+        "x": 16,
         "y": 0,
-        "w": 6,
-        "h": 3
+        "w": 8,
+        "h": 1
       },
       "options": {
         "reduceOptions": {
@@ -1030,11 +1030,18 @@
         },
         "colorMode": "none",
         "graphMode": "none",
-        "textMode": "value"
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "dateTimeFromNow"
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
         },
         "overrides": []
       },
@@ -1050,7 +1057,8 @@
           "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(updated_at) AS t FROM live_candle\n  UNION ALL SELECT MAX(ingested_at) FROM trading_day\n  UNION ALL SELECT MAX(imported_at) FROM trade)",
           "timeColumns": []
         }
-      ]
+      ],
+      "transparent": true
     }
   ]
 }

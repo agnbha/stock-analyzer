@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,10 +96,18 @@ class LastDataRefreshTest {
                 recordedAt);
     }
 
+    /** The tile is found by its title, or by the name it shows when the title is left empty to save space. */
+    private static JsonNode tile(JsonNode root, String name) {
+        return StreamSupport.stream(root.path("panels").spliterator(), false)
+                .filter(p -> p.path("title").asText().equals(name)
+                        || p.path("fieldConfig").path("defaults").path("displayName").asText().equals(name))
+                .findFirst().orElse(null);
+    }
+
     private Long refreshedAt(String dashboard) throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
-        JsonNode tile = StreamSupport.stream(root.path("panels").spliterator(), false)
-                .filter(p -> p.path("title").asText().equals("Last data refresh")).findFirst().orElseThrow();
+        JsonNode tile = tile(root, "Last data refresh");
+        assertTrue(tile != null, dashboard + " needs a 'Last data refresh' tile");
         String sql = tile.path("targets").get(0).path("queryText").asText();
         return database.read(connection -> {
             try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
@@ -167,8 +177,7 @@ class LastDataRefreshTest {
             for (Path file : files.filter(f -> f.toString().endsWith(".json")).toList()) {
                 JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
                 String title = file.getFileName().toString().equals("06-canslim.json") ? "Last scan" : "Last data refresh";
-                JsonNode tile = StreamSupport.stream(root.path("panels").spliterator(), false)
-                        .filter(p -> p.path("title").asText().equals(title)).findFirst().orElse(null);
+                JsonNode tile = tile(root, title);
                 assertTrue(tile != null, file.getFileName() + " needs a '" + title + "' tile");
                 assertEquals("stat", tile.path("type").asText());
                 assertEquals("dateTimeFromNow", tile.path("fieldConfig").path("defaults").path("unit").asText(),
@@ -177,5 +186,39 @@ class LastDataRefreshTest {
             }
         }
         assertEquals(6, checked);
+    }
+
+    @Test
+    @DisplayName("the tile is a one-line label in the top right corner, so it takes no room from the panels")
+    void isASmallLabelInTheTopRightCorner() throws IOException {
+        for (String dashboard : new String[]{"01-overview.json", "02-candles-and-calls.json", "03-decision-reasons.json",
+                "04-stock-trend.json", "05-watchlist.json"}) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
+            JsonNode tile = tile(root, "Last data refresh");
+            JsonNode at = tile.path("gridPos");
+            assertEquals(0, at.path("y").asInt(), dashboard + ": on the first row");
+            assertEquals(1, at.path("h").asInt(), dashboard + ": one line high");
+            assertEquals(24, at.path("x").asInt() + at.path("w").asInt(), dashboard + ": against the right edge");
+            assertTrue(tile.path("transparent").asBoolean(), dashboard + ": no box of its own");
+
+            int left = at.path("x").asInt();
+            Set<Integer> bottoms = new TreeSet<>();
+            for (JsonNode other : root.path("panels")) {
+                if (other == tile) {
+                    continue;
+                }
+                JsonNode o = other.path("gridPos");
+                if (o.path("y").asInt() <= 1) {
+                    bottoms.add(o.path("y").asInt() + o.path("h").asInt());
+                }
+                boolean sameRow = o.path("y").asInt() < at.path("y").asInt() + at.path("h").asInt()
+                        && o.path("y").asInt() + o.path("h").asInt() > at.path("y").asInt();
+                boolean sameColumns = o.path("x").asInt() < 24 && o.path("x").asInt() + o.path("w").asInt() > left;
+                assertTrue(!(sameRow && sameColumns), dashboard + ": '" + other.path("title").asText()
+                        + "' overlaps the label");
+            }
+            assertEquals(1, bottoms.size(), dashboard + ": the panels beside and under the label end on one line, "
+                    + "so the label does not leave a gap or stagger the tiles; they end at rows " + bottoms);
+        }
     }
 }

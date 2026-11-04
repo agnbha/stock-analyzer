@@ -112,9 +112,9 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 3,
+        "y": 0,
         "w": 14,
-        "h": 10
+        "h": 11
       },
       "targets": [
         {
@@ -159,7 +159,7 @@
       },
       "gridPos": {
         "x": 14,
-        "y": 3,
+        "y": 1,
         "w": 10,
         "h": 10
       },
@@ -211,7 +211,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 13,
+        "y": 11,
         "w": 14,
         "h": 9
       },
@@ -260,7 +260,7 @@
       },
       "gridPos": {
         "x": 14,
-        "y": 13,
+        "y": 11,
         "w": 10,
         "h": 9
       },
@@ -314,7 +314,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 20,
         "w": 24,
         "h": 11
       },
@@ -448,17 +448,17 @@
     {
       "id": 90,
       "type": "stat",
-      "title": "Last data refresh",
+      "title": "",
       "description": "When the reasons for trades were last worked out. They are redone each time fills are imported, which the daemon does every few minutes while the market is open and the evening batch does after the close.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 18,
+        "x": 14,
         "y": 0,
-        "w": 6,
-        "h": 3
+        "w": 10,
+        "h": 1
       },
       "options": {
         "reduceOptions": {
@@ -470,11 +470,18 @@
         },
         "colorMode": "none",
         "graphMode": "none",
-        "textMode": "value"
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "dateTimeFromNow"
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
         },
         "overrides": []
       },
@@ -490,7 +497,8 @@
           "queryText": "SELECT MAX(recorded_at) * 1000 AS \"Last data refresh\" FROM trade_reason",
           "timeColumns": []
         }
-      ]
+      ],
+      "transparent": true
     }
   ]
 }

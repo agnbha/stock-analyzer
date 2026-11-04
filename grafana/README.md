@@ -145,6 +145,21 @@ breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
 full score sheet, letter by letter, is at the bottom.
 
+**Last data refresh** — a one-line label in the top-right corner of every page
+except CAN SLIM (which has its own *Last scan*), showing how long ago the page's
+data was last written. It is a small stat panel without a title, so it takes one
+row and sits beside or above the first panel. What it counts differs by page:
+
+| Page | Newest of |
+|---|---|
+| Account Overview | last fill imported, last balance recorded, last reasons worked out |
+| Candles and Calls | last live candle (daemon, every poll in market hours), last session ingested, last fill imported |
+| Decision Reasons | when the reasons were last worked out (each fill import) |
+| Stock Trend, Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
+
+On Candles and Calls, a figure much older than a few minutes during market hours
+means the daemon is not running or cannot reach Groww.
+
 One number to read carefully: the overview's charges are **all charges paid on
 that day's fills**, while `pnl`'s charges are only those **allocated to lots that
 closed**. Both are right; they answer different questions, and they differ

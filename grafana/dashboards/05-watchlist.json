@@ -32,8 +32,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
-        "h": 4
+        "w": 8,
+        "h": 5
       },
       "targets": [
         {
@@ -98,10 +98,10 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 6,
+        "x": 8,
         "y": 0,
-        "w": 6,
-        "h": 4
+        "w": 8,
+        "h": 5
       },
       "targets": [
         {
@@ -148,9 +148,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 6,
+        "x": 16,
+        "y": 1,
+        "w": 8,
         "h": 4
       },
       "targets": [
@@ -199,7 +199,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 5,
         "w": 24,
         "h": 8
       },
@@ -486,7 +486,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 13,
         "w": 15,
         "h": 10
       },
@@ -701,7 +701,7 @@
       },
       "gridPos": {
         "x": 15,
-        "y": 12,
+        "y": 13,
         "w": 9,
         "h": 10
       },
@@ -792,17 +792,17 @@
     {
       "id": 90,
       "type": "stat",
-      "title": "Last data refresh",
+      "title": "",
       "description": "When a session's data was last written to the history these rankings are read from. That happens after the close - the daemon reconciles the day and evening.sh ingests it - so during the market day this shows that earlier write, not the live session. The 52-week band is a separate snapshot refreshed by hand, with its own as-of date in the table.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 18,
+        "x": 16,
         "y": 0,
-        "w": 6,
-        "h": 4
+        "w": 8,
+        "h": 1
       },
       "options": {
         "reduceOptions": {
@@ -814,11 +814,18 @@
         },
         "colorMode": "none",
         "graphMode": "none",
-        "textMode": "value"
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "dateTimeFromNow"
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
         },
         "overrides": []
       },
@@ -834,7 +841,8 @@
           "queryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
           "timeColumns": []
         }
-      ]
+      ],
+      "transparent": true
     }
   ]
 }

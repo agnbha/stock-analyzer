@@ -153,8 +153,8 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 5,
-        "h": 4
+        "w": 6,
+        "h": 5
       },
       "targets": [
         {
@@ -233,10 +233,10 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 5,
+        "x": 6,
         "y": 0,
-        "w": 5,
-        "h": 4
+        "w": 6,
+        "h": 5
       },
       "targets": [
         {
@@ -304,10 +304,10 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 10,
+        "x": 12,
         "y": 0,
-        "w": 5,
-        "h": 4
+        "w": 6,
+        "h": 5
       },
       "targets": [
         {
@@ -373,9 +373,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 15,
-        "y": 0,
-        "w": 5,
+        "x": 18,
+        "y": 1,
+        "w": 6,
         "h": 4
       },
       "targets": [
@@ -447,7 +447,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 4,
+        "y": 5,
         "w": 24,
         "h": 12
       },
@@ -591,7 +591,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 17,
         "w": 12,
         "h": 7
       },
@@ -674,7 +674,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 16,
+        "y": 17,
         "w": 12,
         "h": 7
       },
@@ -776,7 +776,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 24,
         "w": 24,
         "h": 9
       },
@@ -1054,7 +1054,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 33,
         "w": 24,
         "h": 8
       },
@@ -1160,17 +1160,17 @@
     {
       "id": 90,
       "type": "stat",
-      "title": "Last data refresh",
+      "title": "",
       "description": "When a session's data was last written to the history these charts are drawn from. That happens after the close - the daemon reconciles the day and evening.sh ingests it - so during the market day this shows that earlier write, not the live session.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 20,
+        "x": 18,
         "y": 0,
-        "w": 4,
-        "h": 4
+        "w": 6,
+        "h": 1
       },
       "options": {
         "reduceOptions": {
@@ -1182,11 +1182,18 @@
         },
         "colorMode": "none",
         "graphMode": "none",
-        "textMode": "value"
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "dateTimeFromNow"
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
         },
         "overrides": []
       },
@@ -1202,7 +1209,8 @@
           "queryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
           "timeColumns": []
         }
-      ]
+      ],
+      "transparent": true
     }
   ]
 }
