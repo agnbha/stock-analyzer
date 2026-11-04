@@ -2,14 +2,12 @@ package com.stockanalyzer;
 
 import com.stockanalyzer.alert.AlertEngine;
 import com.stockanalyzer.alert.AlertPolicy;
-import com.stockanalyzer.alert.AlertScope;
-import com.stockanalyzer.alert.AlertScopeResolver;
 import com.stockanalyzer.alert.AlertSink;
 import com.stockanalyzer.alert.CompositeAlertSink;
 import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.alert.FileAlertSink;
 import com.stockanalyzer.alert.MacNotificationSink;
-import com.stockanalyzer.alert.SessionAlertPlanner;
+import com.stockanalyzer.alert.SellTargetAlerts;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
@@ -65,7 +63,6 @@ import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.store.SchemaMigrator;
 import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
-import com.stockanalyzer.store.WatchlistRepository;
 import com.stockanalyzer.store.Week52Repository;
 import com.stockanalyzer.store.jdbc.SqliteAlertRepository;
 import com.stockanalyzer.client.AccountDataClient;
@@ -92,7 +89,6 @@ import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradingDayRepository;
-import com.stockanalyzer.store.jdbc.SqliteWatchlistRepository;
 import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
 import com.stockanalyzer.store.AttributionRepository;
@@ -149,7 +145,6 @@ public final class AppContext implements AutoCloseable {
     private final LiveCandleRepository liveCandleRepository;
     private final LiveOpportunityRepository liveOpportunityRepository;
     private final Week52Repository week52Repository;
-    private final WatchlistRepository watchlistRepository;
     private final CalendarRepository calendarRepository;
     private final IngestionRunRepository ingestionRunRepository;
     private final HotWindowRepository hotWindowRepository;
@@ -195,7 +190,6 @@ public final class AppContext implements AutoCloseable {
         this.liveCandleRepository = new SqliteLiveCandleRepository(database);
         this.liveOpportunityRepository = new SqliteLiveOpportunityRepository(database);
         this.week52Repository = new SqliteWeek52Repository(database);
-        this.watchlistRepository = new SqliteWatchlistRepository(database);
         this.calendarRepository = new SqliteCalendarRepository(database);
         this.ingestionRunRepository = new SqliteIngestionRunRepository(database);
         this.hotWindowRepository = new SqliteHotWindowRepository(database);
@@ -270,12 +264,7 @@ public final class AppContext implements AutoCloseable {
                 config.preferBrokerCharges(), config.exchange(), config.segment());
     }
 
-    /** The symbols allowed to alert on {@code sessionDate}, from {@code alerts.symbols}. */
-    public AlertScope alertScope(LocalDate sessionDate) {
-        return new AlertScopeResolver(watchlistRepository).resolve(sessionDate, config.alertSymbolKinds());
-    }
-
-    public AlertEngine alertEngine(AlertScope scope) {
+    public AlertEngine alertEngine() {
         List<AlertSink> sinks = new ArrayList<>();
         for (String name : config.alertSinks()) {
             switch (name.toLowerCase()) {
@@ -289,11 +278,7 @@ public final class AppContext implements AutoCloseable {
                 default -> throw new IllegalStateException("Unknown alert sink: " + name);
             }
         }
-        return new AlertEngine(
-                new AlertPolicy(alertRepository, config.alertCooldownMinutes(),
-                        config.alertMaxPerSymbolPerDay(), config.alertMaxPerDay(), scope),
-                new CompositeAlertSink(sinks),
-                alertRepository);
+        return new AlertEngine(new AlertPolicy(alertRepository), new CompositeAlertSink(sinks), alertRepository);
     }
 
     private AlertSeverity desktopMinSeverity() {
@@ -306,11 +291,10 @@ public final class AppContext implements AutoCloseable {
         }
     }
 
-    public SessionAlertPlanner alertPlanner(AlertScope scope) {
-        return new SessionAlertPlanner(hotWindowRepository, clock, config.hotWindowBucketMinutes(),
-                config.hotWindowLookbackDays(), config.alertLeadTimeMinutes(),
-                config.alertHotWindowMinSessions(), config.alertHotWindowMinLowerBound(),
-                config.alertHotWindowSkipOpeningMinutes(), config.alertHotWindowMaxPerDay(), scope);
+    /** The alert that says when a purchase is worth selling, and at what limit price. */
+    public SellTargetAlerts sellTargetAlerts() {
+        return new SellTargetAlerts(config.alertSellTargetsPct(), config.alertSellTickSize(),
+                config.intradayIntervalMinutes(), config.alertMaxAgeMinutes());
     }
 
     public HotWindowCalculator hotWindowCalculator() {

@@ -1,7 +1,7 @@
 package com.stockanalyzer.live;
 
 import com.stockanalyzer.alert.AlertEngine;
-import com.stockanalyzer.alert.SessionAlertPlanner;
+import com.stockanalyzer.alert.SellTargetAlerts;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.features.EventDetector;
 import com.stockanalyzer.features.FeatureExtractor;
@@ -10,25 +10,25 @@ import com.stockanalyzer.features.TimeOfDayVolumeProfile;
 import com.stockanalyzer.intraday.GainOpportunityDetector;
 import com.stockanalyzer.intraday.TradingCalendar;
 import com.stockanalyzer.model.Alert;
-import com.stockanalyzer.model.AlertSeverity;
 import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.DailyGainSummary;
 import com.stockanalyzer.model.GainOpportunity;
 import com.stockanalyzer.model.LiveSnapshot;
 import com.stockanalyzer.model.LiveSymbolState;
 import com.stockanalyzer.model.MarketEvent;
-import com.stockanalyzer.model.ScheduledAlert;
 import com.stockanalyzer.model.SignalPrediction;
 import com.stockanalyzer.model.StockCandleSeries;
+import com.stockanalyzer.model.Side;
+import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.model.TradingSession;
 import com.stockanalyzer.signal.IntradaySignalModel;
 import com.stockanalyzer.signal.SignalRequest;
-import com.stockanalyzer.store.AlertRepository;
 import com.stockanalyzer.store.HeartbeatRepository;
 import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.LiveCandleRepository;
 import com.stockanalyzer.store.LiveOpportunityRepository;
 import com.stockanalyzer.store.MarketEventRepository;
+import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
@@ -40,8 +40,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,7 +53,8 @@ import java.util.function.LongSupplier;
 /**
  * The market-hours process: polls for new candles every couple of minutes,
  * re-runs the same top-3 detector over the partial day, detects events, scores
- * the model, evaluates alerts, and redraws the view.
+ * the model, checks the day's purchases against their sell targets, and redraws
+ * the view. The sell-target check is the only thing that alerts.
  *
  * <p>Parts 3 and 4 share this one loop deliberately - the poll tick is exactly
  * the moment at which alert conditions can be evaluated, so there is no second
@@ -69,9 +70,9 @@ public final class MarketMonitor {
     private final FeatureExtractor featureExtractor;
     private final IntradaySignalModel signalModel;
     private final AlertEngine alertEngine;
-    private final AlertRepository alertRepository;
+    private final SellTargetAlerts sellTargets;
+    private final TradeRepository tradeRepository;
     private final HeartbeatRepository heartbeatRepository;
-    private final SessionAlertPlanner alertPlanner;
     private final InstrumentRepository instrumentRepository;
     private final LiveCandleRepository liveCandleRepository;
     private final LiveOpportunityRepository liveOpportunityRepository;
@@ -87,9 +88,8 @@ public final class MarketMonitor {
 
     private final Map<String, LiveSessionState> states = new LinkedHashMap<>();
     private final Map<String, EventDetector.PriorSessionContext> priorContexts = new HashMap<>();
-    private final Set<String> firedEventKeys = new HashSet<>();
-    /** Alerts passed over this tick because what they describe is already old news. */
-    private int staleAlertsSkipped;
+    /** Symbols bought today that are not in the tracked list: polled too, so their sell targets can be watched. */
+    private final Set<String> untrackedBuys = new LinkedHashSet<>();
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final List<Alert> recentAlerts = new ArrayList<>();
 
@@ -99,9 +99,9 @@ public final class MarketMonitor {
                          FeatureExtractor featureExtractor,
                          IntradaySignalModel signalModel,
                          AlertEngine alertEngine,
-                         AlertRepository alertRepository,
+                         SellTargetAlerts sellTargets,
+                         TradeRepository tradeRepository,
                          HeartbeatRepository heartbeatRepository,
-                         SessionAlertPlanner alertPlanner,
                          InstrumentRepository instrumentRepository,
                          LiveCandleRepository liveCandleRepository,
                          LiveOpportunityRepository liveOpportunityRepository,
@@ -114,7 +114,7 @@ public final class MarketMonitor {
                          ExecutorService executor,
                          MonitorSettings settings) {
         this(candleDataClient, detector, eventDetector, featureExtractor, signalModel, alertEngine,
-                alertRepository, heartbeatRepository, alertPlanner, instrumentRepository, liveCandleRepository,
+                sellTargets, tradeRepository, heartbeatRepository, instrumentRepository, liveCandleRepository,
                 liveOpportunityRepository, marketEventRepository, tradingDayRepository, calendar, reconciler,
                 view, clock, executor, settings, () -> System.currentTimeMillis() / 1000);
     }
@@ -126,9 +126,9 @@ public final class MarketMonitor {
                   FeatureExtractor featureExtractor,
                   IntradaySignalModel signalModel,
                   AlertEngine alertEngine,
-                  AlertRepository alertRepository,
+                  SellTargetAlerts sellTargets,
+                  TradeRepository tradeRepository,
                   HeartbeatRepository heartbeatRepository,
-                  SessionAlertPlanner alertPlanner,
                   InstrumentRepository instrumentRepository,
                   LiveCandleRepository liveCandleRepository,
                   LiveOpportunityRepository liveOpportunityRepository,
@@ -148,9 +148,9 @@ public final class MarketMonitor {
         this.featureExtractor = featureExtractor;
         this.signalModel = signalModel;
         this.alertEngine = alertEngine;
-        this.alertRepository = alertRepository;
+        this.sellTargets = sellTargets;
+        this.tradeRepository = tradeRepository;
         this.heartbeatRepository = heartbeatRepository;
-        this.alertPlanner = alertPlanner;
         this.instrumentRepository = instrumentRepository;
         this.liveCandleRepository = liveCandleRepository;
         this.liveOpportunityRepository = liveOpportunityRepository;
@@ -176,10 +176,6 @@ public final class MarketMonitor {
         }
 
         prepare(sessionDate);
-
-        List<ScheduledAlert> plan = alertPlanner.plan(sessionDate, settings.symbols());
-        alertRepository.replaceSchedule(sessionDate, plan);
-        log.info("Planned {} alerts for {}", plan.size(), sessionDate);
 
         long closeEpoch = clock.sessionCloseEpoch(sessionDate);
         while (running.get() && nowEpoch() <= closeEpoch + settings.postCloseGraceSeconds()) {
@@ -207,8 +203,23 @@ public final class MarketMonitor {
         long now = nowEpoch();
         List<String> degradedSymbols = new ArrayList<>();
 
+        List<Trade> fills = todaysFills(sessionDate);
+        Set<String> bought = new LinkedHashSet<>();
+        for (Trade fill : fills) {
+            if (fill.side() == Side.BUY) {
+                bought.add(fill.symbol());
+                if (!settings.symbols().contains(fill.symbol()) && untrackedBuys.add(fill.symbol())) {
+                    states.put(fill.symbol(), new LiveSessionState(fill.symbol(), settings.intervalMinutes()));
+                    log.info("{} was bought today and is not a tracked symbol: polling it for its sell targets",
+                            fill.symbol());
+                }
+            }
+        }
+
         Map<String, List<String>> failuresByCause = new LinkedHashMap<>();
-        List<CompletableFuture<Void>> fetches = settings.symbols().stream()
+        List<String> toFetch = new ArrayList<>(settings.symbols());
+        toFetch.addAll(untrackedBuys);
+        List<CompletableFuture<Void>> fetches = toFetch.stream()
                 .map(symbol -> CompletableFuture.runAsync(() -> {
                     try {
                         fetchInto(symbol, sessionDate, now);
@@ -229,13 +240,7 @@ public final class MarketMonitor {
             symbolStates.add(analyse(symbol, sessionDate, now));
         }
 
-        fireDueScheduledAlerts(sessionDate, now);
-        if (staleAlertsSkipped > 0) {
-            log.info("Not alerting on {} event(s) and scheduled alert(s) older than {} minutes - "
-                    + "recorded and shown, but too late to act on", staleAlertsSkipped,
-                    settings.alertMaxAgeMinutes());
-            staleAlertsSkipped = 0;
-        }
+        fireSellTargets(sessionDate, fills, bought, now);
 
         long staleness = symbolStates.stream()
                 .mapToLong(state -> now - state.lastUpdatedEpoch())
@@ -294,12 +299,10 @@ public final class MarketMonitor {
                     sessionDate, settings.intervalMinutes(), completed);
             events = eventDetector.detect(session, context);
             persistEvents(symbol, events);
-            fireEventAlerts(sessionDate, symbol, events, now);
 
             List<FeatureVector> features = featureExtractor.extract(session, context, events);
             predictions = signalModel.score(new SignalRequest(symbol, sessionDate,
                     settings.horizonMinutes(), features));
-            fireSignalAlerts(sessionDate, symbol, predictions, now);
         }
 
         SignalPrediction latest = predictions.stream()
@@ -340,10 +343,9 @@ public final class MarketMonitor {
     }
 
     /**
-     * Stores what was detected. Events are not just alert fodder: they are the
+     * Stores what was detected. Events raise no alerts, but they are the
      * reasons a trade gets attributed to, model features, and the record of what
-     * happened that day. Detecting them and only shouting about them leaves
-     * every trade UNEXPLAINED afterwards.
+     * happened that day. Without them every trade would be UNEXPLAINED afterwards.
      *
      * <p>The repository ignores duplicates, so re-detecting the same event on
      * each tick costs nothing.
@@ -418,70 +420,32 @@ public final class MarketMonitor {
         return mean <= 0 ? 1.0 : candles.getLast().volume() / mean;
     }
 
-    private void fireEventAlerts(LocalDate sessionDate, String symbol, List<MarketEvent> events, long now) {
-        for (MarketEvent event : events) {
-            String key = sessionDate + "|" + symbol + "|" + event.type() + "|" + event.tsEpoch();
-            if (!firedEventKeys.add(key)) {
-                continue;
-            }
-            if (isStale(event.tsEpoch(), now)) {
-                staleAlertsSkipped++;
-                continue;
-            }
-            String message = String.format("%s: %s at %s (strength %.2f)", symbol, event.type(),
-                    clock.timeOf(event.tsEpoch()).withSecond(0).withNano(0), event.strength());
-            deliver(new Alert(sessionDate, now, symbol, "event." + event.type().name().toLowerCase(),
-                    AlertSeverity.NOTABLE, event.type().name(), message, key));
+    /** Everything filled today, for any symbol; empty rather than fatal when the journal cannot be read. */
+    private List<Trade> todaysFills(LocalDate sessionDate) {
+        try {
+            return tradeRepository.findRange(sessionDate, sessionDate);
+        } catch (RuntimeException e) {
+            log.warn("Could not read today's fills, so no sell targets this tick: {}", e.getMessage());
+            return List.of();
         }
     }
 
-    private void fireSignalAlerts(LocalDate sessionDate, String symbol, List<SignalPrediction> predictions, long now) {
-        predictions.stream()
-                .filter(p -> p.signal() == SignalPrediction.Signal.ENTRY)
-                .filter(p -> !isStale(p.tsEpoch(), now))
-                .filter(p -> p.probability() >= settings.modelMinProbability())
-                .max(Comparator.comparingDouble(SignalPrediction::probability))
-                .ifPresent(best -> {
-                    String key = sessionDate + "|" + symbol + "|signal|" + best.tsEpoch();
-                    String message = String.format("%s: entry signal %.2f%s", symbol, best.probability(),
-                            best.reason() == null ? "" : " (" + best.reason() + ")");
-                    deliver(new Alert(sessionDate, now, symbol, "model.entry", AlertSeverity.URGENT,
-                            "Entry signal", message, key));
-                });
-    }
-
-    private void fireDueScheduledAlerts(LocalDate sessionDate, long now) {
-        for (ScheduledAlert scheduled : alertRepository.pendingSchedule(sessionDate)) {
-            if (scheduled.fireAtEpoch() > now) {
+    /** For each symbol bought today, the sell-target alerts that have come due. */
+    private void fireSellTargets(LocalDate sessionDate, List<Trade> fills, Set<String> bought, long now) {
+        for (String symbol : bought) {
+            LiveSessionState state = states.get(symbol);
+            if (state == null) {
                 continue;
             }
-            if (now - scheduled.fireAtEpoch() > settings.alertMaxAgeMinutes() * 60L) {
-                alertRepository.markScheduleStatus(scheduled.id(), ScheduledAlert.Status.SKIPPED);
-                staleAlertsSkipped++;
-                continue;
+            try {
+                for (Alert alert : sellTargets.due(sessionDate, symbol, fills, state.allCandles(), now)) {
+                    deliver(alert);
+                }
+            } catch (RuntimeException e) {
+                // One symbol's trouble, or a sink that cannot post, must never stop the day's monitoring.
+                log.warn("Could not check the sell targets for {}: {}", symbol, e.toString());
             }
-            String key = sessionDate + "|" + scheduled.rule() + "|" + scheduled.symbol() + "|"
-                    + scheduled.fireAtEpoch();
-            AlertSeverity severity = scheduled.symbol() == null ? AlertSeverity.INFO : AlertSeverity.NOTABLE;
-            deliver(new Alert(sessionDate, now, scheduled.symbol(), scheduled.rule(), severity,
-                    scheduled.rule(), scheduled.payload(), key));
-            alertRepository.markScheduleStatus(scheduled.id(), ScheduledAlert.Status.FIRED);
         }
-    }
-
-    /**
-     * Whether something that happened in the candle starting at {@code tsEpoch}
-     * is too old to be worth interrupting for. The clock starts when the candle
-     * completes, because that is the earliest the event could have been known.
-     *
-     * <p>This is what keeps a late start, or a restart, from replaying the
-     * morning: a daemon that comes up at 10:08 detects every event since 09:15
-     * on its first tick, and without this they all arrive in one burst - using
-     * up the day's alert cap on events nobody can act on.
-     */
-    private boolean isStale(long tsEpoch, long now) {
-        long knowableAt = tsEpoch + settings.intervalMinutes() * 60L;
-        return now - knowableAt > settings.alertMaxAgeMinutes() * 60L;
     }
 
     private void deliver(Alert alert) {
@@ -528,8 +492,6 @@ public final class MarketMonitor {
                                   int pollIntervalSeconds,
                                   int postCloseGraceSeconds,
                                   int horizonMinutes,
-                                  double modelMinProbability,
-                                  boolean persistLiveCandles,
-                                  int alertMaxAgeMinutes) {
+                                  boolean persistLiveCandles) {
     }
 }

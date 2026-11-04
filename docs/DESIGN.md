@@ -10,7 +10,7 @@ Six parts, designed together so they share one data model and one process:
 |---|---|---|
 | 1 | Daily intraday analysis: top 3 gain windows per symbol per session, appended to months of history in a local DB | nightly, batch |
 | 2 | ML model inferring which times and events are worth acting on | offline training, online scoring |
-| 3 | Alerts: session start/end, and moments when today's clock reaches a historically significant timestamp | during market hours |
+| 3 | One alert: after a purchase, when to sell and at what limit price | during market hours |
 | 4 | Live monitoring every 2–3 minutes, projecting new candles and showing change as it happens | during market hours |
 | 5 | Trade journal and gain/loss statements per day, week and month | after the fact, on demand |
 | 6 | Grafana dashboards over the same database | on demand |
@@ -267,8 +267,7 @@ Two complementary things, deliberately kept separate:
 results into per-bucket frequency: how often does a 5-minute bucket of the
 session contain a top-3 entry, and what gain follows? This is cheap, fully
 explainable, directly answers "which times", and — importantly — is the
-**baseline any model must beat**. It is also what Part 3's recurring-timestamp
-alerts consume.
+**baseline any model must beat**. It also drives the baseline entry signal.
 
 ```sql
 CREATE TABLE hot_window (
@@ -347,7 +346,7 @@ Intraday ML fails in exactly two ways, and both are prevented structurally:
   held-out final month never touched during development; report performance
   against the Part 2(a) time-of-day baseline, not against 0; and require a
   model to beat that baseline on the held-out month before it is allowed to
-  drive an alert.
+  drive a decision.
 
 *Metrics*: precision@k (you act on few signals, so the top of the ranking is
 all that matters), mean realized forward return of fired signals **net of an
@@ -408,58 +407,50 @@ time-of-day prior as a null result, which is a normal outcome here.
 
 # Part 3 — Alerts
 
-## 3.1 Alert types
+## 3.1 The sell alert
 
-**(a) Session lifecycle** — pre-open (09:00 IST), open (09:15), mid-session
-(12:00), closing window (15:15), close (15:30). Weekdays only, skipping
-holidays.
+There is one alert. When you buy something, it says when to sell, and at what limit price.
 
-This needs a **forward-looking** calendar: the `holiday-inferred` mechanism from
-Part 1 only works backwards. So `TradingCalendar` gains a `HolidaySource` —
-a checked-in, hand-editable `nse-holidays-2026.txt` (the NSE publishes the list
-annually) — with the inferred table still used for historical questions. A
-startup warning fires if the holiday file's last date is under 30 days away.
-
-**(b) Recurring-timestamp alerts** — the direct answer to "moments where similar
-timestamps are reached in the day". At session start the daemon loads the
-`hot_window` rows for each symbol and schedules a fire a configurable lead time
-(default 2 min) before each qualifying bucket:
+Everything bought in a symbol during the session has a single price: the **average of the buy
+fills, weighted by quantity**, because a position built in several fills at different prices has one
+break-even. Each target is a percentage above that average (`alerts.sell.targets.pct`, default
+`0.6,1.0`). The first time the price reaches a target there is one alert:
 
 ```
-09:45  RELIANCE approaching a historically strong window (09:47–09:52)
-       top-3 entry on 14 of the last 60 sessions · median +0.9% · hit-rate LCB 0.14
-       today: +0.3% on the day, volume 1.8× normal for this time
+10:32  URGENT  BHARTIARTL  BHARTIARTL is up 0.6% on your average buy of 2065.00 (100 shares).
+                           Sell now: set the limit at 2077.40.
 ```
 
-Qualification thresholds (`alerts.hotwindow.min-sessions`, default 30;
-`alerts.hotwindow.min-lcb`, default 0.10) keep thin statistics from generating
-noise.
+The rules are small and each one has a reason:
 
-Two more limits keep the list short and informative. Windows starting within
-`alerts.hotwindow.skip-opening-minutes` (default 5) of the open are ignored,
-because the day's low - and so the start of a top-3 window - often sits at the
-open: the opening bucket qualifies for nearly every symbol and says nothing
-about any one of them. The baseline entry signal ignores it for the same reason.
-And at most `alerts.hotwindow.max-per-day` (default 20) are planned, the
-strongest by lower bound, chosen when the day is planned so that the cut
-falls on the weakest windows rather than the latest ones.
+- **The limit is the target rounded up to the next tick** (`alerts.sell.tick.size`, default 0.05), so
+  the order is never below the target. "Reached" means a candle's high is at or above that limit,
+  which is exactly when an order at the limit could fill.
+- **Only prices after the last purchase count.** Before it the position was not this one yet, so a
+  high in the minute of the buy, or earlier, proves nothing.
+- **A new purchase moves the average, and with it the targets.** Each average has its own alert per
+  target: the idempotency key is `sellTarget|session|symbol|average|target`, so one that has gone out
+  is never repeated, and a restart is safe, but buying more at a different price re-arms the targets.
+- **A position sold out has nothing left to say.** Today's sells are netted off the buys; a part-sold
+  position still alerts, for the shares that remain.
+- **Only what is current is announced.** A target last touched longer ago than `alerts.max.age.minutes`
+  (default 10, counted from when the touching candle completed) is skipped, so a daemon that starts at
+  11:00 does not announce the morning. A price that is still at the target is current, however long
+  ago it first got there.
 
-**(c) Live condition alerts** — an `event` fired now, or a Part 2 model
-probability crossing `alerts.model.min-probability` (default 0.65). Suppressed
-automatically whenever the active model has not beaten the baseline.
+Purchases come from the trade journal: the daemon imports the day's fills every few minutes
+(`trades.live.import.interval.minutes`), and the monitor reads them each tick. A symbol bought today
+that is not one of the tracked symbols is polled too, for the rest of the day, so its targets are
+watched all the same.
 
-Only what is **current** is announced. An event is recorded the moment it is
-detected, but it is alerted on only if it happened within
-`alerts.max.age.minutes` (default 10, counted from when its candle completed),
-and a scheduled alert that fell due more than that long before the monitor was
-looking is skipped rather than fired late. A daemon that starts at 10:08 would
-otherwise detect everything since 09:15 on its first tick and spend the day's
-alert cap on it in one burst.
-
-A hot window's hit rate is **sessions with an entry in the bucket over sessions**
-(for the market-wide window, symbol-sessions). Counting opportunities instead
-puts more hits than sessions in the numerator, which the denominator then
-stretches to match - a rate of 1.0 that is an artifact, not evidence.
+*History.* Earlier versions also raised session-lifecycle alerts, "approaching a historically strong
+window" alerts, event alerts and model-entry alerts, rationed by cooldowns, daily caps and a
+per-symbol scope (`alerts.symbols`). They were removed. Events and model predictions are still
+detected, stored and scored - they are what trades are attributed to and what the next day's
+evaluation reads - but nothing alerts on them, and the hot windows still feed the baseline entry
+signal. A window's hit rate is **sessions with an entry in the bucket over sessions** (for the
+market-wide window, symbol-sessions); counting opportunities instead puts more hits than sessions in
+the numerator, which the denominator then stretches to match - a rate of 1.0 that is an artifact.
 
 ## 3.2 Delivery and control
 
@@ -472,30 +463,15 @@ terminal-notifier), `FileAlertSink` (JSONL, for later analysis), and optionally
 `TelegramAlertSink` / `EmailAlertSink`. Same pluggable pattern as the existing
 `AnalysisReporter`. A `CompositeAlertSink` fans out.
 
-Alert fatigue is the actual failure mode of this feature, so control is part of
-the design, not a later fix:
-
-- **Deterministic day plan** — at session start the daemon materialises the
-  day's scheduled alerts into `alert_schedule`, so you can inspect what *will*
-  fire before it does.
-- **Cooldown** per `(symbol, rule)`, default 15 min.
-- **Daily cap** per symbol, default 3, and a global cap, default 30.
-- **Dedup on restart** — every fired alert is written to `alert_log` with an
-  idempotency key `(session_date, symbol, rule, bucket)`; a daemon restart
-  re-reads it and never re-fires.
-- **Severity** (`INFO` / `NOTABLE` / `URGENT`) routed per sink, so lifecycle
-  alerts stay in the console while only `URGENT` reaches a desktop notification.
-  (As built, the desktop threshold is `alerts.desktop.min-severity`, default
-  `NOTABLE`: with `model.enabled=false` nothing is ever `URGENT`, so an
-  `URGENT`-only threshold would leave the desktop silent.)
+- **Dedup on restart** - every fired alert is written to `alert_log` with its idempotency key; a
+  daemon restart re-reads it and never re-fires. This is the only limit: there are no cooldowns or
+  daily caps, because a purchase is rare and an alert per target is the point.
+- **Severity** (`INFO` / `NOTABLE` / `URGENT`) is routed per sink. Sell alerts are `URGENT`, so they
+  reach the desktop with a sound; the threshold is `alerts.desktop.min-severity`, default `NOTABLE`.
+- **Attribution** - a trade made shortly after an alert is recorded against it, so a sale made on
+  "sell now" shows up under that reason in the Decision Reasons dashboard.
 
 ```sql
-CREATE TABLE alert_schedule (
-  id INTEGER PRIMARY KEY, session_date TEXT NOT NULL,
-  fire_at_epoch INTEGER NOT NULL, instrument_id INTEGER, rule TEXT NOT NULL,
-  payload_json TEXT, status TEXT NOT NULL      -- PENDING | FIRED | SKIPPED
-);
-
 CREATE TABLE alert_log (
   id INTEGER PRIMARY KEY, session_date TEXT NOT NULL,
   fired_at_epoch INTEGER NOT NULL, instrument_id INTEGER,
@@ -503,6 +479,9 @@ CREATE TABLE alert_log (
   idempotency_key TEXT NOT NULL UNIQUE
 );
 ```
+
+(`alert_schedule`, which held the planned day, is still in the schema from the earlier design and is
+no longer written.)
 
 ---
 
@@ -520,7 +499,7 @@ tick:
   3. run the SAME Part 1 detector over the partial day  -> "top 3 so far"
   4. run event detectors over new candles                -> event rows
   5. score with the active IntradaySignalModel           -> prediction rows
-  6. evaluate alert rules (Part 3)                       -> AlertSink
+  6. check today's purchases against their sell targets  -> AlertSink (Part 3)
   7. push updated state to every LiveView
 ```
 
@@ -986,15 +965,13 @@ hotwindow.bucket.minutes=5
 hotwindow.lookback.days=60
 
 # Part 3
-alerts.enabled=true
+alerts.sell.targets.pct=0.6,1.0
+alerts.sell.tick.size=0.05
+alerts.max.age.minutes=10
 alerts.sinks=console,macos
-alerts.lead.time.minutes=2
-alerts.hotwindow.min-sessions=30
+alerts.hotwindow.min-sessions=30       # these three tune the baseline entry signal
 alerts.hotwindow.min-lcb=0.10
-alerts.model.min-probability=0.65
-alerts.cooldown.minutes=15
-alerts.max.per.symbol.per.day=3
-alerts.max.per.day=30
+alerts.hotwindow.skip-opening-minutes=5
 alerts.holidays.file=nse-holidays-2026.txt
 
 # Part 4
@@ -1063,7 +1040,7 @@ Fakes over mocks, matching the existing `StockGrowthAnalysisServiceTest` style.
 | 6 | `HotWindowCalculator` + `hot_window` + `hot-windows` command | 2a | 5 |
 | 7 | `EventDetector` + `event` table + event report | 2b | 5 |
 | 8 | `MarketDayDaemon` skeleton: poll loop, `LiveSessionState`, `TerminalLiveView`, reconciliation | 4 | 3 |
-| 9 | `AlertEngine` + sinks + lifecycle and hot-window alerts | 3 | 6, 8 |
+| 9 | `AlertEngine` + sinks + the sell alert | 3 | 6, 8 |
 | 10 | `ml-service`: labelling, features, walk-forward CV, training | 2b | 6, 7 |
 | 11 | `RestIntradaySignalModel`, `prediction` storage, `evaluate` job, model-driven alerts | 2b | 9, 10 |
 | 12 | Projection rendering + optional dashboard view | 4 | 8, 11 |

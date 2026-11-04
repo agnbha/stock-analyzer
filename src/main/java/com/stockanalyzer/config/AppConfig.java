@@ -233,24 +233,9 @@ public final class AppConfig {
 
     // ---- Part 3: alerts --------------------------------------------------------------
 
-    public boolean alertsEnabled() {
-        return Boolean.parseBoolean(get("alerts.enabled", "true"));
-    }
-
     /** Comma-separated: console, macos, file. */
     public List<String> alertSinks() {
         return List.of(get("alerts.sinks", "console,macos").split(",")).stream()
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .toList();
-    }
-
-    /**
-     * Which symbols may alert: any of {@code bullish}, {@code holdings}, or {@code all} for no filter.
-     * Everything is still tracked; this only decides what is allowed to interrupt.
-     */
-    public List<String> alertSymbolKinds() {
-        return List.of(get("alerts.symbols", "bullish,holdings").split(",")).stream()
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .toList();
@@ -265,50 +250,42 @@ public final class AppConfig {
         return get("alerts.file.path", "data/alerts.jsonl");
     }
 
-    public int alertLeadTimeMinutes() {
-        return Integer.parseInt(get("alerts.lead.time.minutes", "2"));
+    /** Percentages above the average buy price at which to say "sell now", one alert each. */
+    public List<Double> alertSellTargetsPct() {
+        return List.of(get("alerts.sell.targets.pct", "0.6,1.0").split(",")).stream()
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(Double::parseDouble)
+                .toList();
     }
+
+    /** The smallest price step, in rupees: a sell limit is rounded up to it. NSE equities move in 5 paise. */
+    public double alertSellTickSize() {
+        return Double.parseDouble(get("alerts.sell.tick.size", "0.05"));
+    }
+
+    // The hot-window settings are named for the alerts they once fed; they now tune the baseline
+    // entry signal, which still records predictions that are scored the next day.
 
     public int alertHotWindowMinSessions() {
         return Integer.parseInt(get("alerts.hotwindow.min-sessions", "30"));
     }
 
-    /** Windows starting within this many minutes of the open are ignored: see SessionAlertPlanner. */
+    /** Windows starting within this many minutes of the open are ignored by the baseline entry signal. */
     public int alertHotWindowSkipOpeningMinutes() {
         return Integer.parseInt(get("alerts.hotwindow.skip-opening-minutes", "5"));
-    }
-
-    /** The most "approaching a strong window" alerts planned for one day; the strongest are kept. */
-    public int alertHotWindowMaxPerDay() {
-        return Integer.parseInt(get("alerts.hotwindow.max-per-day", "20"));
     }
 
     public double alertHotWindowMinLowerBound() {
         return Double.parseDouble(get("alerts.hotwindow.min-lcb", "0.10"));
     }
 
-    public double alertModelMinProbability() {
-        return Double.parseDouble(get("alerts.model.min-probability", "0.65"));
-    }
-
     /**
-     * How old an event may be, counted from when it could first have been known,
-     * and still be alerted on. Older ones are recorded but not announced.
+     * How long after a sell target was last touched an alert is still worth sending. Older than this
+     * and the moment has gone, so a restart does not announce the morning.
      */
     public int alertMaxAgeMinutes() {
         return Integer.parseInt(get("alerts.max.age.minutes", "10"));
-    }
-
-    public int alertCooldownMinutes() {
-        return Integer.parseInt(get("alerts.cooldown.minutes", "15"));
-    }
-
-    public int alertMaxPerSymbolPerDay() {
-        return Integer.parseInt(get("alerts.max.per.symbol.per.day", "3"));
-    }
-
-    public int alertMaxPerDay() {
-        return Integer.parseInt(get("alerts.max.per.day", "30"));
     }
 
     public String holidaysFile() {

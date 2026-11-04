@@ -5,8 +5,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Published exchange holidays. Alerts and schedules look forward, and holidays
- * inferred from empty data only work backwards - so the forward-looking list has
+ * Published exchange holidays. The daemon decides each morning whether to start, which
+ * looks forward, and holidays inferred from empty data only work backwards - so the forward-looking list has
  * to come from somewhere it can be maintained by hand.
  */
 public interface HolidaySource {

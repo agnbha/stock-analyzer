@@ -31,8 +31,8 @@ public final class DefaultTradingCalendar implements TradingCalendar {
     private void warnIfHolidayListRunningOut() {
         holidaySource.coveredUntil().ifPresentOrElse(last -> {
             if (last.isBefore(LocalDate.now().plusDays(COVERAGE_WARNING_DAYS))) {
-                log.warn("Holiday list only covers to {}. Add next year's dates before scheduled alerts "
-                        + "start firing on holidays.", last);
+                log.warn("Holiday list only covers to {}. Add next year's dates before the daemon "
+                        + "starts treating holidays as trading days.", last);
             }
         }, () -> log.warn("No exchange holidays configured; only weekends will be skipped"));
     }

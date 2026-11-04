@@ -2,7 +2,6 @@ package com.stockanalyzer;
 
 import com.stockanalyzer.alert.AlertEngine;
 import com.stockanalyzer.alert.AlertPolicy;
-import com.stockanalyzer.alert.AlertScope;
 import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.live.LiveFillImporter;
@@ -67,16 +66,11 @@ public final class MarketDayDaemon {
         try (AppContext context = new AppContext(config)) {
             LocalDate sessionDate = args.date("date", LocalDate.now(context.clock().zone()));
 
-            AlertScope alertScope = context.alertScope(sessionDate);
-            logAlertScope(alertScope, config);
-
             AlertEngine alertEngine = args.flag("dry-run")
-                    ? new AlertEngine(
-                            new AlertPolicy(context.alertRepository(), config.alertCooldownMinutes(),
-                                    config.alertMaxPerSymbolPerDay(), config.alertMaxPerDay(), alertScope),
+                    ? new AlertEngine(new AlertPolicy(context.alertRepository()),
                             new ConsoleAlertSink(context.clock()),
                             context.alertRepository())
-                    : context.alertEngine(alertScope);
+                    : context.alertEngine();
 
             MarketMonitor monitor = new MarketMonitor(
                     context.candleDataClient(),
@@ -85,9 +79,9 @@ public final class MarketDayDaemon {
                     context.featureExtractor(),
                     context.signalModel(),
                     alertEngine,
-                    context.alertRepository(),
+                    context.sellTargetAlerts(),
+                    context.tradeRepository(),
                     context.heartbeatRepository(),
-                    context.alertPlanner(alertScope),
                     context.instrumentRepository(),
                     context.liveCandleRepository(),
                     context.liveOpportunityRepository(),
@@ -103,8 +97,7 @@ public final class MarketDayDaemon {
                             config.stockSymbols(), config.exchange(), config.segment(),
                             config.intradayIntervalMinutes(), config.monitorPollIntervalSeconds(),
                             config.monitorPostCloseGraceSeconds(), config.modelHorizonMinutes(),
-                            config.alertModelMinProbability(), config.monitorPersistLiveCandles(),
-                            config.alertMaxAgeMinutes()));
+                            config.monitorPersistLiveCandles()));
 
             warnIfSessionExceedsDailyBudget(context, config);
             // Yesterday's close is today's baseline: if the evening batch missed it, fetch it now.
@@ -118,26 +111,6 @@ public final class MarketDayDaemon {
                 fills.start();
                 monitor.run(sessionDate);
             }
-        }
-    }
-
-    /**
-     * Said once at start-up, because "why did nothing alert on X" is otherwise a
-     * question about a set that was computed an hour before anyone asked.
-     */
-    private static void logAlertScope(AlertScope scope, AppConfig config) {
-        if (scope.isEverything()) {
-            log.info("Alerting on all {} tracked symbols (alerts.symbols={})",
-                    config.stockSymbols().size(), config.alertSymbolKinds());
-            return;
-        }
-        List<String> alertable = config.stockSymbols().stream().filter(scope::includes).sorted().toList();
-        log.info("Alerting on {} of {} tracked symbols (alerts.symbols={}): {}",
-                alertable.size(), config.stockSymbols().size(), config.alertSymbolKinds(),
-                String.join(", ", alertable));
-        if (alertable.isEmpty()) {
-            log.warn("No tracked symbol is in the alert scope, so only market-wide alerts will fire. "
-                    + "Daily history may be too short for the bullish test (it needs 20 sessions).");
         }
     }
 

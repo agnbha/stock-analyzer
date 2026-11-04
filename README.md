@@ -8,7 +8,7 @@ Seven parts, sharing one local database and one market-hours process:
 |---|---|---|
 | 1 | Daily intraday analysis: the top 3 gain windows per symbol per session, appended to months of history | nightly, batch |
 | 2 | A time-of-day prior, and a hook for a trained model | offline, plus online scoring |
-| 3 | Alerts for the session lifecycle and for historically strong moments | during market hours |
+| 3 | One alert: after a purchase, when to sell and at what limit price | during market hours |
 | 4 | Live monitoring every 2-3 minutes, projecting new candles as they arrive | during market hours |
 | 5 | Trade journal and gain/loss statements per day, week, month and financial year | on demand |
 | 6 | Grafana dashboards over the same database | on demand |
@@ -112,35 +112,40 @@ java $JOPTS -cp $CP com.stockanalyzer.MarketDayDaemon --dry-run  # console only,
 java $JOPTS -cp $CP com.stockanalyzer.MarketDayDaemon status     # is it alive?
 ```
 
-**Which symbols alert.** Every tracked symbol is still polled, charted and
-scored; `alerts.symbols` only decides which of them may interrupt you. It takes
-any of `bullish`, `holdings` and `all`, and they add up. The default is
-`bullish,holdings`:
+**The sell alert.** There is one alert: when you buy something, it says when to
+sell. Everything you bought in a symbol today has one average price, weighted by
+quantity, so buys at different prices are combined. The first time the price
+reaches each target above it (0.6% and 1% by default, `alerts.sell.targets.pct`)
+you get one alert with the limit price to set:
 
-- `bullish` - the Watchlist page's "reading bullish" test: the last close and
-  the 5-day average both above the 20-day average. It is worked out once, from
-  sessions before today, when the daemon starts, so the set does not move during
-  the day (a restart at noon gives the same list as one at 09:00). A symbol with
-  fewer than 20 sessions of history is left out.
-- `holdings` - what the broker reports you hold, plus long open positions in the
-  trade journal, so an exit signal on a position is never filtered away. A
-  negative journal quantity (a sell with no matching buy in the imported history)
-  does not count as holding anything.
-- `all` - no filter.
+```
+BHARTIARTL is up 0.6% on your average buy of 2065.00 (100 shares). Sell now: set the limit at 2077.40.
+```
 
-A symbol outside the scope never fires and never uses up the daily cap, and the
-hot-window plan spends its 20-a-day budget inside the scope. Market-wide
-lifecycle alerts are unaffected. The daemon logs the resolved list at start-up
-("Alerting on N of 54 tracked symbols: ..."), so the answer to "why no alert on
-X" is in `logs/market-day-*.err.log`. Like the other settings it is read at
-launch.
+- The limit is the target rounded **up** to the next tick (`alerts.sell.tick.size`,
+  0.05), so the order is never below the target, and the alert comes when the
+  price has actually reached it: an order at that limit can fill.
+- Buying more changes the average, so the targets move and each new average gets
+  its own alerts. Selling the position out ends them; a part-sold position still
+  alerts, for the shares that are left.
+- It works from the fills the daemon imports every few minutes
+  (`trades.live.import.interval.minutes`), so an alert follows a purchase by up
+  to that long. A symbol you bought that is not in `stock.symbols` is polled for
+  the rest of the day, so it is watched too.
+- A target the price touched more than `alerts.max.age.minutes` ago (10) is not
+  announced, which keeps a restart from announcing the morning; one the price is
+  still at is. Each alert is sent once, and a restart does not repeat it.
+
+Nothing else alerts. Market events and model predictions are still detected,
+stored and scored (trades are attributed to them, and the next day's evaluation
+reads them), but they no longer interrupt you, and there are no session or
+"strong window" alerts, caps or symbol filters.
 
 **Desktop notifications.** Alerts go to the console and, on macOS, to a
-notification banner (`alerts.sinks=console,macos`). Per-symbol alerts
-(`NOTABLE`) show a silent banner; `URGENT` ones also play a sound; the session
-lifecycle chatter (`INFO`) stays in the console. Lower the bar with
-`alerts.desktop.min-severity=INFO`, or drop `macos` from `alerts.sinks` to turn
-the banners off. `--dry-run` never posts one.
+notification banner (`alerts.sinks=console,macos`). Sell alerts are `URGENT`, so
+the banner also plays a sound. `alerts.desktop.min-severity` sets the lowest
+severity that reaches the desktop; drop `macos` from `alerts.sinks` to turn the
+banners off. `--dry-run` never posts one.
 
 osascript posts the banner as *Script Editor*, so macOS shows nothing until that
 app is allowed to notify (System Settings > Notifications > Script Editor, and
@@ -271,7 +276,7 @@ annotated list):
 | `db.*` | Where the SQLite file lives |
 | `ingest.*`, `backfill.*` | Rate limits, retries, and how many days one request may span |
 | `hotwindow.*`, `model.*` | The time-of-day prior, and the optional model service |
-| `alerts.*` | Sinks, lead time, evidence thresholds, cooldowns and caps, holiday file |
+| `alerts.*` | Sell targets and tick size, how stale a target may be, sinks, holiday file; three `alerts.hotwindow.*` settings tune the baseline entry signal |
 | `monitor.*` | Poll interval, session hours, timezone |
 | `trades.*`, `charges.*`, `report.fy.start.month` | Trade import (including `trades.live.import.interval.minutes`, how often the daemon pulls the day's fills during the session), the charge schedule, and the financial year |
 
@@ -328,7 +333,7 @@ plus the original `Main`.
   stored; the session is reconciled against the authoritative tape at the close.
 - **Charges are modelled, never ignored.** On intraday equity they are a large
   fraction of a small move, so every P&L figure is shown gross and net.
-- **The statistical baseline is the default.** Alerts and the monitor work with
+- **The statistical baseline is the default.** The monitor works with
   no ML at all; a trained model has to beat the prior on a held-out month before
   `model.enabled` is worth turning on.
 
@@ -342,7 +347,7 @@ Fakes over mocks, matching the existing style. Notable cases: the detector
 against hand-built sessions with known answers; ingesting the same day twice
 leaving exactly three windows; the backfill planner against gaps, weekends and
 holidays; FIFO matching through partial fills, short-then-cover and simultaneous
-MIS/CNC positions; alert cooldowns and restart dedup; and every Grafana
+MIS/CNC positions; sell-target alerts (average buy price, limit rounding, restart dedup); and every Grafana
 dashboard query executed against a real migrated database.
 
 ## Important caveats
@@ -383,9 +388,9 @@ dashboard query executed against a real migrated database.
   natural key, so re-importing the same day is a no-op.
 - **`nse-holidays-2026.txt` ships incomplete.** It has the fixed-date national
   holidays only. Festival holidays move every year and must be copied from the
-  NSE's published circular, or the daemon will fire session alerts on days the
-  market is shut. History self-corrects (a day with no data for any symbol is
-  recorded as non-trading), but scheduled alerts look forward and cannot.
+  NSE's published circular, or the daemon will treat those days as trading days.
+  History self-corrects (a day with no data for any symbol is recorded as
+  non-trading), but the calendar looks forward and cannot.
 - **The charge rates are as configured, not as billed.** Verify them once against
   a real contract note; after that `charges.prefer.broker.actuals` means broker
   figures win wherever they exist.
