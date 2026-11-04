@@ -75,6 +75,25 @@
           ]
         },
         "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Saved notes",
+        "target": {
+          "queryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\n  AND n.symbol = '$symbol'\nORDER BY n.noted_at\nLIMIT 500",
+          "rawQueryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\n  AND n.symbol = '$symbol'\nORDER BY n.noted_at\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
       }
     ]
   },
@@ -421,7 +440,7 @@
       "id": 10,
       "type": "candlestick",
       "title": "$symbol - daily candles and moving averages",
-      "description": "Daily candles with their moving averages.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.\n\n**Volume** (bars, right axis) — shares traded that day.\n\n**Notes** (cyan dashed lines) — your own notes on the chart. Click the chart, press **Add annotation**, write the note (your sentiment, the plan), tag it with this symbol in capitals (for example `RELIANCE`; add `BUY` or `SELL` too if you like) and Save. It appears at once, here and on this symbol's other charts, and on the account views if it is tagged `BUY` or `SELL`. Hover its marker to read it. A note without the symbol tag is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
+      "description": "Daily candles with their moving averages.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.\n\n**Volume** (bars, right axis) — shares traded that day.\n\n**Notes** (cyan dashed lines) — your own notes on the chart. Click the chart, press **Add annotation**, write the note (your sentiment, the plan), tag it with this symbol in capitals (for example `RELIANCE`) and a sentiment (`BULLISH`, `BEARISH` or `NEUTRAL`; `BUY` or `SELL` too if you like) and Save. It appears at once, here and on this symbol's other charts, and on the account views if it is tagged `BUY` or `SELL`. Hover its marker to read it. A note without the symbol tag is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

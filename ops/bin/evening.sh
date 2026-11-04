@@ -32,6 +32,9 @@ run_step "ingest session" com.stockanalyzer.DailyAnalysisMain daily --date "$SES
 run_step "score predictions" com.stockanalyzer.DailyAnalysisMain evaluate --date "$SESSION_DATE"
 run_step "import fills" com.stockanalyzer.TradeJournalMain trades import --broker \
     --from "$SESSION_DATE" --to "$SESSION_DATE"
+# The notes written on the Grafana charts live in Grafana's own file; keep a copy with the journal. Harmless
+# where Grafana is not installed: it says so and carries on.
+run_step "sync chart notes" com.stockanalyzer.TradeJournalMain chartnotes sync
 run_step "capture analysis" com.stockanalyzer.TradeJournalMain capture --month "$MONTH"
 # Read the balance from the broker rather than carrying a number forward. It runs
 # after the fills are in so the day's ledger has settled, and it is what makes the

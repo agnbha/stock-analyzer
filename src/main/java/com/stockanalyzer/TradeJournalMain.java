@@ -48,6 +48,10 @@ import java.util.stream.Collectors;
  *                                             list the calls you have noted
  *   trades balance [--date D]                 read the balance from the broker
  *   trades balance --cash X [--date D]        record it by hand instead
+ *   chartnotes sync                           copy the notes written on the Grafana charts into this database
+ *   chartnotes list [--symbol S]              the notes written on the charts, with their symbol and sentiment
+ *   chartnotes assign --id N[,N...] --symbol S
+ *                                             give notes that carry no symbol tag a symbol, by hand
  *   pnl --period day|week|month|fy [--date D | --of D | --month YYYY-MM | --year YYYY-YY]
  *   pnl --rebuild                             re-match every stored trade
  *   statement --from D --to D --out FILE      one row per realized lot
@@ -63,12 +67,13 @@ public final class TradeJournalMain {
         try (AppContext context = new AppContext(AppConfig.load())) {
             switch (command) {
                 case "trades" -> trades(context, parsed);
+                case "chartnotes" -> chartNotes(context, parsed);
                 case "pnl" -> pnl(context, parsed);
                 case "statement" -> statement(context, parsed);
                 case "capture" -> capture(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
-                    System.err.println("Try: trades | pnl | statement | capture");
+                    System.err.println("Try: trades | chartnotes | pnl | statement | capture");
                     System.exit(2);
                 }
             }
@@ -183,6 +188,63 @@ public final class TradeJournalMain {
         if (result.calls().size() > 1 && !args.has("at") && !args.has("order")) {
             System.out.println("That was more than one order. To note just one, add --at HH:MM or --order ID "
                     + "(and --clear removes a note).");
+        }
+    }
+
+    /**
+     * The notes written on the Grafana charts live in Grafana's own database; this keeps a copy with the journal.
+     * A note's symbol comes from a tag that names an instrument, and its sentiment from the first tag that is a
+     * generic one (UP counts as BULLISH); one with no symbol tag can be given a symbol by hand.
+     */
+    private static void chartNotes(AppContext context, Args args) {
+        switch (args.subcommand("list")) {
+            case "sync" -> {
+                try {
+                    var result = context.chartNoteSync().sync(Instant.now().getEpochSecond());
+                    System.out.printf("Chart notes: %d in Grafana (%d new, %d tied to a symbol by a tag), %d no longer there%n",
+                            result.found(), result.added(), result.withSymbol(), result.removed());
+                    if (result.withSymbol() < result.found()) {
+                        System.out.printf("%d have no symbol tag: see them with `chartnotes list`, and give them a symbol with "
+                                + "`chartnotes assign --id N --symbol S`%n", result.found() - result.withSymbol());
+                    }
+                } catch (com.stockanalyzer.note.GrafanaAnnotationSource.Unavailable e) {
+                    // Not an error for a scheduled run: Grafana may simply not be installed on this machine.
+                    System.out.println("Chart notes not synced: " + e.getMessage());
+                }
+            }
+            case "assign" -> {
+                String symbol = args.require("symbol").toUpperCase(Locale.ROOT);
+                String known = context.instrumentRepository().findAll().stream().map(i -> i.symbol())
+                        .filter(s -> s.equalsIgnoreCase(symbol)).findFirst().orElse(null);
+                if (known == null) {
+                    System.err.println("Unknown symbol " + symbol + ": it is not one of the instruments in the database");
+                    System.exit(2);
+                    return;
+                }
+                for (String id : args.require("id").split(",")) {
+                    boolean found = context.chartNoteRepository().assignSymbol(Long.parseLong(id.trim()), known);
+                    System.out.println(found ? "Note " + id.trim() + " is now about " + known
+                            : "No note " + id.trim() + " (run `chartnotes sync` first)");
+                }
+            }
+            default -> {
+                var found = context.chartNoteRepository()
+                        .findLive(args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
+                if (found.isEmpty()) {
+                    System.out.println("No chart notes. Run `chartnotes sync` to copy them from Grafana.");
+                    return;
+                }
+                System.out.printf("%n%-4s %-17s %-12s %-10s %-14s %s%n", "ID", "WHEN (IST)", "SYMBOL", "SENTIMENT", "TAGS", "NOTE");
+                for (var note : found) {
+                    System.out.printf("%-4d %-17s %-12s %-10s %-14s %s%n", note.grafanaId(),
+                            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(
+                                    Instant.ofEpochSecond(note.notedAt()).atZone(context.clock().zone())),
+                            note.symbol() == null ? "(none)" : note.symbol(),
+                            note.sentiment() == null ? "-" : note.sentiment(), String.join(",", note.tags()),
+                            note.note() == null ? "" : note.note().replace('\n', ' '));
+                }
+                System.out.println();
+            }
         }
     }
 

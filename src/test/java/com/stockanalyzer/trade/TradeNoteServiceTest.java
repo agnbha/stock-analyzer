@@ -154,6 +154,20 @@ class TradeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("a sentiment you type in your own words is counted as the generic one: UP is BULLISH")
+    void ownWordsAreCountedAsGenericSentiments() {
+        order(SYMBOL, "o1", Side.BUY, at(9, 28, 19), 500, 206200);
+        order(SYMBOL, "o2", Side.SELL, at(10, 40, 0), 500, 207000);
+
+        service.note(select(Side.BUY, null, null), "up", "Should go up", 1);
+        service.note(select(Side.SELL, null, null), "nervous", null, 2);
+
+        List<TradeNoteRepository.Noted> notes = noted();
+        assertEquals("BULLISH", notes.get(0).sentiment());
+        assertEquals("NERVOUS", notes.get(1).sentiment(), "a label outside the vocabulary is kept as itself");
+    }
+
+    @Test
     @DisplayName("noting a call again replaces the note, and clearing removes it")
     void replaceAndClear() {
         order(SYMBOL, "o1", Side.BUY, at(9, 28, 19), 500, 206200);

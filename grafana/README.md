@@ -30,21 +30,36 @@ the daemon is live.
 
 ## Notes on the charts: documenting a call
 
-Notes on a chart are Grafana annotations, kept in Grafana's own database (not in the analyzer's, which the
-dashboards only read). To write one:
+Notes on a chart are Grafana annotations. To write one:
 
 1. **Click** a point on a candle chart. The tooltip pins and shows an **Add annotation** button.
-2. Press it, write the note - your sentiment, the plan, why you are in or out - and add a **tag**: the symbol, in
-   capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`). Add `BUY` or `SELL` as well if you
-   like; they show as chips when you hover.
+2. Press it, write the note - why you are in or out, what you expect, the plan - and add two **tags**:
+   - the **symbol**, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`), and
+   - a **sentiment**: `BULLISH`, `BEARISH` or `NEUTRAL`. (`BUY` or `SELL` too, if you like; other words such as
+     `NERVOUS` are kept but are not read as a market view.)
 3. **Save.** The note appears at once as a cyan dashed line; hover its marker to read it, and use the pencil and bin
    in the hover box to edit or delete it.
 
 The symbol tag is what makes a note show: it is drawn on every chart of that symbol - Candles and Calls, Stock
 Trend and CAN SLIM - wherever you wrote it, and on Account Overview and Decision Reasons (which have no symbol
 picker) when it is tagged `BUY` or `SELL`. A note without the symbol tag is saved but not drawn, which keeps another
-symbol's notes off the candles; tags are matched exactly, so `reliance` will not show. A note saved without the tag
-cannot be edited from the chart because it is not drawn: write it again with the tag (the stray one is harmless).
+symbol's notes off the candles; tags are matched exactly, so `reliance` will not show.
+
+**Your notes are kept in the analyzer's database too.** Grafana stores them in its own file, so they were not in the
+journal, and would be lost with Grafana's volume. `chartnotes sync` copies them into the `chart_note` table
+(`evening.sh` runs it each night; run it by hand to see a note straight away). The table on **Candles and Calls**
+(*notes written on the charts*) lists every note for the symbol, newest first, plus any with no symbol tag, so a note
+can be found even when it is not drawn. A note edited in Grafana is updated on the next sync, and one deleted there is
+marked as deleted, not lost.
+
+**Generic sentiments.** A note is counted under the first tag that is `BULLISH`, `BEARISH` or `NEUTRAL`, and the
+home-made labels that stand for them count as the same: `UP`, `UPTREND` and `LONG` are `BULLISH`; `DOWN`, `DOWNTREND`
+and `SHORT` are `BEARISH`; `LEVEL`, `FLAT`, `SIDEWAYS` and `RANGE` are `NEUTRAL`. The mapping is `notes.sentiment.aliases`.
+Grafana's own tags are never rewritten: a note tagged `UP` stays `UP` there and is stored as `BULLISH` here.
+
+**A note with no symbol tag** (one written before the symbol tag was needed) is not drawn, and cannot be edited from the
+chart. List them with `chartnotes list`, and give each a symbol with `chartnotes assign --id 3 --symbol RELIANCE`: it is
+then drawn on that symbol's charts, from the analyzer's copy.
 
 To record *why* a call was made against the fills themselves, use `trades note` (see the main README). The call is
 drawn on the candle charts for you, as a light-blue (buy) or orange (sell) dashed marker with the sentiment and your

@@ -87,6 +87,7 @@ public final class SchemaMigrator {
         all.put(19, v19());
         all.put(20, v20());
         all.put(21, v21());
+        all.put(22, v22());
         return all;
     }
 
@@ -295,6 +296,33 @@ public final class SchemaMigrator {
                   note TEXT,
                   noted_at INTEGER NOT NULL
                 )""");
+    }
+
+    /**
+     * v22: the notes written on the charts. Grafana keeps them in its own database, so they were not
+     * in the journal, and a note exists only as long as Grafana's volume does. This is the analyzer's
+     * copy, keyed by Grafana's annotation id so a sync can be repeated: edits update the row, and a note
+     * deleted in Grafana is marked (deleted_at) rather than lost. The symbol comes from a tag that names
+     * an instrument; a note with none can be given one by hand (symbol_source MANUAL), which a later sync
+     * leaves alone. The sentiment is the first tag that is a generic sentiment once aliases are applied.
+     */
+    private List<String> v22() {
+        return List.of("""
+                CREATE TABLE chart_note (
+                  grafana_id INTEGER PRIMARY KEY,
+                  dashboard_uid TEXT,
+                  panel_id INTEGER,
+                  symbol TEXT,
+                  symbol_source TEXT,
+                  noted_at INTEGER NOT NULL,
+                  noted_to INTEGER,
+                  sentiment TEXT,
+                  tags TEXT NOT NULL,
+                  note TEXT,
+                  synced_at INTEGER NOT NULL,
+                  deleted_at INTEGER
+                )""",
+                "CREATE INDEX ix_chart_note_symbol ON chart_note (symbol, noted_at)");
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */

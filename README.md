@@ -214,6 +214,22 @@ trades notes --date 2026-11-04                                                 #
   hand; chart notes (click the chart, **Add annotation**, tag the symbol) remain for marking a moment you have not
   traded on.
 
+**Notes written on the charts.** Notes you write on a Grafana chart (click the chart, **Add annotation**) live in
+Grafana's own file. `chartnotes sync` copies them into this database so they are kept with the journal; `evening.sh`
+runs it every night.
+
+```bash
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes sync            # copy them in (repeatable)
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes list --symbol WIPRO
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes assign --id 3 --symbol BHARTIARTL
+```
+
+Tag a note with its symbol and a generic sentiment: `BULLISH`, `BEARISH` or `NEUTRAL`. Labels you used before count as
+the generic one they stand for (`UP` is `BULLISH`, `DOWN` is `BEARISH`, `LEVEL` is `NEUTRAL`; see
+`notes.sentiment.aliases`), and the same mapping applies to `trades note --sentiment`. A note with no symbol tag is
+stored without a symbol until you give it one with `chartnotes assign`. `grafana.db.path` says where Grafana's database
+is (under Docker, point it at a copy). The *notes written on the charts* table on Candles and Calls lists them.
+
 ### Part 6 - dashboards
 
 ```bash

@@ -1,6 +1,7 @@
 package com.stockanalyzer.trade;
 
 import com.stockanalyzer.model.Side;
+import com.stockanalyzer.note.SentimentVocabulary;
 import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.store.TradeNoteRepository;
 import com.stockanalyzer.store.TradeRepository;
@@ -14,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Records what you thought when you took a trade - a sentiment and some words - against the fills
@@ -34,11 +34,19 @@ public final class TradeNoteService {
     private final TradeRepository trades;
     private final TradeNoteRepository notes;
     private final MarketClock clock;
+    private final SentimentVocabulary vocabulary;
 
     public TradeNoteService(TradeRepository trades, TradeNoteRepository notes, MarketClock clock) {
+        this(trades, notes, clock, SentimentVocabulary.defaults());
+    }
+
+    /** @param vocabulary turns a label you typed into its generic form: UP is counted as BULLISH */
+    public TradeNoteService(TradeRepository trades, TradeNoteRepository notes, MarketClock clock,
+                            SentimentVocabulary vocabulary) {
         this.trades = trades;
         this.notes = notes;
         this.clock = clock;
+        this.vocabulary = vocabulary;
     }
 
     /**
@@ -69,7 +77,7 @@ public final class TradeNoteService {
      * @throws IllegalArgumentException when nothing is selected, or there is neither a sentiment nor text
      */
     public Result note(Selection selection, String sentiment, String text, long nowEpoch) {
-        String label = normaliseSentiment(sentiment);
+        String label = vocabulary.canonical(sentiment);
         String words = text == null || text.isBlank() ? null : text.strip();
         if (label == null && words == null) {
             throw new IllegalArgumentException("Give a --sentiment, some --text, or both");
@@ -162,11 +170,6 @@ public final class TradeNoteService {
 
     /** BULLISH, bullish and " Bullish " are one sentiment; anything that is not a letter or digit becomes an underscore. */
     static String normaliseSentiment(String sentiment) {
-        if (sentiment == null) {
-            return null;
-        }
-        String code = sentiment.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-        return Objects.equals(code, "") ? null : code;
+        return SentimentVocabulary.clean(sentiment);
     }
 }

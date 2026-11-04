@@ -76,6 +76,25 @@
           ]
         },
         "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Saved notes",
+        "target": {
+          "queryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "rawQueryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
       }
     ]
   },

@@ -191,6 +191,40 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
+    @DisplayName("every dashboard with a time chart also draws the notes saved in the journal")
+    void chartsDrawSavedNotes() throws Exception {
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            if (!root.has("annotations")) {
+                continue;
+            }
+            checked++;
+            boolean hasSymbol = false;
+            for (JsonNode variable : root.path("templating").path("list")) {
+                hasSymbol |= variable.path("name").asText().equals("symbol");
+            }
+            JsonNode saved = null;
+            for (JsonNode annotation : root.path("annotations").path("list")) {
+                if (annotation.path("name").asText().equals("Saved notes")) {
+                    saved = annotation;
+                }
+            }
+            String name = file.getFileName().toString();
+            assertTrue(saved != null, name + ": needs a 'Saved notes' annotation query");
+            assertTrue(saved.path("enable").asBoolean(false) && saved.path("hide").asBoolean(false),
+                    name + ": saved notes are drawn, with no switch to show");
+            String sql = saved.path("target").path("queryText").asText();
+            assertEquals(sql, saved.path("target").path("rawQueryText").asText(), name);
+            assertTrue(sql.contains("FROM chart_note") && sql.contains("symbol_source = 'MANUAL'"),
+                    name + ": only notes given a symbol by hand, since a tagged one is already drawn by Grafana: " + sql);
+            assertTrue(sql.contains("n.symbol = '$symbol'") == hasSymbol, name + (hasSymbol
+                    ? ": with a symbol picker, limit to the symbol picked" : ": without one, do not limit to a symbol"));
+        }
+        assertTrue(checked >= 5, "expected the dashboards with time charts, found " + checked);
+    }
+
+    @Test
     @DisplayName("Candles and Calls offers 'Today's trading hours' and no ranges shorter than two days")
     void candlesAndCallsTimePicker() throws Exception {
         JsonNode root = JsonMapper.INSTANCE.readTree(
