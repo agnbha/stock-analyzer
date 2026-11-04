@@ -30,50 +30,14 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard",
-        "filter": {
-          "exclude": false,
-          "ids": [
-            99999
-          ]
+        "target": {
+          "limit": 200,
+          "matchAny": false,
+          "tags": [
+            "$symbol"
+          ],
+          "type": "tags"
         }
-      },
-      {
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "iconColor": "#73BF69",
-        "name": "Buy calls",
-        "target": {
-          "limit": 200,
-          "matchAny": false,
-          "tags": [
-            "BUY",
-            "$symbol"
-          ],
-          "type": "tags"
-        },
-        "hide": true
-      },
-      {
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "iconColor": "#F2495C",
-        "name": "Sell calls",
-        "target": {
-          "limit": 200,
-          "matchAny": false,
-          "tags": [
-            "SELL",
-            "$symbol"
-          ],
-          "type": "tags"
-        },
-        "hide": true
       },
       {
         "datasource": {
@@ -1035,7 +999,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - daily candles, 50/200-day averages and the pivot",
-      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Click the chart, press **Add annotation** in the box that appears, write the call, tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`), and Save; the coloured line shows after the next Refresh. It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
+      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Notes** (cyan dashed lines) — your own notes on the chart. Click the chart, press **Add annotation**, write the note (your sentiment, the plan), tag it with this symbol in capitals (for example `RELIANCE`; add `BUY` or `SELL` too if you like) and Save. It appears at once, here and on this symbol's other charts, and on the account views if it is tagged `BUY` or `SELL`. Hover its marker to read it. A note without the symbol tag is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

@@ -29,48 +29,15 @@
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
         "type": "dashboard",
-        "filter": {
-          "exclude": false,
-          "ids": [
-            99999
-          ]
-        }
-      },
-      {
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "iconColor": "#73BF69",
-        "name": "Buy calls",
         "target": {
           "limit": 200,
-          "matchAny": false,
+          "matchAny": true,
           "tags": [
-            "BUY"
-          ],
-          "type": "tags"
-        },
-        "hide": true
-      },
-      {
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "iconColor": "#F2495C",
-        "name": "Sell calls",
-        "target": {
-          "limit": 200,
-          "matchAny": false,
-          "tags": [
+            "BUY",
             "SELL"
           ],
           "type": "tags"
-        },
-        "hide": true
+        }
       },
       {
         "datasource": {
@@ -316,7 +283,7 @@
         },
         "overrides": []
       },
-      "description": "How the reasons you record shift over time, one line per reason code.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`, for every symbol. Hover a marker for the symbol, the sentiment and your note."
+      "description": "How the reasons you record shift over time, one line per reason code.\n\n**Notes** (cyan dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to read the note and see which symbol it was for.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`, for every symbol. Hover a marker for the symbol, the sentiment and your note."
     },
     {
       "id": 14,

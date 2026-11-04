@@ -211,7 +211,8 @@ trades notes --date 2026-11-04                                                 #
   - **As a reason** in Decision Reasons, which shows how often you acted on each sentiment and whether those
     trades paid.
   A marker appears for a call as soon as you have noted it, so there is no need to also annotate the chart by
-  hand; the `BUY` / `SELL` chart annotations remain for marking a moment you have not traded on.
+  hand; chart notes (click the chart, **Add annotation**, tag the symbol) remain for marking a moment you have not
+  traded on.
 
 ### Part 6 - dashboards
 

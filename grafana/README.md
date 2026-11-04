@@ -28,39 +28,34 @@ Either way you get the plugin, the datasource and all three dashboards in a
 dashboard can never modify the journal; running locally, open it read-only if
 the daemon is live.
 
-## Recording buy and sell calls
+## Notes on the charts: documenting a call
 
 Notes on a chart are Grafana annotations, kept in Grafana's own database (not in the analyzer's, which the
-dashboards only read). To record a call, **click** a candle chart (the tooltip pins), press **Add annotation** in it, write the call, and tag it:
+dashboards only read). To write one:
 
-- `BUY` or `SELL`, in capitals, and
-- the symbol, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`).
+1. **Click** a point on a candle chart. The tooltip pins and shows an **Add annotation** button.
+2. Press it, write the note - your sentiment, the plan, why you are in or out - and add a **tag**: the symbol, in
+   capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`). Add `BUY` or `SELL` as well if you
+   like; they show as chips when you hover.
+3. **Save.** The note appears at once as a cyan dashed line; hover its marker to read it, and use the pencil and bin
+   in the hover box to edit or delete it.
 
-Grafana suggests tags you have used before, which saves retyping them. Press **Save**, then **Refresh** (top right): the
-coloured line appears on the next refresh, not the instant you save.
+The symbol tag is what makes a note show: it is drawn on every chart of that symbol - Candles and Calls, Stock
+Trend and CAN SLIM - wherever you wrote it, and on Account Overview and Decision Reasons (which have no symbol
+picker) when it is tagged `BUY` or `SELL`. A note without the symbol tag is saved but not drawn, which keeps another
+symbol's notes off the candles; tags are matched exactly, so `reliance` will not show. A note saved without the tag
+cannot be edited from the chart because it is not drawn: write it again with the tag (the stray one is harmless).
 
-A tagged call is drawn as a green (buy) or red (sell) dashed line with a marker, and appears wherever buy and sell
-decisions are discussed: Candles and Calls, Stock Trend and CAN SLIM for that symbol, and Account Overview and
-Decision Reasons for every symbol (hover a marker for the note and its symbol). The dashboards read the tags, not the
-dashboard a note was made on, so one note shows everywhere.
-
-To record *why* a call was made - the sentiment at the time - use `trades note` (see the main README). The call is
+To record *why* a call was made against the fills themselves, use `trades note` (see the main README). The call is
 drawn on the candle charts for you, as a light-blue (buy) or orange (sell) dashed marker with the sentiment and your
 note on hover; the same words appear on the **every call** table, and the sentiment is a reason on Decision Reasons.
 Those markers come from the journal, so the pencil and bin in their hover box do nothing: run `trades note` again to
-change one. The `BUY` / `SELL` notes described above are for marking a moment you have not traded on.
+change one.
 
-Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are saved but not drawn. That is
-deliberate: a note on a candle chart should be a call, not clutter. Tags are matched exactly, so `buy` or `reliance`
-will not show. A note that was saved without the right tags is not drawn, so it cannot be edited from the chart:
-add it again with the tags (the stray one is harmless).
-
-**Why the built-in annotation layer is on but invisible.** Grafana offers *Add annotation* only while a dashboard's
-built-in "Annotations & Alerts" layer is enabled; with it off, clicking the chart shows a tooltip and no button. So each
-dashboard keeps that layer enabled, hides its switch, and shows it in a panel that does not exist, which is why a note
-is drawn only when it carries the `BUY` / `SELL` tags. The switches for the buy, sell and noted-call layers are hidden
-too: there is nothing to choose between, the calls are simply drawn. Do not switch the built-in layer off to tidy the
-chart.
+**Why the built-in annotation layer is the notes layer, and invisible as a switch.** Grafana offers *Add annotation*
+only while a dashboard's built-in "Annotations & Alerts" layer is enabled, and only that layer redraws the moment you
+save. So each dashboard keeps it enabled, hides its switch, and gives it a tag filter (the symbol) instead of "every
+note made on this dashboard". Do not switch it off to tidy the chart: you could no longer annotate.
 
 ## Troubleshooting
 
