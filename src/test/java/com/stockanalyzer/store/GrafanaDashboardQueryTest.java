@@ -174,6 +174,7 @@ class GrafanaDashboardQueryTest {
                 }
                 assertTrue(noted != null, name + ": needs a 'Noted " + side.toLowerCase() + "s' annotation query");
                 assertTrue(noted.path("enable").asBoolean(false), name + ": noted " + side + " calls are switched off");
+                assertTrue(noted.path("hide").asBoolean(false), name + ": the noted " + side + " calls switch is shown, but there is nothing to choose");
                 assertEquals("stock-analyzer-sqlite", noted.path("datasource").path("uid").asText(),
                         name + ": noted calls come from the journal, so from the SQLite datasource");
                 JsonNode target = noted.path("target");
@@ -195,6 +196,7 @@ class GrafanaDashboardQueryTest {
         List<String> tags = new ArrayList<>();
         target.path("tags").forEach(t -> tags.add(t.asText()));
         assertTrue(annotation.path("enable").asBoolean(false), name + ": " + tag + " calls are switched off");
+        assertTrue(annotation.path("hide").asBoolean(false), name + ": the " + tag + " calls switch is shown, but there is nothing to choose");
         assertTrue(target.path("type").asText().equals("tags"),
                 name + ": " + tag + " calls must be found by tag, not by dashboard, to show on every dashboard");
         assertFalse(target.path("matchAny").asBoolean(true), name + ": every tag must match, not any");

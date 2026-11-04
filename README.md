@@ -205,9 +205,8 @@ trades notes --date 2026-11-04                                                 #
   - **On the candle charts**, as a dashed marker at the time of the call - light blue for a buy, orange for a
     sell, matching "Your buy" and "Your sell". Hover it for `WIPRO BUY 5000 @ 195.55 - BULLISH: your words`.
     They show on Candles and Calls, Stock Trend and CAN SLIM for that symbol, and on Account Overview and
-    Decision Reasons for every symbol. The "Noted buys" / "Noted sells" switches at the top of a dashboard hide
-    them. The pencil and bin in the hover box belong to Grafana's own notes and do nothing here: change a note
-    by running `trades note` again.
+    Decision Reasons for every symbol. The pencil and bin in the hover box belong to Grafana's own notes and do
+    nothing here: change a note by running `trades note` again.
   - **Beside each fill** in the *every call* table on Candles and Calls (Sentiment and Note columns).
   - **As a reason** in Decision Reasons, which shows how often you acted on each sentiment and whether those
     trades paid.

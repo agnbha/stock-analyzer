@@ -51,7 +51,8 @@
             "BUY"
           ],
           "type": "tags"
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -68,7 +69,8 @@
             "SELL"
           ],
           "type": "tags"
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -86,7 +88,8 @@
           "timeColumns": [
             "time"
           ]
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -104,7 +107,8 @@
           "timeColumns": [
             "time"
           ]
-        }
+        },
+        "hide": true
       }
     ]
   },

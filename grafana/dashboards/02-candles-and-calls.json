@@ -241,7 +241,8 @@
             "$symbol"
           ],
           "type": "tags"
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -259,7 +260,8 @@
             "$symbol"
           ],
           "type": "tags"
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -277,7 +279,8 @@
           "timeColumns": [
             "time"
           ]
-        }
+        },
+        "hide": true
       },
       {
         "datasource": {
@@ -295,7 +298,8 @@
           "timeColumns": [
             "time"
           ]
-        }
+        },
+        "hide": true
       }
     ]
   },

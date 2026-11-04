@@ -57,8 +57,10 @@ add it again with the tags (the stray one is harmless).
 
 **Why the built-in annotation layer is on but invisible.** Grafana offers *Add annotation* only while a dashboard's
 built-in "Annotations & Alerts" layer is enabled; with it off, clicking the chart shows a tooltip and no button. So each
-dashboard keeps that layer enabled, hides its switch, and shows it in a panel that does not exist, which is why notes
-appear only through the Buy / Sell calls switches. Do not switch the layer off to tidy the chart.
+dashboard keeps that layer enabled, hides its switch, and shows it in a panel that does not exist, which is why a note
+is drawn only when it carries the `BUY` / `SELL` tags. The switches for the buy, sell and noted-call layers are hidden
+too: there is nothing to choose between, the calls are simply drawn. Do not switch the built-in layer off to tidy the
+chart.
 
 ## Troubleshooting
 
