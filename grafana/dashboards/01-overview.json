@@ -24,11 +24,17 @@
           "type": "grafana",
           "uid": "-- Grafana --"
         },
-        "enable": false,
+        "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "type": "dashboard",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            99999
+          ]
+        }
       },
       {
         "datasource": {

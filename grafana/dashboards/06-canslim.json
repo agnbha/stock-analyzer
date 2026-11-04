@@ -25,11 +25,17 @@
           "type": "grafana",
           "uid": "-- Grafana --"
         },
-        "enable": false,
+        "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "type": "dashboard",
+        "filter": {
+          "exclude": false,
+          "ids": [
+            99999
+          ]
+        }
       },
       {
         "datasource": {
@@ -1025,7 +1031,7 @@
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - daily candles, 50/200-day averages and the pivot",
-      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Ctrl/Cmd+click the chart to add one, write the call, and tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`). It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
+      "description": "Daily bars as priced by the last scan.\n\n- **SMA 50 / SMA 200** — the 50- and 200-day moving averages. A heavy-volume close below the 50-day is the classic sign a rally is over.\n- **Pivot** — the base's high a breakout has to clear (or the pivot of the latest breakout).\n- **Buy / Sell signal** — the days a scan flagged one.\n- **Volume** (bars) — shares traded each day; a breakout wants 1.4x the 50-day average.\n\n**Buy / sell calls** (green / red dashed lines) — your own notes. Click the chart, press **Add annotation** in the box that appears, write the call, tag it `BUY` or `SELL` plus this symbol in capitals (for example `RELIANCE`), and Save; the coloured line shows after the next Refresh. It then shows here, on the other charts of the same symbol and on the account views. A note without those tags is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

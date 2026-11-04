@@ -31,12 +31,13 @@ the daemon is live.
 ## Recording buy and sell calls
 
 Notes on a chart are Grafana annotations, kept in Grafana's own database (not in the analyzer's, which the
-dashboards only read). To record a call, **Ctrl/Cmd+click** a candle chart, write the call, and tag it:
+dashboards only read). To record a call, **click** a candle chart (the tooltip pins), press **Add annotation** in it, write the call, and tag it:
 
 - `BUY` or `SELL`, in capitals, and
 - the symbol, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`).
 
-Grafana suggests tags you have used before, which saves retyping them. Drag with Ctrl/Cmd held to mark a range.
+Grafana suggests tags you have used before, which saves retyping them. Press **Save**, then **Refresh** (top right): the
+coloured line appears on the next refresh, not the instant you save.
 
 A tagged call is drawn as a green (buy) or red (sell) dashed line with a marker, and appears wherever buy and sell
 decisions are discussed: Candles and Calls, Stock Trend and CAN SLIM for that symbol, and Account Overview and
@@ -49,10 +50,15 @@ note on hover; the same words appear on the **every call** table, and the sentim
 Those markers come from the journal, so the pencil and bin in their hover box do nothing: run `trades note` again to
 change one. The `BUY` / `SELL` notes described above are for marking a moment you have not traded on.
 
-Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are kept but not drawn. That is
+Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are saved but not drawn. That is
 deliberate: a note on a candle chart should be a call, not clutter. Tags are matched exactly, so `buy` or `reliance`
-will not show; edit the note (click its marker) to fix the tags. To list or delete every note, use Explore with the
-`-- Grafana --` datasource and the annotations query, or the marker's trash icon.
+will not show. A note that was saved without the right tags is not drawn, so it cannot be edited from the chart:
+add it again with the tags (the stray one is harmless).
+
+**Why the built-in annotation layer is on but invisible.** Grafana offers *Add annotation* only while a dashboard's
+built-in "Annotations & Alerts" layer is enabled; with it off, clicking the chart shows a tooltip and no button. So each
+dashboard keeps that layer enabled, hides its switch, and shows it in a panel that does not exist, which is why notes
+appear only through the Buy / Sell calls switches. Do not switch the layer off to tidy the chart.
 
 ## Troubleshooting
 

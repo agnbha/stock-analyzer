@@ -94,12 +94,13 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
-    @DisplayName("every dashboard with a time chart shows buy and sell calls, and nothing else Grafana annotates")
+    @DisplayName("every dashboard with a time chart lets you annotate, and draws only buy and sell calls")
     void chartsShowBuyAndSellCalls() throws Exception {
-        // A note added by clicking on a chart is drawn as a dashed vertical line with a marker. Without an explicit
-        // annotation block Grafana switches its built-in layer on, so stray notes appear on the candles. Calls are
-        // pulled in by tag instead - across dashboards, so a note made on one chart shows on the others - and in
-        // the dashboards that have a symbol picker only for the symbol picked.
+        // Grafana offers "Add annotation" on a chart only while its built-in annotation layer is enabled, so
+        // that layer must stay on. It is hidden (turning it off would stop you annotating) and filtered to a
+        // panel that does not exist, so a note with no BUY/SELL tag is saved but not drawn over the candles.
+        // Calls are pulled in by tag instead - across dashboards, so a note made on one chart shows on the
+        // others - and in the dashboards that have a symbol picker only for the symbol picked.
         int checked = 0;
         for (Path file : dashboardFiles()) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
@@ -129,8 +130,19 @@ class GrafanaDashboardQueryTest {
                 }
             }
             String name = file.getFileName().toString();
-            assertTrue(builtIn != null && !builtIn.path("enable").asBoolean(true),
-                    name + ": the built-in annotation layer must be declared and switched off");
+            assertTrue(builtIn != null && builtIn.path("enable").asBoolean(false),
+                    name + ": Grafana only offers 'Add annotation' while the built-in annotation layer is enabled");
+            assertTrue(builtIn.path("hide").asBoolean(false),
+                    name + ": its switch is hidden, because switching it off would stop you annotating");
+            JsonNode filter = builtIn.path("filter");
+            assertFalse(filter.path("exclude").asBoolean(true), name + ": the filter must list the panels to show it in");
+            assertTrue(filter.path("ids").size() > 0, name + ": an empty list would show every untagged note everywhere");
+            for (JsonNode shownIn : filter.path("ids")) {
+                for (JsonNode panel : root.path("panels")) {
+                    assertFalse(panel.path("id").asInt() == shownIn.asInt(),
+                            name + ": the built-in layer must be shown in no real panel, but panel " + shownIn + " is one");
+                }
+            }
             assertTrue(buy != null && sell != null, name + ": needs a Buy calls and a Sell calls annotation query");
             assertTagged(name, buy, "BUY", hasSymbol);
             assertTagged(name, sell, "SELL", hasSymbol);
