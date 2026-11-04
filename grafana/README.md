@@ -28,6 +28,26 @@ Either way you get the plugin, the datasource and all three dashboards in a
 dashboard can never modify the journal; running locally, open it read-only if
 the daemon is live.
 
+## Recording buy and sell calls
+
+Notes on a chart are Grafana annotations, kept in Grafana's own database (not in the analyzer's, which the
+dashboards only read). To record a call, **Ctrl/Cmd+click** a candle chart, write the call, and tag it:
+
+- `BUY` or `SELL`, in capitals, and
+- the symbol, in capitals, spelled as in the symbol picker (`RELIANCE`, `M&M`, `BAJAJ-AUTO`).
+
+Grafana suggests tags you have used before, which saves retyping them. Drag with Ctrl/Cmd held to mark a range.
+
+A tagged call is drawn as a green (buy) or red (sell) dashed line with a marker, and appears wherever buy and sell
+decisions are discussed: Candles and Calls, Stock Trend and CAN SLIM for that symbol, and Account Overview and
+Decision Reasons for every symbol (hover a marker for the note and its symbol). The dashboards read the tags, not the
+dashboard a note was made on, so one note shows everywhere.
+
+Notes without a `BUY`/`SELL` tag, or with a symbol that is not the one selected, are kept but not drawn. That is
+deliberate: a note on a candle chart should be a call, not clutter. Tags are matched exactly, so `buy` or `reliance`
+will not show; edit the note (click its marker) to fix the tags. To list or delete every note, use Explore with the
+`-- Grafana --` datasource and the annotations query, or the marker's trash icon.
+
 ## Troubleshooting
 
 **`Grafana-server Init Failed: Could not find config defaults, make sure

@@ -100,6 +100,11 @@ public final class CanSlimReporter {
                         + "%d not yet checked (below the RS bar, or waiting on the page budget)",
                 summary.listed(), summary.ranked(), summary.failed(), summary.selected(),
                 summary.minMarketCapCr(), summary.unchecked());
+        if (summary.skippedRejected() > 0 || summary.newlyRejected() > 0) {
+            out.printf(Locale.ROOT, "; %d skipped as refused by Groww within the last %d days, %d newly refused "
+                    + "and remembered (table market_reject)", summary.skippedRejected(), summary.rejectDays(),
+                    summary.newlyRejected());
+        }
         if (!summary.unranked().isEmpty()) {
             out.print("; left out of the ranking: " + summary.unranked().entrySet().stream()
                     .map(e -> e.getValue() + " " + e.getKey()).collect(Collectors.joining(", ")));

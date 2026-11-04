@@ -16,6 +16,56 @@
     "from": "now-6M",
     "to": "now"
   },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": false,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "iconColor": "#73BF69",
+        "name": "Buy calls",
+        "target": {
+          "limit": 200,
+          "matchAny": false,
+          "tags": [
+            "BUY"
+          ],
+          "type": "tags"
+        }
+      },
+      {
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "iconColor": "#F2495C",
+        "name": "Sell calls",
+        "target": {
+          "limit": 200,
+          "matchAny": false,
+          "tags": [
+            "SELL"
+          ],
+          "type": "tags"
+        }
+      }
+    ]
+  },
   "templating": {
     "list": []
   },
@@ -220,7 +270,7 @@
         },
         "overrides": []
       },
-      "description": "How the reasons you record shift over time, one line per reason code."
+      "description": "How the reasons you record shift over time, one line per reason code.\n\n**Buy / sell calls** (green / red dashed lines) — notes tagged `BUY` or `SELL` on any symbol's chart. Hover a marker to see the call and which symbol it was for."
     },
     {
       "id": 14,

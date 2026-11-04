@@ -215,9 +215,62 @@ class DailyIngestionServiceTest {
         assertTrue(calendarRepository.nonTradingDays(DAY, DAY).isEmpty());
     }
 
-    private DailyIngestionService service(CandleDataClient client) {
-        MarketClock clock = MarketClock.nse();
-        TradingCalendar calendar = new DefaultTradingCalendar(new HolidaySource() {
+    @Test
+    @DisplayName("a previous session that was never stored is backfilled when the day starts")
+    void missingPreviousSessionIsBackfilled() {
+        FakeCandleClient client = new FakeCandleClient();
+        var backfill = new com.stockanalyzer.live.PriorSessionBackfill(service(client), calendar());
+        LocalDate today = DAY.plusDays(1);
+
+        IngestionReport report = backfill.ensure(today, List.of("GOOD"), "NSE", "CASH", 1).orElseThrow();
+
+        assertEquals(1, report.sessionsWritten());
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        assertTrue(tradingDays.findId(instrumentId, DAY, 1).isPresent(), "yesterday is there for today to measure against");
+        assertEquals(Optional.of(tradingDays.find(instrumentId, DAY, 1).orElseThrow().close()),
+                tradingDays.previousClose(instrumentId, today, 1));
+    }
+
+    @Test
+    @DisplayName("when the previous session is already stored nothing is fetched")
+    void storedPreviousSessionCostsNoRequest() {
+        FakeCandleClient client = new FakeCandleClient();
+        DailyIngestionService service = service(client);
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "daily");
+        int calls = client.calls;
+
+        new com.stockanalyzer.live.PriorSessionBackfill(service, calendar())
+                .ensure(DAY.plusDays(1), List.of("GOOD"), "NSE", "CASH", 1);
+
+        assertEquals(calls, client.calls);
+    }
+
+    @Test
+    @DisplayName("on a non-trading day there is no previous session to look for")
+    void nothingToBackfillOnAHoliday() {
+        FakeCandleClient client = new FakeCandleClient();
+        LocalDate saturday = DAY.plusDays(2);
+
+        var report = new com.stockanalyzer.live.PriorSessionBackfill(service(client), calendar())
+                .ensure(saturday, List.of("GOOD"), "NSE", "CASH", 1);
+
+        assertTrue(report.isEmpty());
+        assertEquals(0, client.calls);
+    }
+
+    @Test
+    @DisplayName("an outage while backfilling is reported, not thrown: the day's monitoring still starts")
+    void backfillFailureDoesNotStopTheDay() {
+        var backfill = new com.stockanalyzer.live.PriorSessionBackfill(service(new AlwaysFailingClient()), calendar());
+
+        IngestionReport report = backfill.ensure(DAY.plusDays(1), List.of("GOOD", "BAD"), "NSE", "CASH", 1)
+                .orElseThrow();
+
+        assertEquals(2, report.failures().size());
+    }
+
+    private TradingCalendar calendar() {
+        return new DefaultTradingCalendar(new HolidaySource() {
             @Override
             public Set<LocalDate> holidays() {
                 return Set.of();
@@ -228,6 +281,11 @@ class DailyIngestionServiceTest {
                 return Optional.empty();
             }
         }, calendarRepository);
+    }
+
+    private DailyIngestionService service(CandleDataClient client) {
+        MarketClock clock = MarketClock.nse();
+        TradingCalendar calendar = calendar();
 
         return new DailyIngestionService(client, new SessionSplitter(clock),
                 new DailySummaryBuilder(new TopKNonOverlappingDetector(3, PriceBasis.CLOSE_CLOSE, 1, 0.0)),

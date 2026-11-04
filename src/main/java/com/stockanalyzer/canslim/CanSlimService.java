@@ -1,12 +1,14 @@
 package com.stockanalyzer.canslim;
 
 import com.stockanalyzer.client.CandleDataClient;
+import com.stockanalyzer.client.GrowwSymbolRejectedException;
 import com.stockanalyzer.model.Candle;
 import com.stockanalyzer.model.OpenPosition;
 import com.stockanalyzer.store.CanSlimRepository;
 import com.stockanalyzer.store.DailyBarRepository;
 import com.stockanalyzer.store.FundamentalsCacheRepository;
 import com.stockanalyzer.store.InstrumentRepository;
+import com.stockanalyzer.store.MarketRejectRepository;
 import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
@@ -74,6 +76,7 @@ public final class CanSlimService {
     private final ScreenerClient screener;
     private final CompanyFundamentalsClient companyFundamentals;
     private final FundamentalsCacheRepository fundamentalsCache;
+    private final MarketRejectRepository rejects;
     private final FundamentalsRefreshPolicy refreshPolicy;
     private final CandleDataClient dailyClient;
     private final InstrumentRepository instruments;
@@ -89,13 +92,15 @@ public final class CanSlimService {
     private final CanSlimEvaluator evaluator;
 
     public CanSlimService(ScreenerClient screener, CompanyFundamentalsClient companyFundamentals,
-                          FundamentalsCacheRepository fundamentalsCache, CandleDataClient dailyClient,
+                          FundamentalsCacheRepository fundamentalsCache, MarketRejectRepository rejects,
+                          CandleDataClient dailyClient,
                           InstrumentRepository instruments, DailyBarRepository dailyBars, CanSlimRepository runs,
                           RealizedLotRepository positions, MarketClock marketClock, Clock clock,
                           ExecutorService executor, CanSlimCriteria criteria, Settings settings) {
         this.screener = screener;
         this.companyFundamentals = companyFundamentals;
         this.fundamentalsCache = fundamentalsCache;
+        this.rejects = rejects;
         this.refreshPolicy = new FundamentalsRefreshPolicy(settings.fundamentalsCacheDays(),
                 settings.fundamentalsSeasonCheckDays());
         this.dailyClient = dailyClient;
@@ -190,7 +195,17 @@ public final class CanSlimService {
                 new java.util.concurrent.atomic.AtomicInteger(settings.maxPagesPerRun());
         FundamentalsResult pageFundamentals = pageFundamentals(needFundamentals, exchangeOf, pageKeyOf, pageBudget);
 
+        // A listing Groww refused recently is not asked about again: the instrument list carries symbols
+        // the candle API will not serve, and every scan would otherwise pay a request to be told so.
+        Map<String, MarketRejectRepository.Reject> rejectsOnFile =
+                wide == null || wide.rejectDays() <= 0 ? Map.of() : rejectsOnFile();
+        Set<String> skipped = recentlyRefused(rejectsOnFile, sources, exchangeOf, wide);
+        if (!skipped.isEmpty()) {
+            log.info("Not asking about {} listings Groww refused within the last {} days (table market_reject)",
+                    skipped.size(), wide.rejectDays());
+        }
         List<String> toPrice = new ArrayList<>(sources.keySet());
+        toPrice.removeAll(skipped);
         if (!sources.containsKey(settings.indexSymbol())) {
             toPrice.add(settings.indexSymbol());
         }
@@ -217,6 +232,8 @@ public final class CanSlimService {
         if (marketFailed > MAX_LISTED_MARKET_FAILURES) {
             failures.add("... and " + (marketFailed - MAX_LISTED_MARKET_FAILURES) + " more market symbols");
         }
+        int newlyRejected = wide == null || wide.rejectDays() <= 0 ? 0
+                : rememberRefusals(priced, sources, exchangeOf, rejectsOnFile, wide.rejectDays());
 
         Priced index = priced.get(settings.indexSymbol());
         MarketAssessment market = index == null || index.bars().isEmpty()
@@ -325,7 +342,7 @@ public final class CanSlimService {
                     .forEach(reason -> byReason.merge(reason, 1, Integer::sum));
             summary = new MarketSummary(wide.listings().size(), marketFailed, fieldSize, selected.size(),
                     fieldSize - selected.size() - foundSmall.size(), byReason, leaders.size(),
-                    wide.minMarketCapCr());
+                    wide.minMarketCapCr(), skipped.size(), newlyRejected, wide.rejectDays());
         }
         List<CanSlimScore> ordered = scores.values().stream().sorted(REPORT_ORDER).toList();
         String fundamentalsNotice = pageFundamentals.notice();
@@ -336,6 +353,88 @@ public final class CanSlimService {
         }
         return new CanSlimReport(runId, query, screenedCount, market, ordered, failures, screenerNotice,
                 screenerFailed, needsLogin, fundamentalsNotice, summary);
+    }
+
+    private static String listingKey(String symbol, String exchange) {
+        return symbol + "@" + exchange;
+    }
+
+    private Map<String, MarketRejectRepository.Reject> rejectsOnFile() {
+        Map<String, MarketRejectRepository.Reject> onFile = new HashMap<>();
+        rejects.findAll().forEach(reject -> onFile.put(listingKey(reject.symbol(), reject.exchange()), reject));
+        return onFile;
+    }
+
+    /**
+     * The market listings Groww refused within the last {@code rejectDays} days. Only listings are ever
+     * left out: a holding or a configured symbol is always priced, because a missing sell signal costs
+     * far more than one wasted request.
+     */
+    private Set<String> recentlyRefused(Map<String, MarketRejectRepository.Reject> onFile,
+                                        Map<String, CanSlimScore.Source> sources,
+                                        Map<String, String> exchangeOf, MarketScan wide) {
+        if (onFile.isEmpty()) {
+            return Set.of();
+        }
+        long cutoff = clock.instant().getEpochSecond() - wide.rejectDays() * 86_400L;
+        Set<String> recent = new HashSet<>();
+        for (Map.Entry<String, CanSlimScore.Source> entry : sources.entrySet()) {
+            if (entry.getValue() != CanSlimScore.Source.MARKET) {
+                continue;
+            }
+            MarketRejectRepository.Reject reject = onFile.get(listingKey(entry.getKey(),
+                    exchangeOf.getOrDefault(entry.getKey(), settings.exchange())));
+            if (reject != null && reject.lastRejectedAt() > cutoff) {
+                recent.add(entry.getKey());
+            }
+        }
+        return recent;
+    }
+
+    /**
+     * Writes down which listings Groww refused in this scan, and forgets the ones it has begun to serve.
+     * A transient failure (rate limit, connection, token) is neither: it says nothing about the listing.
+     *
+     * @return how many listings were refused
+     */
+    private int rememberRefusals(Map<String, Priced> priced, Map<String, CanSlimScore.Source> sources,
+                                 Map<String, String> exchangeOf,
+                                 Map<String, MarketRejectRepository.Reject> onFile, int rejectDays) {
+        List<String> refused = new ArrayList<>();
+        int asked = 0;
+        for (Map.Entry<String, Priced> entry : priced.entrySet()) {
+            if (sources.get(entry.getKey()) != CanSlimScore.Source.MARKET) {
+                continue;
+            }
+            asked++;
+            if (entry.getValue().refusal() != null) {
+                refused.add(entry.getKey());
+            }
+        }
+        if (refused.size() > SYSTEMIC_MIN_REFUSALS && (long) refused.size() * SYSTEMIC_ONE_IN > asked) {
+            log.warn("Groww refused {} of {} listings, too many to be dead symbols: not remembering any of them",
+                    refused.size(), asked);
+            return 0;
+        }
+        long now = clock.instant().getEpochSecond();
+        for (String symbol : refused) {
+            rejects.record(symbol, exchangeOf.getOrDefault(symbol, settings.exchange()),
+                    priced.get(symbol).refusal(), now);
+        }
+        for (Map.Entry<String, Priced> entry : priced.entrySet()) {
+            String symbol = entry.getKey();
+            String exchange = exchangeOf.getOrDefault(symbol, settings.exchange());
+            if (sources.get(symbol) == CanSlimScore.Source.MARKET && entry.getValue().error() == null
+                    && onFile.containsKey(listingKey(symbol, exchange))) {
+                rejects.clear(symbol, exchange);
+                log.info("{} is served again; no longer remembered as refused", symbol);
+            }
+        }
+        if (!refused.isEmpty()) {
+            log.info("Remembered {} listings Groww refused; they are left alone for {} days: {}", refused.size(),
+                    rejectDays, String.join(", ", refused));
+        }
+        return refused.size();
     }
 
     /** The market capitalisation (rupees crore) that a cached company page recorded, by symbol, for market listings. */
@@ -442,12 +541,30 @@ public final class CanSlimService {
      * symbols does not hold a year of bars for each of them.
      */
     private record Priced(List<DailyBar> bars, PriceAction action, int sessions, double avgTurnover,
-                          LocalDate lastBar, String error) {
+                          LocalDate lastBar, String error, String refusal) {
 
+        /** A failure that may pass: a rate limit, a dropped connection, an expired token. */
         static Priced failed(String error) {
-            return new Priced(List.of(), null, 0, 0, null, error);
+            return new Priced(List.of(), null, 0, 0, null, error, null);
+        }
+
+        /** A failure that will not: Groww has no bars for this listing, and says so every time. */
+        static Priced refused(String error, String refusal) {
+            return new Priced(List.of(), null, 0, 0, null, error, refusal);
         }
     }
+
+    /** Groww did not recognise the symbol (HTTP 400, GA001). */
+    private static final String REFUSED_SYMBOL = "GA001";
+    /** Groww knew the symbol and had no daily bars for it. */
+    private static final String REFUSED_NO_CANDLES = "NO_CANDLES";
+    /**
+     * If more than this many listings, and more than one in twenty, are refused in one scan, the fault
+     * is far more likely a bad request of ours or an outage than that many dead listings. Nothing is
+     * remembered then, or one bad night would silence the market for weeks.
+     */
+    private static final int SYSTEMIC_MIN_REFUSALS = 25;
+    private static final int SYSTEMIC_ONE_IN = 20;
 
     private static final int TURNOVER_WINDOW = 50;
     private static final int MAX_LISTED_MARKET_FAILURES = 20;
@@ -478,14 +595,17 @@ public final class CanSlimService {
                     end.minusDays(settings.historyDays()), end, DAILY_INTERVAL_MINUTES).candles();
             List<DailyBar> bars = completedBars(candles);
             if (bars.isEmpty()) {
-                return Priced.failed("no daily candles returned - check the symbol");
+                return Priced.refused("no daily candles returned - check the symbol", REFUSED_NO_CANDLES);
             }
             long instrumentId = instruments.findOrCreate(symbol, exchange, settings.segment());
             dailyBars.upsert(instrumentId, bars, bar -> marketClock.sessionOpenEpoch(bar.date()));
             double turnover = bars.subList(Math.max(0, bars.size() - TURNOVER_WINDOW), bars.size()).stream()
                     .mapToDouble(bar -> bar.close() * bar.volume()).average().orElse(0);
             return new Priced(symbol.equals(settings.indexSymbol()) ? bars : List.of(),
-                    priceActionAnalyzer.analyze(bars), bars.size(), turnover, bars.getLast().date(), null);
+                    priceActionAnalyzer.analyze(bars), bars.size(), turnover, bars.getLast().date(), null, null);
+        } catch (GrowwSymbolRejectedException e) {
+            log.warn("Could not price {}: {}", symbol, e.getMessage());
+            return Priced.refused(e.getClass().getSimpleName() + ": " + e.getMessage(), REFUSED_SYMBOL);
         } catch (RuntimeException e) {
             log.warn("Could not price {}: {}", symbol, e.getMessage());
             return Priced.failed(e.getClass().getSimpleName() + ": " + e.getMessage());

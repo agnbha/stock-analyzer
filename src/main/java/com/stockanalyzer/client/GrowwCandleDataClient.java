@@ -73,11 +73,12 @@ public final class GrowwCandleDataClient implements CandleDataClient {
         }
 
         if (response.statusCode() / 100 != 2) {
-            throw new GrowwApiException(
-                    "Groww candle request for " + symbol + " failed with status " + response.statusCode()
-                            + ": " + response.body(),
-                    response.statusCode(),
-                    retryAfterMillis(response));
+            String message = "Groww candle request for " + symbol + " failed with status " + response.statusCode()
+                    + ": " + response.body();
+            if (rejectsSymbol(response.statusCode(), response.body())) {
+                throw new GrowwSymbolRejectedException(message, response.statusCode());
+            }
+            throw new GrowwApiException(message, response.statusCode(), retryAfterMillis(response));
         }
 
         GrowwCandleResponse candleResponse;
@@ -122,6 +123,24 @@ public final class GrowwCandleDataClient implements CandleDataClient {
      * so anything unparseable is treated as "did not say" rather than guessed
      * at.
      */
+    /**
+     * True when Groww says it does not know the trading symbol: 400, code GA001, and a message that
+     * names the symbol. GA001 alone is a general "bad request" and also covers parameters that are
+     * wrong through no fault of the symbol, which must not be taken for a bad listing.
+     */
+    static boolean rejectsSymbol(int status, String body) {
+        if (status != 400 || body == null) {
+            return false;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode error = JsonMapper.INSTANCE.readTree(body).path("error");
+            return "GA001".equals(error.path("code").asText())
+                    && error.path("message").asText("").toLowerCase(java.util.Locale.ROOT).contains("trading symbol");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static long retryAfterMillis(HttpResponse<String> response) {
         for (String header : List.of("Retry-After", "retry-after", "X-RateLimit-Reset-After")) {
             String value = response.headers().firstValue(header).orElse(null);

@@ -55,9 +55,17 @@ public final class GrowwInstrumentCatalog implements MarketCatalog {
      * @param exchanges the exchanges to include, NSE and/or BSE
      * @param nseSeries NSE series to include, for example EQ, BE, BZ
      * @param bseSeries BSE groups to include for companies NSE does not list
+     * @param excluded  trading symbols to leave out, as the catalog spells them: instruments the candle API
+     *                  rejects however often they are asked for. A company dropped this way stays dropped
+     *                  rather than being listed under its other exchange
      */
     public record Settings(String url, Path cacheFile, Duration maxAge, Set<String> exchanges,
-                           Set<String> nseSeries, Set<String> bseSeries) {
+                           Set<String> nseSeries, Set<String> bseSeries, Set<String> excluded) {
+
+        public Settings(String url, Path cacheFile, Duration maxAge, Set<String> exchanges,
+                        Set<String> nseSeries, Set<String> bseSeries) {
+            this(url, cacheFile, maxAge, exchanges, nseSeries, bseSeries, Set.of());
+        }
     }
 
     private final HttpClient httpClient;
@@ -195,6 +203,12 @@ public final class GrowwInstrumentCatalog implements MarketCatalog {
         }
         if (collisions > 0) {
             log.info("Skipped {} BSE-only companies whose symbol is already an NSE company's", collisions);
+        }
+        // After the one-company-once pass, so a dropped NSE listing is not replaced by its BSE twin.
+        int listed = all.size();
+        all.removeIf(listing -> settings.excluded().contains(listing.symbol()));
+        if (all.size() < listed) {
+            log.info("Left out {} listings named in canslim.market.exclude", listed - all.size());
         }
         return all;
     }

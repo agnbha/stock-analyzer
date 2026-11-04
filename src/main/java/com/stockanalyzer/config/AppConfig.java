@@ -487,6 +487,18 @@ public final class AppConfig {
         return series;
     }
 
+    /** Trading symbols never priced in a market scan; the catalog spells them in capitals. */
+    public java.util.Set<String> canSlimMarketExcluded() {
+        return csvSet("canslim.market.exclude", "").stream()
+                .map(symbol -> symbol.toUpperCase(java.util.Locale.ROOT))
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
+    /** Days a listing Groww refused (unknown symbol, no bars) is left unasked; 0 asks about it every scan. */
+    public int canSlimMarketRejectDays() {
+        return Integer.parseInt(get("canslim.market.reject.days", "30"));
+    }
+
     public boolean canSlimMarketIncludeSme() {
         return Boolean.parseBoolean(get("canslim.market.include.sme", "false"));
     }

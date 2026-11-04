@@ -86,6 +86,7 @@ import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.store.jdbc.SqliteLiveCandleRepository;
 import com.stockanalyzer.store.jdbc.SqliteLiveOpportunityRepository;
 import com.stockanalyzer.store.jdbc.SqliteMarketEventRepository;
+import com.stockanalyzer.store.jdbc.SqliteMarketRejectRepository;
 import com.stockanalyzer.store.jdbc.SqlitePnlPeriodRepository;
 import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
@@ -470,7 +471,7 @@ public final class AppContext implements AutoCloseable {
                 new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
                 new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
                         config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
-                new SqliteFundamentalsCacheRepository(database),
+                new SqliteFundamentalsCacheRepository(database), new SqliteMarketRejectRepository(database),
                 wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
                 new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
                 executor, criteria, settings);
@@ -487,7 +488,8 @@ public final class AppContext implements AutoCloseable {
         List<MarketListing> listings = new GrowwInstrumentCatalog(httpClient, new GrowwInstrumentCatalog.Settings(
                 config.canSlimCatalogUrl(), java.nio.file.Path.of(config.canSlimCatalogCache()),
                 Duration.ofHours(config.canSlimCatalogMaxAgeHours()), config.canSlimMarketExchanges(),
-                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries())).listings();
+                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries(),
+                config.canSlimMarketExcluded())).listings();
         if (limit > 0 && limit < listings.size()) {
             List<MarketListing> sample = new ArrayList<>(limit);
             for (int i = 0; i < limit; i++) {
@@ -498,7 +500,7 @@ public final class AppContext implements AutoCloseable {
         return new MarketScan(listings, config.canSlimMarketMinSessions(), config.canSlimMarketMinPrice(),
                 config.canSlimMarketMinTurnover(), config.canSlimMarketMaxStaleDays(),
                 config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns(),
-                config.canSlimMarketMinMarketCapCr());
+                config.canSlimMarketMinMarketCapCr(), config.canSlimMarketRejectDays());
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {
