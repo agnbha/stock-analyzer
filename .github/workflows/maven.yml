@@ -38,6 +38,12 @@ jobs:
     # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
     # Only the default branch's graph matters, and pull requests (forks in
     # particular) do not get a token that may write it.
+    #
+    # GitHub refuses the snapshot with a 404 until "Dependency graph" is switched on for the repository
+    # (Settings > Advanced Security). That is a repository setting no workflow can change, and this step
+    # only feeds Dependabot, so a refusal must not fail a build whose tests passed. It still shows as an
+    # error annotation on the run; turning the setting on makes it succeed without touching this file.
     - name: Update dependency graph
       if: github.event_name == 'push'
+      continue-on-error: true
       uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6
