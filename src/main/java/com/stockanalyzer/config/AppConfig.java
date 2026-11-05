@@ -405,6 +405,16 @@ public final class AppConfig {
         return Long.parseLong(get("canslim.screener.request.interval.ms", "12000"));
     }
 
+    /** How old a company's profile may be before its screener.in page is read again. */
+    public int companyProfileRefreshDays() {
+        return Integer.parseInt(get("company.profile.refresh.days", "7"));
+    }
+
+    /** The most company pages one nightly run reads for profiles; zero reads every one that is due. */
+    public int companyProfileMaxPagesPerRun() {
+        return Integer.parseInt(get("company.profile.max.pages.per.run", "12"));
+    }
+
     /** How long to wait after screener.in answers 429, unless it says how long itself. */
     public long screenerRateLimitBackoffMillis() {
         return Long.parseLong(get("canslim.screener.rate.limit.backoff.ms", "60000"));

@@ -16,6 +16,7 @@ import com.stockanalyzer.canslim.CanSlimService;
 import com.stockanalyzer.canslim.GrowwInstrumentCatalog;
 import com.stockanalyzer.canslim.MarketListing;
 import com.stockanalyzer.canslim.MarketScan;
+import com.stockanalyzer.canslim.CompanyProfileService;
 import com.stockanalyzer.canslim.ScreenerCompanyClient;
 import com.stockanalyzer.canslim.ScreenerInClient;
 import com.stockanalyzer.client.CandleDataClient;
@@ -63,6 +64,7 @@ import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.store.SchemaMigrator;
 import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
+import com.stockanalyzer.store.CompanyProfileRepository;
 import com.stockanalyzer.store.WatchlistPickRepository;
 import com.stockanalyzer.store.Week52Repository;
 import com.stockanalyzer.store.jdbc.SqliteAlertRepository;
@@ -92,6 +94,7 @@ import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradingDayRepository;
+import com.stockanalyzer.store.jdbc.SqliteCompanyProfileRepository;
 import com.stockanalyzer.store.jdbc.SqliteWatchlistPickRepository;
 import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
@@ -168,6 +171,7 @@ public final class AppContext implements AutoCloseable {
     private final TradeNoteRepository tradeNoteRepository;
     private final ChartNoteRepository chartNoteRepository;
     private final WatchlistPickRepository watchlistPickRepository;
+    private final CompanyProfileRepository companyProfileRepository;
     private final AccountBalanceRepository accountBalanceRepository;
     private final Supplier<AccountDataClient> accountDataClient;
 
@@ -216,6 +220,7 @@ public final class AppContext implements AutoCloseable {
         this.tradeNoteRepository = new SqliteTradeNoteRepository(database);
         this.chartNoteRepository = new SqliteChartNoteRepository(database);
         this.watchlistPickRepository = new SqliteWatchlistPickRepository(database);
+        this.companyProfileRepository = new SqliteCompanyProfileRepository(database);
         this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
 
         this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
@@ -442,6 +447,15 @@ public final class AppContext implements AutoCloseable {
 
     public WatchlistService watchlistService() {
         return new WatchlistService(watchlistPickRepository);
+    }
+
+    /** Reads company profiles from screener.in's public pages, one at a time at the configured pace. */
+    public CompanyProfileService companyProfileService() {
+        return new CompanyProfileService(
+                new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                        config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
+                companyProfileRepository, instrumentRepository, java.time.Clock.systemUTC(),
+                config.exchange(), config.segment());
     }
 
     /**

@@ -11,4 +11,12 @@ import java.util.Optional;
 public interface CompanyFundamentalsClient {
 
     Optional<CompanyFundamentals> fetch(String symbol);
+
+    /**
+     * The same page read for what to show next to a chart rather than for what CAN SLIM scores. Empty when the
+     * source has nothing on the symbol; a source that cannot give a profile says so by always being empty.
+     */
+    default Optional<CompanyProfile> fetchProfile(String symbol) {
+        return Optional.empty();
+    }
 }

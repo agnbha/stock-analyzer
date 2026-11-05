@@ -147,6 +147,26 @@ One thing the box cannot change: the chart's time axis always spans the time ran
 session shown on a three-month range is a thin strip at the right edge however many candles it has, so narrow the
 range to the sessions you want to look at.
 
+**Company details, under the charts.** For the symbol picked, Candles and Calls ends with what screener.in says
+about the business: the fundamentals (market cap, P/E, P/B, debt/equity, ROE, ROCE, EPS, dividend yield, book and
+face value, and the 52-week range), revenue and net profit for the last eight quarters, growth over the trailing year
+and three years, who holds the shares over the same quarters (promoters, FII, DII, public), and what the company does.
+
+They come from the company's public page, read by `CanSlimMain profiles`. `evening.sh` reads a dozen of the stalest
+each night, 12 seconds apart because screener.in refuses a faster pace, so the symbols in `symbols.txt` turn over in
+about a week (`company.profile.refresh.days`, `company.profile.max.pages.per.run`); `profiles --symbol RELIANCE` reads
+one now, and `profiles --max-pages 0` everything due. Until a company has been read its panels are empty, and so are
+those of a symbol outside `symbols.txt`.
+
+Market cap, P/E, P/B and dividend yield are not the page's figures from the day it was read: they are restated at
+the latest price this database holds (today's last candle, else the last session's close) from the figures that do not
+move with it: earnings per share over the trailing twelve months, book value, the share count and the dividend per
+share. A loss-making company has no P/E, and shows none. Debt/equity is borrowings over equity capital plus reserves in
+the latest balance sheet.
+
+Three things on a typical stock page are not here: market depth and the circuit limits are exchange data that
+screener.in does not carry, and the industry P/E, which screener.in loads separately from the company page.
+
 **Decision Reasons** — how often each reason recurs, where it came from (typed by
 you, an event the detector found, an alert that fired, or the model), buy
 reasons versus sell reasons, and a table of whether each reason actually paid.

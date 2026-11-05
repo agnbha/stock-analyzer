@@ -89,6 +89,7 @@ public final class SchemaMigrator {
         all.put(21, v21());
         all.put(22, v22());
         all.put(23, v23());
+        all.put(24, v24());
         return all;
     }
 
@@ -454,6 +455,93 @@ public final class SchemaMigrator {
                              AVG(close_to_close_pct) AS avg_close_to_close_pct
                       FROM v_session_move GROUP BY session_date) a
                   ON a.session_date = m.session_date""");
+        return ddl;
+    }
+
+    /**
+     * v24: what a company does and how it is doing, from its screener.in page, for the Candles and Calls
+     * page: headline ratios and growth, the latest quarters' revenue and profit, and who holds the shares.
+     *
+     * <p>A row with only {@code fetched_at} says "asked, and the page had nothing" (an ETF), so it is not
+     * asked again every night. The price-dependent ratios are stored as the page showed them together with
+     * that price, and {@code v_company_fundamentals} restates them at the latest price we hold, from the
+     * figures that do not move with it: earnings per share, book value and the share count (market cap over
+     * price). Money is in crore rupees except per-share figures; shareholding is in percent of shares.
+     */
+    private List<String> v24() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE company_profile (
+                  instrument_id INTEGER PRIMARY KEY REFERENCES instrument(id),
+                  fetched_at INTEGER NOT NULL,
+                  results_quarter TEXT,
+                  holding_quarter TEXT,
+                  about TEXT,
+                  classification TEXT,
+                  market_cap_cr REAL,
+                  price REAL,
+                  high_52w REAL,
+                  low_52w REAL,
+                  pe REAL,
+                  book_value REAL,
+                  dividend_yield REAL,
+                  roce REAL,
+                  roe REAL,
+                  face_value REAL,
+                  eps_ttm REAL,
+                  debt_to_equity REAL,
+                  sales_growth_ttm REAL,
+                  sales_growth_3y REAL,
+                  profit_growth_ttm REAL,
+                  profit_growth_3y REAL
+                )""");
+        ddl.add("""
+                CREATE TABLE company_quarter (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  period TEXT NOT NULL,
+                  sales REAL,
+                  net_profit REAL,
+                  eps REAL,
+                  PRIMARY KEY (instrument_id, period)
+                ) WITHOUT ROWID""");
+        ddl.add("""
+                CREATE TABLE company_holding (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  period TEXT NOT NULL,
+                  promoters REAL,
+                  fiis REAL,
+                  diis REAL,
+                  government REAL,
+                  public REAL,
+                  others REAL,
+                  shareholders REAL,
+                  PRIMARY KEY (instrument_id, period)
+                ) WITHOUT ROWID""");
+        ddl.add("""
+                CREATE VIEW v_company_fundamentals AS
+                SELECT symbol, instrument_id, fetched_at, results_quarter, holding_quarter, about, classification,
+                       price AS price_when_read, price_now,
+                       CASE WHEN price > 0 THEN market_cap_cr * price_now / price END      AS market_cap_now_cr,
+                       CASE WHEN eps_ttm > 0 THEN price_now / eps_ttm END                  AS pe_now,
+                       CASE WHEN book_value > 0 THEN price_now / book_value END            AS pb_now,
+                       CASE WHEN price > 0 AND price_now > 0
+                            THEN dividend_yield * price / price_now END                    AS dividend_yield_now,
+                       book_value, eps_ttm, debt_to_equity, roe, roce, face_value,
+                       COALESCE(week52_high, high_52w) AS high_52w, COALESCE(week52_low, low_52w) AS low_52w,
+                       CASE WHEN COALESCE(week52_high, high_52w) > 0
+                            THEN (price_now / COALESCE(week52_high, high_52w) - 1) * 100 END AS pct_from_52w_high,
+                       sales_growth_ttm, sales_growth_3y, profit_growth_ttm, profit_growth_3y
+                FROM (
+                  SELECT i.symbol AS symbol, p.*, w.week52_high AS week52_high, w.week52_low AS week52_low,
+                         COALESCE((SELECT l.close FROM live_candle l
+                                   WHERE l.instrument_id = p.instrument_id ORDER BY l.ts_epoch DESC LIMIT 1),
+                                  (SELECT t.close FROM trading_day t
+                                   WHERE t.instrument_id = p.instrument_id ORDER BY t.session_date DESC LIMIT 1),
+                                  p.price) AS price_now
+                  FROM company_profile p
+                  JOIN instrument i ON i.id = p.instrument_id
+                  LEFT JOIN symbol_week52 w ON w.instrument_id = p.instrument_id
+                )""");
         return ddl;
     }
 

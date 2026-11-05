@@ -1079,6 +1079,636 @@
         }
       ],
       "transparent": true
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "$symbol - fundamentals, restated at the latest price",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "description": "From the company's page on screener.in, read by `CanSlimMain profiles` (evening.sh does a few each night). **Market cap, P/E, P/B and dividend yield** are restated at the latest price this database holds (today's last candle, else the last session's close) from the figures that do not move with it: earnings per share over the trailing twelve months, book value, the share count and the dividend per share. **Debt / equity** is borrowings over equity capital plus reserves in the latest balance sheet. **ROE, ROCE, book value and face value** are as the page shows them. The 52-week range is this database's own where it has one, else the page's. Empty until the company's page has been read.",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(market_cap_now_cr)       AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'",
+          "queryText": "SELECT ROUND(market_cap_now_cr)       AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Market cap (₹ Cr)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P/E"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P/B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Debt / equity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROCE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EPS (TTM)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dividend yield"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Book value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Face value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52-week high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52-week low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyINR"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "From 52-week high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "type": "barchart",
+      "title": "$symbol - revenue and net profit by quarter (₹ crore)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "description": "The company's latest eight reported quarters, from screener.in. Revenue is its \"Sales\" line (a bank's \"Revenue\"); net profit is after tax.",
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue\",\n       q.net_profit AS \"Net profit\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue\",\n       q.net_profit AS \"Net profit\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "decimals": 0,
+          "noValue": "no profile read yet"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8aa0b8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net profit"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3aa76d"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "type": "barchart",
+      "title": "$symbol - who holds the shares (% of shares)",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "description": "The shareholding pattern at the end of each of the last eight quarters, from screener.in: promoters, foreign institutions (FII), domestic institutions (DII) and the public. Government and other holders, a percent or so, are left out, so the bars fall a little short of 100.",
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters AS \"Promoters\",\n       h.fiis      AS \"FII\",\n       h.diis      AS \"DII\",\n       h.public    AS \"Public\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters AS \"Promoters\",\n       h.fiis      AS \"FII\",\n       h.diis      AS \"DII\",\n       h.public    AS \"Public\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": 0,
+        "stacking": "normal",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 90,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "decimals": 1,
+          "unit": "percent",
+          "noValue": "no profile read yet",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Promoters"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6b5fb5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3b82c4"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#e0913a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Public"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa3ad"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "type": "stat",
+      "title": "$symbol - growth",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "description": "Compounded growth in revenue and profit as screener.in prints it: over the trailing twelve months, and per year over three years.",
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT sales_growth_ttm  AS \"Revenue growth (TTM)\",\n       sales_growth_3y   AS \"Revenue growth (3Y CAGR)\",\n       profit_growth_ttm AS \"Profit growth (TTM)\",\n       profit_growth_3y  AS \"Profit growth (3Y CAGR)\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'",
+          "queryText": "SELECT sales_growth_ttm  AS \"Revenue growth (TTM)\",\n       sales_growth_3y   AS \"Revenue growth (3Y CAGR)\",\n       profit_growth_ttm AS \"Profit growth (TTM)\",\n       profit_growth_3y  AS \"Profit growth (3Y CAGR)\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "unit": "percent",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 34,
+      "type": "table",
+      "title": "$symbol - about",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "description": "What the company does, and the sector it is filed under, from its page on screener.in.",
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT p.classification AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL",
+          "queryText": "SELECT p.classification AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "lg"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sector"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read from screener.in"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

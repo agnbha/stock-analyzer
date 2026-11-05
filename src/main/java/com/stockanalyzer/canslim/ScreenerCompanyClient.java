@@ -70,6 +70,27 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
         return Optional.empty();
     }
 
+    /**
+     * The company profile from the same pages: consolidated first, then standalone. A page that has the
+     * company but nothing in it (an ETF) is skipped like a missing one.
+     */
+    @Override
+    public Optional<CompanyProfile> fetchProfile(String symbol) {
+        String encoded = URLEncoder.encode(symbol, StandardCharsets.UTF_8);
+        for (String path : new String[]{"/company/" + encoded + "/consolidated/", "/company/" + encoded + "/"}) {
+            String html = get(baseUrl + path, symbol);
+            if (html == null) {
+                continue;
+            }
+            CompanyProfile profile = ScreenerCompanyParser.profile(html);
+            if (!profile.isEmpty()) {
+                return Optional.of(profile);
+            }
+            log.debug("{}{} carried no profile figures", symbol, path);
+        }
+        return Optional.empty();
+    }
+
     /** The page body, or null when the page does not exist. */
     private String get(String url, String symbol) {
         HttpRequest request = HttpRequest.newBuilder()
