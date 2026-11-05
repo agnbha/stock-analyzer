@@ -96,6 +96,7 @@ public final class MarketDayDaemon {
                     new MarketMonitor.MonitorSettings(
                             config.stockSymbols(), config.exchange(), config.segment(),
                             config.intradayIntervalMinutes(), config.monitorPollIntervalSeconds(),
+                            config.monitorActivePollIntervalSeconds(),
                             config.monitorPostCloseGraceSeconds(), config.modelHorizonMinutes(),
                             config.monitorPersistLiveCandles()));
 
@@ -114,11 +115,15 @@ public final class MarketDayDaemon {
         }
     }
 
+    /** Fewest symbols traded in a day that the request budget should still cover at the active speed. */
+    private static final int ACTIVE_SYMBOLS_TO_AFFORD = 5;
+
     /**
-     * A full session costs (ticks x symbols) requests. If that does not fit in
-     * the daily budget the limiter will simply stop fetching part-way through
-     * the afternoon - quietly, because sleeping is what a limiter is supposed to
-     * do. Better to say so before the open than to find a flat line at 13:00.
+     * Every symbol costs one request per slow poll, and a symbol traded today one per active poll for the
+     * rest of the session. If that does not fit in the daily budget the limiter will simply stop fetching
+     * part-way through the afternoon - quietly, because sleeping is what a limiter is supposed to do.
+     * Better to say so before the open than to find a flat line at 13:00. The number of symbols that will
+     * be traded is not known at the open, so this says how many the budget has room for.
      */
     private static void warnIfSessionExceedsDailyBudget(AppContext context, AppConfig config) {
         int dailyLimit = config.rateLimitPerDay();
@@ -126,18 +131,29 @@ public final class MarketDayDaemon {
             return;
         }
         long sessionSeconds = context.clock().sessionLengthMinutes() * 60L;
-        long ticks = sessionSeconds / Math.max(config.monitorPollIntervalSeconds(), 1);
-        long projected = ticks * config.stockSymbols().size();
-        if (projected <= dailyLimit) {
-            log.info("Projected {} requests this session ({} ticks x {} symbols), within the daily budget of {}",
-                    projected, ticks, config.stockSymbols().size(), dailyLimit);
-            return;
+        int symbols = config.stockSymbols().size();
+        long slowTicks = sessionSeconds / Math.max(config.monitorPollIntervalSeconds(), 1);
+        long slowRequests = slowTicks * symbols;
+        long activeTicks = sessionSeconds / Math.max(config.monitorActivePollIntervalSeconds(), 1);
+        long affordable = slowRequests >= dailyLimit ? 0 : (dailyLimit - slowRequests) / activeTicks;
+        if (slowRequests > dailyLimit) {
+            log.warn("This session needs about {} requests ({} polls x {} symbols) but "
+                            + "ingest.rate.limit.per.day is {}. The monitor will stall part-way through the "
+                            + "afternoon. Raise the limit, lengthen monitor.poll.interval.seconds, or watch "
+                            + "fewer symbols.",
+                    slowRequests, slowTicks, symbols, dailyLimit);
+        } else if (affordable < ACTIVE_SYMBOLS_TO_AFFORD) {
+            log.warn("Scanning {} symbols every {}s takes {} of the {} requests a day ingest.rate.limit.per.day "
+                            + "allows, which leaves room to follow only {} traded symbols every {}s. The monitor "
+                            + "will stall in the afternoon if more are traded. Raise the limit.",
+                    symbols, config.monitorPollIntervalSeconds(), slowRequests, dailyLimit, affordable,
+                    config.monitorActivePollIntervalSeconds());
+        } else {
+            log.info("Projected {} requests for {} symbols every {}s; the daily budget of {} leaves room to "
+                            + "follow about {} traded symbols every {}s",
+                    slowRequests, symbols, config.monitorPollIntervalSeconds(), dailyLimit, affordable,
+                    config.monitorActivePollIntervalSeconds());
         }
-        log.warn("This session needs about {} requests ({} ticks x {} symbols) but "
-                        + "ingest.rate.limit.per.day is {}. The monitor will stall part-way through the "
-                        + "afternoon. Raise the limit, lengthen monitor.poll.interval.seconds, or watch "
-                        + "fewer symbols.",
-                projected, ticks, config.stockSymbols().size(), dailyLimit);
     }
 
     private static void status() {

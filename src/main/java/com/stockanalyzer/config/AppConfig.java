@@ -313,8 +313,14 @@ public final class AppConfig {
 
     // ---- Part 4: live monitoring -----------------------------------------------------
 
+    /** How often every tracked symbol is scanned. */
     public int monitorPollIntervalSeconds() {
-        return Integer.parseInt(get("monitor.poll.interval.seconds", "150"));
+        return Integer.parseInt(get("monitor.poll.interval.seconds", "180"));
+    }
+
+    /** How often a symbol with a fill today (a buy or a sell) is scanned instead. */
+    public int monitorActivePollIntervalSeconds() {
+        return Integer.parseInt(get("monitor.active.poll.interval.seconds", "10"));
     }
 
     public String monitorSessionOpen() {
