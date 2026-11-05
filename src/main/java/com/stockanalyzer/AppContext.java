@@ -63,6 +63,7 @@ import com.stockanalyzer.store.RealizedLotRepository;
 import com.stockanalyzer.store.SchemaMigrator;
 import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
+import com.stockanalyzer.store.WatchlistPickRepository;
 import com.stockanalyzer.store.Week52Repository;
 import com.stockanalyzer.store.jdbc.SqliteAlertRepository;
 import com.stockanalyzer.client.AccountDataClient;
@@ -91,6 +92,7 @@ import com.stockanalyzer.store.jdbc.SqlitePredictionRepository;
 import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradeRepository;
 import com.stockanalyzer.store.jdbc.SqliteTradingDayRepository;
+import com.stockanalyzer.store.jdbc.SqliteWatchlistPickRepository;
 import com.stockanalyzer.store.jdbc.SqliteWeek52Repository;
 import com.stockanalyzer.store.AccountBalanceRepository;
 import com.stockanalyzer.store.AttributionRepository;
@@ -110,6 +112,7 @@ import com.stockanalyzer.trade.PeriodBounds;
 import com.stockanalyzer.trade.ReasonAttributor;
 import com.stockanalyzer.trade.TradeJournalService;
 import com.stockanalyzer.trade.TradeNoteService;
+import com.stockanalyzer.watchlist.WatchlistService;
 import com.stockanalyzer.util.MarketClock;
 
 import java.net.http.HttpClient;
@@ -164,6 +167,7 @@ public final class AppContext implements AutoCloseable {
     private final TradeReasonRepository tradeReasonRepository;
     private final TradeNoteRepository tradeNoteRepository;
     private final ChartNoteRepository chartNoteRepository;
+    private final WatchlistPickRepository watchlistPickRepository;
     private final AccountBalanceRepository accountBalanceRepository;
     private final Supplier<AccountDataClient> accountDataClient;
 
@@ -211,6 +215,7 @@ public final class AppContext implements AutoCloseable {
         this.tradeReasonRepository = new SqliteTradeReasonRepository(database);
         this.tradeNoteRepository = new SqliteTradeNoteRepository(database);
         this.chartNoteRepository = new SqliteChartNoteRepository(database);
+        this.watchlistPickRepository = new SqliteWatchlistPickRepository(database);
         this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
 
         this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
@@ -435,6 +440,10 @@ public final class AppContext implements AutoCloseable {
 
     public Week52Repository week52Repository() {
         return week52Repository;
+    }
+
+    public WatchlistService watchlistService() {
+        return new WatchlistService(watchlistPickRepository);
     }
 
     /**

@@ -246,6 +246,11 @@ public final class AppConfig {
                 .toList();
     }
 
+    /** How many symbols the evening step writes down as the Watchlist's shortlist. */
+    public int watchlistTop() {
+        return Integer.parseInt(get("watchlist.top", "5"));
+    }
+
     /** The least severe alert that becomes a desktop notification: INFO, NOTABLE or URGENT. */
     public String alertDesktopMinSeverity() {
         return get("alerts.desktop.min-severity", "NOTABLE").trim().toUpperCase();

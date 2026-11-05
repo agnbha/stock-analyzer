@@ -18,6 +18,9 @@ log "weekly maintenance, week ending $LAST_FRIDAY"
 run_step "recompute time-of-day prior" com.stockanalyzer.DailyAnalysisMain hot-windows --lookback 60
 run_step "backfill any gaps" com.stockanalyzer.DailyAnalysisMain backfill \
     --from "$(date -v-14d '+%F' 2>/dev/null || date -d '14 days ago' '+%F')" --to "$LAST_FRIDAY"
+# The Watchlist's 52-week columns read this. One daily-candle request per symbol, and a year's range moves slowly,
+# so weekly is plenty; without it a symbol added to symbols.txt shows no 52-week range at all.
+run_step "refresh 52-week ranges" com.stockanalyzer.DailyAnalysisMain week52
 run_step "week P&L" com.stockanalyzer.TradeJournalMain pnl --period week --of "$LAST_FRIDAY"
 
 finish

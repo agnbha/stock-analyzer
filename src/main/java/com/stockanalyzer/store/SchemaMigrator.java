@@ -88,6 +88,7 @@ public final class SchemaMigrator {
         all.put(20, v20());
         all.put(21, v21());
         all.put(22, v22());
+        all.put(23, v23());
         return all;
     }
 
@@ -323,6 +324,137 @@ public final class SchemaMigrator {
                   deleted_at INTEGER
                 )""",
                 "CREATE INDEX ix_chart_note_symbol ON chart_note (symbol, noted_at)");
+    }
+
+    /**
+     * v23: the Watchlist ranks complete sessions only, and keeps a record of how its shortlists did.
+     *
+     * <p>A session is complete when its last candle is from the final minutes of the day (15:25 IST or
+     * later, which is 09:55 UTC: {@code last_candle_ts % 86400 >= 35700}). A session ingested while the
+     * market is open ends early, so its close is just the price at that moment; ranking on it let a
+     * half-day row decide the shortlist. Those rows are skipped, so the ranking is always "as of the
+     * last full session", which is what a pre-open shortlist is.
+     *
+     * <p>{@code v_bullish_history} is the score for every complete session, so a past evening's
+     * shortlist can be rebuilt; {@code v_bullish_ranking} is its latest row per symbol, as before.
+     * {@code watchlist_pick} stores each evening's shortlist. Nothing about what happened next is
+     * stored: {@code v_watchlist_outcome} reads it from the stored sessions, so a session that is
+     * later re-ingested corrects its own scorecard.
+     *
+     * <p>{@code v_session_move} is one complete session as moves from the open, and from the previous
+     * complete session's close. {@code v_open_excursion} averages the last twenty of them per symbol:
+     * how far above and below its open a stock typically goes, and how often it gets 1% either way,
+     * which is what a 0.6% or 1% sell target and a stop have to be set against.
+     */
+    private List<String> v23() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("DROP VIEW v_bullish_ranking");
+
+        ddl.add("""
+                CREATE VIEW v_session_move AS
+                SELECT symbol, session_date, ts_epoch, open, high, low, close,
+                       CASE WHEN prev_close > 0 THEN (open - prev_close) / prev_close * 100.0 END
+                         AS gap_pct,
+                       (close - open) / open * 100.0                                           AS open_to_close_pct,
+                       CASE WHEN prev_close > 0 THEN (close - prev_close) / prev_close * 100.0 END
+                         AS close_to_close_pct,
+                       (high - open) / open * 100.0                                            AS high_vs_open_pct,
+                       (low - open) / open * 100.0                                             AS low_vs_open_pct
+                FROM (
+                  SELECT i.symbol AS symbol, t.session_date AS session_date,
+                         t.first_candle_ts AS ts_epoch, t.open, t.high, t.low, t.close,
+                         LAG(t.close) OVER (PARTITION BY t.instrument_id ORDER BY t.session_date) AS prev_close
+                  FROM trading_day t JOIN instrument i ON i.id = t.instrument_id
+                  WHERE t.open > 0 AND t.last_candle_ts % 86400 >= 35700
+                )""");
+
+        ddl.add("""
+                CREATE VIEW v_open_excursion AS
+                SELECT symbol,
+                       COUNT(*)                                                    AS sessions,
+                       AVG(high_vs_open_pct)                                       AS avg_high_vs_open_pct,
+                       AVG(low_vs_open_pct)                                        AS avg_low_vs_open_pct,
+                       100.0 * SUM(CASE WHEN high_vs_open_pct >= 1.0 THEN 1 ELSE 0 END) / COUNT(*)
+                         AS pct_sessions_up_1,
+                       100.0 * SUM(CASE WHEN low_vs_open_pct <= -1.0 THEN 1 ELSE 0 END) / COUNT(*)
+                         AS pct_sessions_down_1
+                FROM (
+                  SELECT m.*, ROW_NUMBER() OVER (PARTITION BY m.symbol ORDER BY m.session_date DESC) AS recency
+                  FROM v_session_move m
+                )
+                WHERE recency <= 20
+                GROUP BY symbol""");
+
+        ddl.add("""
+                CREATE VIEW v_bullish_history AS
+                SELECT symbol, session_date, ts_epoch, open, high, low, close, volume,
+                       sma20, sma50, rsi14, trend_score, ret5, pct_above_sma20,
+                       ROUND(pct_above_sma20 + ret5
+                             + CASE WHEN rsi14 IS NULL THEN 0 ELSE (rsi14 - 50) / 10.0 END
+                             - CASE WHEN rsi14 > 75 THEN (rsi14 - 75) / 5.0 ELSE 0 END, 3)
+                       AS bullish_score
+                FROM (
+                  SELECT t.*,
+                         CASE WHEN t.sma20 IS NULL OR t.sma20 = 0 THEN NULL
+                              ELSE (t.close - t.sma20) / t.sma20 * 100.0 END AS pct_above_sma20,
+                         CASE WHEN LAG(t.close, 5) OVER p IS NULL THEN NULL
+                              ELSE (t.close - LAG(t.close, 5) OVER p)
+                                   / LAG(t.close, 5) OVER p * 100.0 END      AS ret5,
+                         d.last_candle_ts                                    AS last_candle_ts
+                  FROM v_symbol_trend t
+                  JOIN instrument i ON i.symbol = t.symbol
+                  JOIN trading_day d ON d.instrument_id = i.id AND d.session_date = t.session_date
+                  WINDOW p AS (PARTITION BY t.symbol ORDER BY t.session_date)
+                )
+                WHERE last_candle_ts % 86400 >= 35700""");
+
+        ddl.add("""
+                CREATE VIEW v_bullish_ranking AS
+                SELECT symbol, session_date, ts_epoch, open, high, low, close, volume,
+                       sma20, sma50, rsi14, trend_score, ret5, pct_above_sma20, bullish_score
+                FROM (
+                  SELECT h.*, ROW_NUMBER() OVER (PARTITION BY h.symbol ORDER BY h.session_date DESC) AS recency
+                  FROM v_bullish_history h
+                )
+                WHERE recency = 1""");
+
+        ddl.add("""
+                CREATE TABLE watchlist_pick (
+                  as_of_date TEXT NOT NULL,
+                  rank INTEGER NOT NULL,
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  score REAL NOT NULL,
+                  close REAL,
+                  pct_above_sma20 REAL,
+                  ret5 REAL,
+                  rsi14 REAL,
+                  source TEXT NOT NULL,
+                  picked_at INTEGER NOT NULL,
+                  PRIMARY KEY (as_of_date, rank)
+                )""");
+
+        ddl.add("""
+                CREATE VIEW v_watchlist_outcome AS
+                SELECT p.as_of_date, p.rank, i.symbol, p.score, p.source, m.session_date AS next_date,
+                       m.gap_pct, m.open_to_close_pct, m.close_to_close_pct,
+                       m.high_vs_open_pct, m.low_vs_open_pct,
+                       a.names                  AS market_names,
+                       a.avg_gap_pct            AS market_gap_pct,
+                       a.avg_open_to_close_pct  AS market_open_to_close_pct,
+                       a.avg_close_to_close_pct AS market_close_to_close_pct
+                FROM watchlist_pick p
+                JOIN instrument i ON i.id = p.instrument_id
+                JOIN v_session_move m
+                  ON m.symbol = i.symbol
+                 AND m.session_date = (SELECT MIN(n.session_date) FROM v_session_move n
+                                       WHERE n.symbol = i.symbol AND n.session_date > p.as_of_date)
+                JOIN (SELECT session_date, COUNT(*) AS names,
+                             AVG(gap_pct) AS avg_gap_pct,
+                             AVG(open_to_close_pct) AS avg_open_to_close_pct,
+                             AVG(close_to_close_pct) AS avg_close_to_close_pct
+                      FROM v_session_move GROUP BY session_date) a
+                  ON a.session_date = m.session_date""");
+        return ddl;
     }
 
     /** v1: candle history, sessions and the gain opportunities derived from them. */
