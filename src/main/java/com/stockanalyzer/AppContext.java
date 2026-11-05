@@ -229,7 +229,9 @@ public final class AppContext implements AutoCloseable {
                 config.growwBaseUrl(), config.exchange(), config.segment(), rateLimiter));
 
         this.detector = new TopKNonOverlappingDetector(config.intradayTopN(),
-                PriceBasis.valueOf(config.intradayPriceBasis()), config.intradayMinHoldCandles(),
+                PriceBasis.valueOf(config.intradayPriceBasis()),
+                TopKNonOverlappingDetector.holdCandles(config.intradayMinHoldMinutes(),
+                        config.intradayMinHoldCandles(), config.intradayIntervalMinutes()),
                 config.intradayMinGainPct());
         this.summaryBuilder = new DailySummaryBuilder(detector);
         this.tradingCalendar = new DefaultTradingCalendar(

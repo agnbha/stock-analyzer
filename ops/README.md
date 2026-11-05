@@ -184,6 +184,10 @@ java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stocka
 # After changing the detector rules - writes a parallel, comparable series
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.DailyAnalysisMain \
      recompute --from 2026-01-01
+# A changed minimum gain, or minimum hold (intraday.min.hold.minutes), is a changed detector. The series is
+# rebuilt from the stored candles with no API calls. The dashboards offer every version and default to the
+# newest, so until this has run the windows on the charts are empty; run hot-windows afterwards so the
+# time-of-day prior reads the new series too.
 
 # After changing the charge schedule
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain pnl --rebuild

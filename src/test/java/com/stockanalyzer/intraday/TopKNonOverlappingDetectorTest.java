@@ -120,6 +120,81 @@ class TopKNonOverlappingDetectorTest {
     }
 
     @Test
+    @DisplayName("the minimum hold is part of the version, and the original one-candle hold keeps its tag")
+    void versionEncodesTheMinimumHold() {
+        assertEquals("topk-nonoverlap/highlow/min0.5/hold5/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 5, 0.5).version());
+        assertEquals("topk-nonoverlap/highlow/hold5/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 5, 0.0).version());
+        assertEquals("topk-nonoverlap/highlow/min0.5/v1",
+                new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 0.5).version(),
+                "a one-candle hold is what the rows already in the database were written under");
+    }
+
+    @Test
+    @DisplayName("a minimum in minutes becomes enough candles, rounded up, never fewer than the candle minimum")
+    void holdCandlesCoversTheTimeAndTheCandleMinimum() {
+        assertEquals(5, TopKNonOverlappingDetector.holdCandles(5, 1, 1), "five one-minute candles");
+        assertEquals(1, TopKNonOverlappingDetector.holdCandles(5, 1, 5), "one five-minute candle");
+        assertEquals(3, TopKNonOverlappingDetector.holdCandles(5, 1, 2), "two two-minute candles are only four minutes");
+        assertEquals(8, TopKNonOverlappingDetector.holdCandles(5, 8, 1), "the candle minimum can be the larger one");
+        assertEquals(1, TopKNonOverlappingDetector.holdCandles(0, 1, 1), "no minimum still means a later candle");
+    }
+
+    @Test
+    @DisplayName("with a five-minute hold no window, on any session, lasts less than five minutes or overlaps another")
+    void noWindowIsShorterThanTheHold() {
+        TopKNonOverlappingDetector patient = new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW,
+                TopKNonOverlappingDetector.holdCandles(5, 1, 1), 0.0);
+        TopKNonOverlappingDetector hasty = new TopKNonOverlappingDetector(3, PriceBasis.HIGH_LOW, 1, 0.0);
+        int windowsChecked = 0;
+        int shorterWithoutTheHold = 0;
+
+        for (long seed = 1; seed <= 60; seed++) {
+            java.util.Random random = new java.util.Random(seed);
+            double[] closes = new double[375];
+            closes[0] = 100;
+            for (int i = 1; i < closes.length; i++) {
+                closes[i] = closes[i - 1] * (1 + random.nextGaussian() * 0.0015);
+            }
+            List<Candle> candles = Candles.ofCloses(0.1, closes);
+
+            List<GainOpportunity> windows = patient.detect(candles);
+            for (GainOpportunity window : windows) {
+                assertTrue(window.durationMinutes() >= 5,
+                        "seed " + seed + ": a " + window.durationMinutes() + "-minute window leaves no time to act");
+                assertTrue(window.exitTs() - window.entryTs() >= 5 * 60L);
+                windowsChecked++;
+            }
+            for (int a = 0; a < windows.size(); a++) {
+                for (int b = a + 1; b < windows.size(); b++) {
+                    assertTrue(windows.get(a).exitTs() < windows.get(b).entryTs()
+                                    || windows.get(b).exitTs() < windows.get(a).entryTs(),
+                            "seed " + seed + ": windows overlap");
+                }
+            }
+            shorterWithoutTheHold += (int) hasty.detect(candles).stream().filter(w -> w.durationMinutes() < 5).count();
+        }
+
+        assertTrue(windowsChecked >= 150, "the test must actually look at windows, saw " + windowsChecked);
+        assertTrue(shorterWithoutTheHold > 0,
+                "without the hold such windows do occur, or this test proves nothing");
+    }
+
+    @Test
+    @DisplayName("a spike that is over in a minute is not offered as a window when five minutes are needed")
+    void aOneMinuteSpikeIsNotAWindow() {
+        // 100 -> 130 in a single candle, then straight back: the best trade on paper, and unactionable.
+        List<Candle> candles = Candles.ofCloses(0, 100, 100, 100, 130, 100, 100, 100, 100, 101, 102, 103, 104, 105, 106);
+        TopKNonOverlappingDetector patient = new TopKNonOverlappingDetector(1, PriceBasis.CLOSE_CLOSE, 5, 0.0);
+
+        GainOpportunity best = patient.detect(candles).getFirst();
+
+        assertTrue(best.durationMinutes() >= 5);
+        assertTrue(best.gainPct() < 10, "the spike cannot be the exit of a five-minute window, got " + best.gainPct());
+    }
+
+    @Test
     @DisplayName("the gain floor is part of the version, so a raised floor is a parallel series")
     void versionEncodesTheGainFloor() {
         assertEquals("topk-nonoverlap/highlow/min0.5/v1",

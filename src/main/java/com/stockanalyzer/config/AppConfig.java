@@ -158,6 +158,11 @@ public final class AppConfig {
         return Integer.parseInt(get("intraday.min.hold.candles", "1"));
     }
 
+    /** The least time between a window's entry and its exit: time enough to act on both. */
+    public int intradayMinHoldMinutes() {
+        return Integer.parseInt(get("intraday.min.hold.minutes", "5"));
+    }
+
     public double intradayMinGainPct() {
         return Double.parseDouble(get("intraday.min.gain.pct", "0.0"));
     }

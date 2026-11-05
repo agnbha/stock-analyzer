@@ -322,7 +322,7 @@ annotated list):
 
 | Prefix | Controls |
 |---|---|
-| `intraday.*` | Candle interval, how many windows to find, `HIGH_LOW` vs `CLOSE_CLOSE`, minimum hold and minimum gain |
+| `intraday.*` | Candle interval, how many windows to find, `HIGH_LOW` vs `CLOSE_CLOSE`, minimum hold (`intraday.min.hold.minutes`, 5 by default: a window's exit is at least five minutes after its entry, so there is time to act on both) and minimum gain |
 | `db.*` | Where the SQLite file lives |
 | `ingest.*`, `backfill.*` | Rate limits, retries, and how many days one request may span |
 | `hotwindow.*`, `model.*` | The time-of-day prior, and the optional model service |
