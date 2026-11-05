@@ -12,7 +12,7 @@ shift the hours in the plists to match a 09:15–15:30 session.
 | 09:15–15:30 | — | the daemon ticks every 150s | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → check purchases against their sell targets → redraw. Every 5 minutes (`trades.live.import.interval.minutes`, 0 = off) it also pulls the day's fills from the broker, so your buys and sells show on Candles and Calls while you trade. |
 | ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
 | **18:30** Mon–Fri | `evening.sh` | ingest → log watchlist shortlist → evaluate → import fills → sync chart notes → capture → broker balance → day P&L | Fills have settled by evening. |
-| **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, week P&L | The prior has to be current before Monday's open, because the daemon's baseline entry signal reads it. |
+| **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, 52-week ranges, week P&L | The prior has to be current before Monday's open, because the daemon's baseline entry signal reads it. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
 
 ## Why the evening order is what it is
