@@ -129,6 +129,19 @@ class CompanyProfileParserTest {
     }
 
     @Test
+    @DisplayName("a page with only a shareholding table is not a profile: every ratio blank, no quarters")
+    void aBlankConsolidatedPageIsNotAProfile() throws IOException {
+        // SBI Life's consolidated page, cut from the real one: the ratios are empty, the quarters table has no
+        // rows, and the shareholding table is full. Its standalone page carries the figures.
+        CompanyProfile blank = profile("company-sbilife-consolidated.html");
+
+        assertFalse(blank.holdings().isEmpty(), "the page does have a shareholding table");
+        assertNull(blank.marketCapCr());
+        assertTrue(blank.quarters().isEmpty());
+        assertTrue(blank.isEmpty(), "so the client must go on to the standalone page");
+    }
+
+    @Test
     @DisplayName("a page with no figures, such as an ETF, is an empty profile")
     void anEtfHasNoProfile() throws IOException {
         CompanyProfile etf = profile("company-etf.html");

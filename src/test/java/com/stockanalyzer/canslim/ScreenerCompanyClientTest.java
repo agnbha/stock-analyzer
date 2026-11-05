@@ -66,6 +66,47 @@ class ScreenerCompanyClientTest {
     }
 
     @Test
+    @DisplayName("a profile skips a consolidated page that is blank and reads the standalone one")
+    void profileFallsBackFromABlankConsolidatedPage() throws IOException {
+        String blank = resource("/screener/company-sbilife-consolidated.html");
+        String full = resource("/screener/company-welspunliv.html");
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/company/", exchange -> {
+            String path = exchange.getRequestURI().getRawPath();
+            requested.add(path);
+            respond(exchange, 200, path.endsWith("/consolidated/") ? blank : full);
+        });
+        server.start();
+
+        Optional<CompanyProfile> profile = client().fetchProfile("SBILIFE");
+
+        assertEquals(List.of("/company/SBILIFE/consolidated/", "/company/SBILIFE/"), requested);
+        assertTrue(profile.isPresent(), "the standalone page had the figures");
+        assertEquals(23_968, profile.get().marketCapCr(), 0.01);
+    }
+
+    @Test
+    @DisplayName("a company that neither page has a profile for is empty, not an error")
+    void noProfileOnEitherPage() throws IOException {
+        String blank = resource("/screener/company-sbilife-consolidated.html");
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/company/", exchange -> {
+            requested.add(exchange.getRequestURI().getRawPath());
+            respond(exchange, 200, blank);
+        });
+        server.start();
+
+        assertTrue(client().fetchProfile("NOFIGURES").isEmpty());
+        assertEquals(2, requested.size(), "both pages were asked");
+    }
+
+    private static String resource(String name) throws IOException {
+        try (var in = ScreenerCompanyClientTest.class.getResourceAsStream(name)) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    @Test
     @DisplayName("falls back to the standalone page for a company with no consolidated one")
     void standaloneFallback() throws IOException {
         serve(path -> path.endsWith("/consolidated/") ? 404 : 200);

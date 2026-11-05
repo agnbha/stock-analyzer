@@ -61,8 +61,12 @@ public record CompanyProfile(String about,
         holdings = List.copyOf(holdings);
     }
 
-    /** A page with no figures on it: an ETF, or a symbol screener.in does not carry. */
+    /**
+     * A page with no figures on it: an ETF, or a symbol screener.in does not carry. The shareholding alone
+     * does not make a profile: screener.in's consolidated page for an insurer can carry that table and
+     * nothing else, with every ratio blank, while the standalone page has it all.
+     */
     public boolean isEmpty() {
-        return marketCapCr == null && quarters.isEmpty() && holdings.isEmpty();
+        return marketCapCr == null && quarters.isEmpty();
     }
 }
