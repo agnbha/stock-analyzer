@@ -26,6 +26,10 @@ import java.util.PriorityQueue;
  * which is the honest answer for a day that offered no tradable move. Set it
  * above the round-trip cost of a trade and a recorded window always describes
  * something worth acting on.
+ *
+ * <p>{@code minHoldCandles} is a floor on how long a window lasts: the exit is at least that many
+ * candles after the entry. A buy and a sell a minute apart describe a move nobody can act on, so the
+ * minimum is normally set in minutes and turned into candles with {@link #holdCandles}.
  */
 public final class TopKNonOverlappingDetector implements GainOpportunityDetector {
 
@@ -48,15 +52,30 @@ public final class TopKNonOverlappingDetector implements GainOpportunityDetector
     }
 
     /**
+     * The hold, in candles, that satisfies both a minimum in minutes and a minimum in candles for candles
+     * of the given length: the exit may not come sooner than either allows. Five minutes of one-minute
+     * candles is five; of five-minute candles, one; of two-minute candles, three (six minutes, since
+     * two candles would be only four).
+     */
+    public static int holdCandles(int minHoldMinutes, int minHoldCandles, int candleMinutes) {
+        int forTheTime = candleMinutes < 1 ? 1 : (Math.max(minHoldMinutes, 0) + candleMinutes - 1) / candleMinutes;
+        return Math.max(Math.max(minHoldCandles, 1), forTheTime);
+    }
+
+    /**
      * Identifies the rules that produced a result, so a changed detector writes
      * a parallel series rather than quietly restating the old one under its
-     * name. The gain floor is part of those rules and so appears here - but
-     * only when it is set, which keeps the tag stable for the original
-     * floor-less runs already in the database.
+     * name. The gain floor and the minimum hold are part of those rules and so
+     * appear here - but only when they are set, which keeps the tag stable for
+     * the floor-less, one-candle-hold runs already in the database.
      */
     @Override
     public String version() {
-        return "topk-nonoverlap/" + priceBasis.tag() + minGainTag() + "/v1";
+        return "topk-nonoverlap/" + priceBasis.tag() + minGainTag() + minHoldTag() + "/v1";
+    }
+
+    private String minHoldTag() {
+        return minHoldCandles > 1 ? "/hold" + minHoldCandles : "";
     }
 
     private String minGainTag() {
