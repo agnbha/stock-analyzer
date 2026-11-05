@@ -3,6 +3,7 @@ package com.stockanalyzer.intraday;
 import com.stockanalyzer.client.CandleDataClient;
 import com.stockanalyzer.client.GrowwApiException;
 import com.stockanalyzer.model.Candle;
+import com.stockanalyzer.model.DailyGainSummary;
 import com.stockanalyzer.model.StockCandleSeries;
 import com.stockanalyzer.store.CalendarRepository;
 import com.stockanalyzer.store.Database;
@@ -205,6 +206,40 @@ class DailyIngestionServiceTest {
     }
 
     @Test
+    @DisplayName("a run over a few symbols does not call a day a holiday because they have nothing for it")
+    void aSubsetRunDoesNotMarkAnotherSymbolsTradingDayAsAHoliday() {
+        // New symbols are backfilled alone, and before their history begins they return nothing. The market
+        // traded all the same: another symbol has a stored session for that day.
+        LocalDate previous = LocalDate.of(2026, 8, 26);
+        storeSession("OTHER", previous);
+        DailyIngestionService service = service(new FakeCandleClient());
+
+        IngestionReport report = service.ingest(List.of("GOOD"), "NSE", "CASH", previous, DAY, 1, "backfill");
+
+        assertEquals(List.of(), report.inferredHolidays());
+        assertFalse(calendarRepository.nonTradingDays(previous, DAY).contains(previous),
+                "a day with a stored session is not a holiday");
+    }
+
+    @Test
+    @DisplayName("daily bars across the market also show it traded, but a handful of them do not")
+    void dailyBarsShowTheMarketTraded() {
+        LocalDate wellCovered = LocalDate.of(2026, 8, 26);
+        LocalDate barelyCovered = LocalDate.of(2026, 8, 25);
+        storeDailyBars(wellCovered, CalendarRepository.MIN_DAILY_BARS_AS_EVIDENCE);
+        storeDailyBars(barelyCovered, CalendarRepository.MIN_DAILY_BARS_AS_EVIDENCE - 1);
+        DailyIngestionService service = service(new FakeCandleClient());
+
+        service.ingest(List.of("GOOD"), "NSE", "CASH", barelyCovered, DAY, 1, "backfill");
+
+        Set<LocalDate> nonTrading = calendarRepository.nonTradingDays(barelyCovered, DAY);
+        assertFalse(nonTrading.contains(wellCovered), "bars for that many instruments mean the market was open");
+        assertTrue(nonTrading.contains(barelyCovered), "too few bars to say anything: still inferred");
+        assertEquals(Set.of(wellCovered, DAY), calendarRepository.datesWithTradingEvidence(barelyCovered, DAY),
+                "the well-covered day, and DAY itself, whose session this run just stored");
+    }
+
+    @Test
     @DisplayName("an outage is not mistaken for a holiday")
     void totalFailureIsNotAHoliday() {
         DailyIngestionService service = service(new AlwaysFailingClient());
@@ -267,6 +302,31 @@ class DailyIngestionServiceTest {
                 .orElseThrow();
 
         assertEquals(2, report.failures().size());
+    }
+
+    /** A complete session for a symbol, as another run would have left it. */
+    private void storeSession(String symbol, LocalDate date) {
+        long instrumentId = instruments.findOrCreate(symbol, "NSE", "CASH");
+        long midnight = date.toEpochDay() * 86_400L;
+        tradingDays.upsert(instrumentId, new DailyGainSummary(symbol, date, 1, 99, 101, 98, 100, 1000, null, 375,
+                midnight + 13_500, midnight + 35_940, List.of()), "test");
+    }
+
+    /** One daily bar on {@code date} for each of {@code instrumentCount} instruments. */
+    private void storeDailyBars(LocalDate date, int instrumentCount) {
+        for (int i = 0; i < instrumentCount; i++) {
+            long instrumentId = instruments.findOrCreate("BAR" + i, "NSE", "CASH");
+            database.inTransaction(connection -> {
+                try (var insert = connection.prepareStatement("""
+                        INSERT OR REPLACE INTO daily_bar (instrument_id, session_date, ts_epoch, open, high, low, close, volume)
+                        VALUES (?,?,?,100,101,99,100,1000)""")) {
+                    insert.setLong(1, instrumentId);
+                    insert.setString(2, date.toString());
+                    insert.setLong(3, date.toEpochDay() * 86_400L);
+                    insert.executeUpdate();
+                }
+            });
+        }
     }
 
     private TradingCalendar calendar() {
