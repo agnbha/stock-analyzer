@@ -4,6 +4,7 @@
 # Order matters, and it is the whole point of this script:
 #   0. consolidate             - re-fetch the now-complete day and clear staging
 #   1. ingest the session      - writes trading_day + the top-3 windows
+#   1b. write the shortlist    - the Watchlist's picks, kept so the page can score them on the next session
 #   2. score yesterday's calls - needs the completed tape from step 1
 #   3. import fills            - matches lots and attributes reasons
 #   4. capture                 - compares 3 against 1, so it must come last
@@ -29,6 +30,10 @@ log "evening batch for $SESSION_DATE"
 run_step "consolidate live session" com.stockanalyzer.DailyAnalysisMain consolidate \
     --date "$SESSION_DATE"
 run_step "ingest session" com.stockanalyzer.DailyAnalysisMain daily --date "$SESSION_DATE"
+# Writes down tonight's Watchlist shortlist (the highest trend scores among complete sessions) so the page can
+# score it against the session that follows. It reads only what the ingest above has stored, so it sits
+# straight after it and never waits on the slow CAN SLIM scan at the end.
+run_step "log watchlist shortlist" com.stockanalyzer.DailyAnalysisMain watchlist --date "$SESSION_DATE"
 run_step "score predictions" com.stockanalyzer.DailyAnalysisMain evaluate --date "$SESSION_DATE"
 run_step "import fills" com.stockanalyzer.TradeJournalMain trades import --broker \
     --from "$SESSION_DATE" --to "$SESSION_DATE"

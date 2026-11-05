@@ -160,6 +160,46 @@ breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
 full score sheet, letter by letter, is at the bottom.
 
+**Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
+the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.
+
+*The shortlist is a list to look at, not a forecast.* It ranks complete sessions only, as of the last full session, so
+a session still in progress (or one ingested half-way) can no longer decide the order. Beside each symbol are the
+stock's typical moves from its own open over its last 20 sessions: how far above and below the open it usually goes,
+and the share of days it got 1% either way. A 0.6% or 1% sell target (`alerts.sell.targets.pct`) and a stop belong
+against those numbers, not against a fixed figure.
+
+*The scorecard underneath is the shortlist marked against what happened.* Each evening `evening.sh` writes the
+shortlist down (`DailyAnalysisMain watchlist`; `watchlist.top`, 5 by default). The scorecard reads the pick's next complete
+session from the stored sessions, so a session that is later re-ingested corrects its own result. It reports the
+open-to-close and close-to-close move of the picks, each against the same day's average over every tracked symbol, and
+how often a pick dipped 1% below its open. Evenings before the first live run are rebuilt from stored history
+(`watchlist-replay`, marked as such), so the record starts on day one; a replay never rewrites an evening that was
+logged live.
+
+**What was measured, and why the page makes no promise.** On a year of daily bars for the liquid market (November 2025 to November 2026: 246
+sessions, about 770 names a session, 181,798 stock-sessions; turnover of at least ₹10 Cr), the score did not separate
+the next day's winners from its losers:
+
+| | next session, relative to the average stock |
+|---|---|
+| every fifth of the market by score, weakest to strongest | within ±0.05 points of the average, standard errors 0.01–0.03 |
+| the top 5 of the whole market | −0.04 ± 0.13 points close to close |
+| strongest fifth falling more than 4% the next day | 6.6% of cases, against 4.4% for the market: a more volatile list, not a better one |
+
+Nothing tried on top of it rescued the one-day horizon: capping the run-up, an RSI ceiling, yesterday's volume and
+where it closed in its range all landed inside the noise. Neither did looking at the open itself. For the 62 tracked
+symbols (5,982 stock-sessions of minute data), the state at 09:45 (above the first 15 minutes' high and VWAP, inside the
+range, or below it) left the rest of the day within ±0.06 points of the average whichever it was; among the strongest fifth of
+the whole market, those that gapped up more than 2% did fade from the open to the close (−0.38 ± 0.14 points), but
+waiting 30 minutes to look did not select better entries. Screened at 1, 5, 10 and 20 sessions, the inputs that point the right way are medium-term
+momentum and closeness to the 120-day high at 10–20 sessions, at about one standard error with the same sign in both
+halves of the year: not yet distinguishable from chance, and the horizon the CAN SLIM page already covers.
+
+So the scorecard exists to settle the question with evidence as it accumulates, instead of with a story about the last
+pick. The scripts that produced the numbers are in `scripts/research/` and open the database read-only
+(`python3 -I scripts/research/market_backtest.py [path/to/stock-analyzer.db]`); rerun them as the history grows.
+
 **Last data refresh** — a one-line label in the top-right corner of every page
 except CAN SLIM (which has its own *Last scan*), showing how long ago the page's
 data was last written. It is a small stat panel without a title, so it takes one

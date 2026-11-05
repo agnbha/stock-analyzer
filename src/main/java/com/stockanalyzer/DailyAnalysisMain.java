@@ -9,6 +9,7 @@ import com.stockanalyzer.report.DailyOpportunityReporter;
 import com.stockanalyzer.report.HistoryReporter;
 import com.stockanalyzer.report.OpportunityCsvExporter;
 import com.stockanalyzer.store.OpportunityRow;
+import com.stockanalyzer.store.WatchlistPickRepository;
 import com.stockanalyzer.util.Args;
 
 import java.nio.file.Path;
@@ -33,6 +34,9 @@ import java.util.Locale;
  *   evaluate [--date D]              score yesterday's predictions against what happened
  *   consolidate [--date D]           re-fetch the session authoritatively and clear its staging
  *   week52 [--days 365]              refresh the 52-week high/low from daily candles
+ *   watchlist [--date D] [--top N]   write down the evening's shortlist for the Watchlist's scorecard
+ *   watchlist-replay --from D [--to D] [--top N]
+ *                                    rebuild shortlists from stored sessions (evenings logged live are kept)
  * </pre>
  */
 public final class DailyAnalysisMain {
@@ -52,10 +56,12 @@ public final class DailyAnalysisMain {
                 case "evaluate" -> evaluate(context, parsed);
                 case "consolidate" -> consolidate(context, parsed);
                 case "week52" -> week52(context, parsed);
+                case "watchlist" -> watchlist(context, parsed);
+                case "watchlist-replay" -> watchlistReplay(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
                     System.err.println("Try: daily | backfill | recompute | report | export "
-                            + "| hot-windows | evaluate | consolidate | week52");
+                            + "| hot-windows | evaluate | consolidate | week52 | watchlist | watchlist-replay");
                     System.exit(2);
                 }
             }
@@ -242,6 +248,43 @@ public final class DailyAnalysisMain {
         }
         System.out.printf("52-week range refreshed for %d symbols over %d days (%d failed)%n",
                 updated, days, failed);
+    }
+
+    /**
+     * Writes down tonight's shortlist, the highest trend scores among complete sessions, so the Watchlist
+     * can show how past shortlists did on the session that followed. It reads only what the session
+     * ingest has already stored, so it belongs right after that step and before anything slow.
+     */
+    private static void watchlist(AppContext context, Args args) {
+        LocalDate asOf = args.date("date",
+                context.tradingCalendar().previousTradingDay(LocalDate.now(context.clock().zone()).plusDays(1)));
+        int top = args.integer("top", context.config().watchlistTop());
+
+        List<WatchlistPickRepository.Pick> picks = context.watchlistService().logEvening(asOf, top);
+        if (picks.isEmpty()) {
+            System.err.printf("No symbol has a score for the session of %s - is it ingested, and are there "
+                    + "twenty sessions behind it?%n", asOf);
+            System.exit(1);
+        }
+        System.out.printf("Shortlist from the session of %s, for the session after it:%n", asOf);
+        System.out.printf("  %-4s %-12s %8s %10s %9s %8s %7s%n",
+                "RANK", "SYMBOL", "SCORE", "CLOSE", "VS SMA20", "5-DAY", "RSI");
+        picks.forEach(p -> System.out.printf(Locale.ROOT, "  %-4d %-12s %8.2f %10s %8s%% %7s%% %7s%n",
+                p.rank(), p.symbol(), p.score(), number(p.close(), 2), number(p.pctAboveSma20(), 1),
+                number(p.ret5(), 1), number(p.rsi14(), 0)));
+    }
+
+    private static void watchlistReplay(AppContext context, Args args) {
+        LocalDate from = LocalDate.parse(args.require("from"));
+        LocalDate to = args.date("to", LocalDate.now(context.clock().zone()));
+        int top = args.integer("top", context.config().watchlistTop());
+
+        int written = context.watchlistService().replay(from, to, top);
+        System.out.printf("Rebuilt the shortlist for %d evenings between %s and %s%n", written, from, to);
+    }
+
+    private static String number(Double value, int decimals) {
+        return value == null ? "-" : String.format(Locale.ROOT, "%." + decimals + "f", value);
     }
 
     private static void evaluate(AppContext context, Args args) {
