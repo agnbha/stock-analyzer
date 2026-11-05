@@ -197,6 +197,11 @@ public final class DailyIngestionService {
      * A weekday on which no symbol returned any data is a holiday the published
      * list did not know about - but only if at least one symbol was actually
      * reached, otherwise this is an outage, not a holiday.
+     *
+     * <p>"No symbol" means no symbol the market has data for, not just the ones this run asked about. A run
+     * over a few symbols (newly added ones, say) is asked only about the days it lacks, and before their
+     * history begins they return nothing, which says nothing about the market. So a day is never inferred
+     * to be a holiday if a session is stored for any symbol, or daily bars exist for a good many.
      */
     private List<LocalDate> inferHolidays(Map<String, List<LocalDate>> planned, LocalDate from, LocalDate to,
                                           List<IngestionReport.SymbolResult> results) {
@@ -208,6 +213,7 @@ public final class DailyIngestionService {
 
         Set<LocalDate> datesWithData = new LinkedHashSet<>();
         results.forEach(result -> datesWithData.addAll(result.datesWithData()));
+        datesWithData.addAll(calendarRepository.datesWithTradingEvidence(from, to));
 
         List<LocalDate> inferred = new ArrayList<>();
         for (LocalDate date : calendar.tradingDaysBetween(from, to)) {
