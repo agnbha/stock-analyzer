@@ -110,6 +110,7 @@ What each tab needs:
 | Account Overview | trades, and a balance for a true account value | `trades import`, `trades balance --cash ...` |
 | Decision Reasons | trades with reasons attached | `trades reasons --month ...` |
 | CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
+| Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
 panel, one bar in the weekly panel, and two empty tabs.
@@ -166,6 +167,32 @@ the latest balance sheet.
 
 Three things on a typical stock page are not here: market depth and the circuit limits are exchange data that
 screener.in does not carry, and the industry P/E, which screener.in loads separately from the company page.
+
+**Company Details** — the same screener.in reading on a page of its own, one symbol at a time, with more of it. Pick
+a symbol (the list is every company whose page has been read), or follow *Company Details* at the top of Candles and
+Calls, which takes the symbol along; *Candles and Calls* at the top of this page goes back.
+
+- *What the company does*: its classification, the description, the last quarter it reported results for, the last
+  shareholding pattern filed, and the day the page was read. The panel's corner links open the company on
+  screener.in and on Candles and Calls.
+- *Valuation* and *growth* tiles: the fundamentals described above, at the latest price, plus the latest quarter's
+  revenue and profit against the same quarter a year earlier and its net margin.
+- *Quarterly results*: revenue and net profit, earnings per share and net margin for the last eight quarters, and a
+  table of them, newest first, with each quarter set against the same quarter a year earlier (YoY, which takes out
+  the seasons) and the quarter before (QoQ). Quarters are paired by date, so a quarter missing from the page leaves a
+  blank instead of comparing with the wrong one; the oldest four have no year-earlier quarter among the eight. A
+  change against a loss or a zero is blank too, because a percentage of it means nothing.
+- *Shareholding*: who holds the shares quarter by quarter (with government and other holders, so a bar adds up to
+  100%), the number of shareholders, and the change over the last quarter and the last year in percentage points
+  (promoters 63.8% from 66.4% is −2.6). Green and red show only which way it moved.
+- *Compared with the other companies*: one row per company read, the symbol picked first, then the others in its
+  industry group (the first two levels of the classification, so banks with banks), then the rest of its sector,
+  then everyone else, each largest first. Click a symbol to show it on the page; sort by any column; filter by
+  industry.
+
+It shows only what is stored: eight quarters, the latest ratios and the shareholding. Annual results, cash flows,
+the rest of the balance sheet (only debt to equity is taken from it) and screener.in's own peer table are on the
+company's page but are not read.
 
 **Decision Reasons** — how often each reason recurs, where it came from (typed by
 you, an event the detector found, an alert that fired, or the model), buy
@@ -231,6 +258,7 @@ row and sits beside or above the first panel. What it counts differs by page:
 | Candles and Calls | last live candle (daemon, every poll in market hours), last session ingested, last fill imported |
 | Decision Reasons | when the reasons were last worked out (each fill import) |
 | Stock Trend, Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
+| Company Details | last company page read from screener.in (any company; this one's is its *Read on* date), last live candle, last session ingested, since the ratios are restated at the latest price |
 
 On Candles and Calls, a figure much older than a few minutes during market hours
 means the daemon is not running or cannot reach Groww.

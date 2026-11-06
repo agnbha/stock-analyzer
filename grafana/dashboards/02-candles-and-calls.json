@@ -246,6 +246,20 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "Company Details",
+      "type": "link",
+      "icon": "doc",
+      "url": "/d/stockanalyzer-company/company-details",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "Everything read from screener.in for this symbol: results, shareholding, peers"
+    }
+  ],
   "templating": {
     "list": [
       {
@@ -1241,7 +1255,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -1273,7 +1287,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -1289,7 +1303,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -1305,7 +1319,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -1321,7 +1335,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "currencyINR"
+                "value": "prefix:₹"
               },
               {
                 "id": "decimals",
@@ -1346,7 +1360,13 @@
             ]
           }
         ]
-      }
+      },
+      "links": [
+        {
+          "title": "All of $symbol's screener.in details",
+          "url": "/d/stockanalyzer-company/company-details?orgId=1&var-symbol=${symbol}"
+        }
+      ]
     },
     {
       "id": 31,

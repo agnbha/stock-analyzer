@@ -13,7 +13,11 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -242,6 +246,49 @@ class GrafanaDashboardQueryTest {
                     minutesOrHours + " is of no use on a chart of whole sessions");
         }
         assertTrue(offered.contains("Last 2 days") && offered.contains("Last 90 days"), offered.toString());
+    }
+
+    @Test
+    @DisplayName("every link to another dashboard names one that exists, and the symbol travels with it")
+    void dashboardLinksLeadSomewhere() throws Exception {
+        Map<String, String> uids = new HashMap<>();
+        for (Path file : dashboardFiles()) {
+            uids.put(JsonMapper.INSTANCE.readTree(Files.readString(file)).path("uid").asText(), file.getFileName().toString());
+        }
+        Pattern link = Pattern.compile("\"/d(?:-solo)?/([A-Za-z0-9_-]+)[^\"]*\"");
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            Matcher matcher = link.matcher(Files.readString(file));
+            while (matcher.find()) {
+                checked++;
+                assertTrue(uids.containsKey(matcher.group(1)),
+                        file.getFileName() + " links to a dashboard that does not exist: " + matcher.group());
+            }
+        }
+        assertTrue(checked >= 4, "expected the links between dashboards, found " + checked);
+
+        // Candles and Calls and Company Details are the same symbol from two sides: each links to the other.
+        for (String[] pair : new String[][]{{"02-candles-and-calls.json", "stockanalyzer-company"},
+                {"07-company-details.json", "stockanalyzer-candles"}}) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(pair[0])));
+            boolean carriesSymbol = false;
+            for (JsonNode dashboardLink : root.path("links")) {
+                carriesSymbol |= dashboardLink.path("url").asText().contains("/d/" + pair[1])
+                        && dashboardLink.path("includeVars").asBoolean(false);
+            }
+            assertTrue(carriesSymbol, pair[0] + " needs a link to " + pair[1] + " that takes the symbol picked along");
+        }
+    }
+
+    @Test
+    @DisplayName("rupee figures are written out, never abbreviated")
+    void rupeesAreNotAbbreviated() throws Exception {
+        // Grafana's currencyINR unit scales like any currency: a 52-week high of 1,018 shows as "₹1K" and an EPS of
+        // 4,000 as "₹4K". A plain prefix ("prefix:₹") or "locale" with the rupee in the label keeps every digit.
+        for (Path file : dashboardFiles()) {
+            assertFalse(Files.readString(file).contains("\"currencyINR\""),
+                    file.getFileName() + " uses currencyINR, which abbreviates amounts of a thousand and more");
+        }
     }
 
     @Test

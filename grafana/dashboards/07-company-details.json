@@ -1,0 +1,2107 @@
+{
+  "uid": "stockanalyzer-company",
+  "title": "Company Details",
+  "description": "Everything read from a company's screener.in page, for one symbol at a time: what it does, valuation, growth, the last eight quarters' results, who holds the shares, and how it compares with its peers.",
+  "tags": [
+    "stock-analyzer",
+    "fundamentals",
+    "screener"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true
+  },
+  "links": [
+    {
+      "title": "Candles and Calls",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-candles/candles-and-calls",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The same symbol's charts and calls"
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "symbol",
+        "label": "Symbol",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT i.symbol FROM company_profile p JOIN instrument i ON i.id = p.instrument_id ORDER BY i.symbol",
+        "definition": "SELECT i.symbol FROM company_profile p JOIN instrument i ON i.id = p.instrument_id ORDER BY i.symbol",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "current": {
+          "selected": false,
+          "text": "RELIANCE",
+          "value": "RELIANCE"
+        },
+        "description": "Companies whose screener.in page has been read: the symbols in symbols.txt."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "",
+      "description": "The newest of: the last company page read from screener.in (any company; when this one was read is in the About table), the last live candle written and the last session ingested. The prices matter because market cap, P/E, P/B and dividend yield are restated at the latest price.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 1
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(fetched_at) AS t FROM company_profile\n  UNION ALL SELECT MAX(updated_at) FROM live_candle\n  UNION ALL SELECT MAX(ingested_at) FROM trading_day)",
+          "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(fetched_at) AS t FROM company_profile\n  UNION ALL SELECT MAX(updated_at) FROM live_candle\n  UNION ALL SELECT MAX(ingested_at) FROM trading_day)",
+          "timeColumns": []
+        }
+      ],
+      "transparent": true
+    },
+    {
+      "id": 1,
+      "type": "table",
+      "title": "$symbol - what the company does",
+      "description": "From the company's public page on screener.in, read by `CanSlimMain profiles` (evening.sh reads a dozen of the stalest each night, so each company is read again about once a week). **Latest results** is the last quarter the company has reported, **Shareholding as of** the last shareholding pattern filed, **Read on** the day its screener.in page was read. The links in the corner open the company on screener.in and on Candles and Calls.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 8
+      },
+      "links": [
+        {
+          "title": "$symbol on screener.in",
+          "url": "https://www.screener.in/company/${symbol}/",
+          "targetBlank": true
+        },
+        {
+          "title": "$symbol on Candles and Calls",
+          "url": "/d/stockanalyzer-candles/candles-and-calls?orgId=1&var-symbol=${symbol}"
+        }
+      ],
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT p.classification AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END) AS \"About\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.results_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.results_quarter,1,4) AS \"Latest results\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.holding_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.holding_quarter,1,4) AS \"Shareholding as of\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'",
+          "queryText": "SELECT p.classification AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END) AS \"About\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.results_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.results_quarter,1,4) AS \"Latest results\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.holding_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.holding_quarter,1,4) AS \"Shareholding as of\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "lg"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sector"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Latest results"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shareholding as of"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Read on"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "$symbol - valuation and balance sheet, at the latest price",
+      "description": "**Price** is the latest this database holds: today's last candle, else the last session's close. **Market cap, P/E, P/B and dividend yield** are restated at that price from the figures that do not move with it: earnings per share over the trailing twelve months, book value, the share count and the dividend per share. A loss-making company has no P/E. **Debt / equity** is borrowings over equity capital plus reserves in the latest balance sheet. **ROE, ROCE, book value and face value** are as screener.in shows them. The 52-week range is this database's own where it has one, else the page's.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'",
+          "queryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Market cap (₹ Cr)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P/E"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P/B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dividend yield"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EPS (TTM)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Book value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROCE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Debt / equity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Face value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52-week high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "52-week low"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "From 52-week high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "$symbol - growth and margin",
+      "description": "The first four are compounded growth as screener.in prints it: over the trailing twelve months, and per year over three years. The **Quarter** figures are the latest reported quarter (see *Latest results* above) against the same quarter a year earlier, and its net profit as a share of revenue. A year-on-year figure is blank when the year-earlier one was zero or a loss, because a percentage of it means nothing. Red below zero, green above.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT f.sales_growth_ttm  AS \"Revenue growth (TTM)\",\n       f.sales_growth_3y   AS \"Revenue growth (3Y CAGR)\",\n       f.profit_growth_ttm AS \"Profit growth (TTM)\",\n       f.profit_growth_3y  AS \"Profit growth (3Y CAGR)\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 1)                AS \"Quarter revenue, YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 1) AS \"Quarter profit, YoY\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 1)              AS \"Quarter net margin\"\nFROM v_company_fundamentals f\nLEFT JOIN company_quarter q\n  ON q.instrument_id = f.instrument_id\n AND q.period = (SELECT MAX(x.period) FROM company_quarter x WHERE x.instrument_id = f.instrument_id)\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nWHERE f.symbol = '$symbol'",
+          "queryText": "SELECT f.sales_growth_ttm  AS \"Revenue growth (TTM)\",\n       f.sales_growth_3y   AS \"Revenue growth (3Y CAGR)\",\n       f.profit_growth_ttm AS \"Profit growth (TTM)\",\n       f.profit_growth_3y  AS \"Profit growth (3Y CAGR)\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 1)                AS \"Quarter revenue, YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 1) AS \"Quarter profit, YoY\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 1)              AS \"Quarter net margin\"\nFROM v_company_fundamentals f\nLEFT JOIN company_quarter q\n  ON q.instrument_id = f.instrument_id\n AND q.period = (SELECT MAX(x.period) FROM company_quarter x WHERE x.instrument_id = f.instrument_id)\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nWHERE f.symbol = '$symbol'"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "unit": "percent",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0.005
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quarter revenue, YoY"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quarter profit, YoY"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quarter net margin"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Quarterly results",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "$symbol - revenue and net profit by quarter (₹ crore)",
+      "description": "The latest eight reported quarters, from screener.in. Revenue is the \"Sales\" line (a bank's \"Revenue\"); net profit is after tax.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue\",\n       q.net_profit AS \"Net profit\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue\",\n       q.net_profit AS \"Net profit\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "noValue": "no profile read yet",
+          "decimals": 0,
+          "unit": "locale"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8aa0b8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net profit"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3aa76d"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "$symbol - earnings per share (₹)",
+      "description": "Net profit per share for each quarter, as screener.in prints it. It follows net profit unless the share count changes (a bonus issue, a split or new shares).",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 6,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.eps AS \"EPS\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.eps AS \"EPS\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": -45,
+        "stacking": "none",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "noValue": "no profile read yet",
+          "decimals": 2,
+          "unit": "prefix:₹"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EPS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2f7d55"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "$symbol - net margin (% of revenue)",
+      "description": "Net profit as a share of revenue, quarter by quarter. A loss shows as a bar below zero.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 19,
+        "w": 6,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 2) AS \"Net margin\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 2) AS \"Net margin\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY q.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": -45,
+        "stacking": "none",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "noValue": "no profile read yet",
+          "decimals": 1,
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net margin"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#c49a3a"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "$symbol - quarterly results, newest first",
+      "description": "**YoY** compares a quarter with the same quarter a year earlier, which takes out the seasons; **QoQ** with the quarter just before. Only the eight latest quarters are read, so the oldest four have no year-earlier quarter to compare with. A change is blank when the earlier figure was zero or a loss, because a percentage of it means nothing.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue (₹ Cr)\",\n       q.net_profit AS \"Net profit (₹ Cr)\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 2)             AS \"Net margin\",\n       q.eps        AS \"EPS (₹)\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 2)                AS \"Revenue YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 2) AS \"Profit YoY\",\n       ROUND(CASE WHEN y.eps > 0 THEN (q.eps / y.eps - 1) * 100 END, 2)                      AS \"EPS YoY\",\n       ROUND(CASE WHEN p.sales > 0 THEN (q.sales / p.sales - 1) * 100 END, 2)                AS \"Revenue QoQ\",\n       ROUND(CASE WHEN p.net_profit > 0 THEN (q.net_profit / p.net_profit - 1) * 100 END, 2) AS \"Profit QoQ\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nLEFT JOIN company_quarter p\n  ON p.instrument_id = q.instrument_id AND p.period = strftime('%Y-%m', q.period || '-01', '-3 months')\nWHERE i.symbol = '$symbol'\nORDER BY q.period DESC",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(q.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(q.period,1,4) AS \"Quarter\",\n       q.sales      AS \"Revenue (₹ Cr)\",\n       q.net_profit AS \"Net profit (₹ Cr)\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 2)             AS \"Net margin\",\n       q.eps        AS \"EPS (₹)\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 2)                AS \"Revenue YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 2) AS \"Profit YoY\",\n       ROUND(CASE WHEN y.eps > 0 THEN (q.eps / y.eps - 1) * 100 END, 2)                      AS \"EPS YoY\",\n       ROUND(CASE WHEN p.sales > 0 THEN (q.sales / p.sales - 1) * 100 END, 2)                AS \"Revenue QoQ\",\n       ROUND(CASE WHEN p.net_profit > 0 THEN (q.net_profit / p.net_profit - 1) * 100 END, 2) AS \"Profit QoQ\"\nFROM company_quarter q\nJOIN instrument i ON i.id = q.instrument_id\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nLEFT JOIN company_quarter p\n  ON p.instrument_id = q.instrument_id AND p.period = strftime('%Y-%m', q.period || '-01', '-3 months')\nWHERE i.symbol = '$symbol'\nORDER BY q.period DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue (₹ Cr)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net profit (₹ Cr)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net margin"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EPS (₹)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "prefix:₹"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue YoY"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Profit YoY"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EPS YoY"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue QoQ"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Profit QoQ"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Shareholding",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "$symbol - who holds the shares (% of shares)",
+      "description": "The shareholding pattern at the end of each of the last eight quarters, from screener.in: promoters, foreign institutions (FII), domestic institutions (DII, mutual funds and insurers among them), the public, and the government and other holders together, so a bar adds up to 100.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters AS \"Promoters\",\n       h.fiis      AS \"FII\",\n       h.diis      AS \"DII\",\n       h.public    AS \"Public\",\n       CASE WHEN h.government IS NULL AND h.others IS NULL THEN NULL\n            ELSE COALESCE(h.government, 0) + COALESCE(h.others, 0) END AS \"Government and others\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters AS \"Promoters\",\n       h.fiis      AS \"FII\",\n       h.diis      AS \"DII\",\n       h.public    AS \"Public\",\n       CASE WHEN h.government IS NULL AND h.others IS NULL THEN NULL\n            ELSE COALESCE(h.government, 0) + COALESCE(h.others, 0) END AS \"Government and others\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": 0,
+        "stacking": "normal",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 90,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "noValue": "no profile read yet",
+          "decimals": 1,
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Promoters"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6b5fb5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3b82c4"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#e0913a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Public"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa3ad"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Government and others"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cdd2d8"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "barchart",
+      "title": "$symbol - number of shareholders",
+      "description": "How many shareholders the company counted at the end of each quarter. Most of them are individuals, so it moves with the public's holding rather than the institutions'.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.shareholders AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol' AND h.shareholders IS NOT NULL\nORDER BY h.period",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.shareholders AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol' AND h.shareholders IS NOT NULL\nORDER BY h.period"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xField": "Quarter",
+        "xTickLabelRotation": 0,
+        "stacking": "none",
+        "showValue": "auto",
+        "barWidth": 0.9,
+        "groupWidth": 0.75,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0,
+            "gradientMode": "none",
+            "axisPlacement": "auto"
+          },
+          "noValue": "no profile read yet",
+          "decimals": 0,
+          "unit": "locale"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shareholders"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa3ad"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "$symbol - change in holdings over the last quarter",
+      "description": "The latest shareholding pattern against the one quarter earlier. Promoters, FII, DII and public are in **percentage points** of the shares (63.8% from 66.4% is -2.6); shareholders is the **percent** change in their number. The colour shows only the direction: green up, red down. Blank when that earlier quarter is not among the eight read.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(h.promoters - e.promoters, 2) AS \"Promoters\",\n       ROUND(h.fiis - e.fiis, 2)           AS \"FII\",\n       ROUND(h.diis - e.diis, 2)           AS \"DII\",\n       ROUND(h.public - e.public, 2)       AS \"Public\",\n       ROUND(CASE WHEN e.shareholders > 0 THEN (h.shareholders / e.shareholders - 1) * 100 END, 1) AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nLEFT JOIN company_holding e\n  ON e.instrument_id = h.instrument_id AND e.period = strftime('%Y-%m', h.period || '-01', '-3 months')\nWHERE i.symbol = '$symbol'\n  AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)",
+          "queryText": "SELECT ROUND(h.promoters - e.promoters, 2) AS \"Promoters\",\n       ROUND(h.fiis - e.fiis, 2)           AS \"FII\",\n       ROUND(h.diis - e.diis, 2)           AS \"DII\",\n       ROUND(h.public - e.public, 2)       AS \"Public\",\n       ROUND(CASE WHEN e.shareholders > 0 THEN (h.shareholders / e.shareholders - 1) * 100 END, 1) AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nLEFT JOIN company_holding e\n  ON e.instrument_id = h.instrument_id AND e.period = strftime('%Y-%m', h.period || '-01', '-3 months')\nWHERE i.symbol = '$symbol'\n  AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "unit": "suffix: pp",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0.005
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shareholders"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "$symbol - change in holdings over the last year",
+      "description": "The latest shareholding pattern against the one year earlier. Promoters, FII, DII and public are in **percentage points** of the shares (63.8% from 66.4% is -2.6); shareholders is the **percent** change in their number. The colour shows only the direction: green up, red down. Blank when that earlier quarter is not among the eight read.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ROUND(h.promoters - e.promoters, 2) AS \"Promoters\",\n       ROUND(h.fiis - e.fiis, 2)           AS \"FII\",\n       ROUND(h.diis - e.diis, 2)           AS \"DII\",\n       ROUND(h.public - e.public, 2)       AS \"Public\",\n       ROUND(CASE WHEN e.shareholders > 0 THEN (h.shareholders / e.shareholders - 1) * 100 END, 1) AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nLEFT JOIN company_holding e\n  ON e.instrument_id = h.instrument_id AND e.period = strftime('%Y-%m', h.period || '-01', '-12 months')\nWHERE i.symbol = '$symbol'\n  AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)",
+          "queryText": "SELECT ROUND(h.promoters - e.promoters, 2) AS \"Promoters\",\n       ROUND(h.fiis - e.fiis, 2)           AS \"FII\",\n       ROUND(h.diis - e.diis, 2)           AS \"DII\",\n       ROUND(h.public - e.public, 2)       AS \"Public\",\n       ROUND(CASE WHEN e.shareholders > 0 THEN (h.shareholders / e.shareholders - 1) * 100 END, 1) AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nLEFT JOIN company_holding e\n  ON e.instrument_id = h.instrument_id AND e.period = strftime('%Y-%m', h.period || '-01', '-12 months')\nWHERE i.symbol = '$symbol'\n  AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 22,
+          "titleSize": 12
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "unit": "suffix: pp",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0.005
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shareholders"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "$symbol - shareholding pattern, newest first (% of shares)",
+      "description": "The shareholding pattern as screener.in prints it, quarter by quarter.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters    AS \"Promoters\",\n       h.fiis         AS \"FII\",\n       h.diis         AS \"DII\",\n       h.government   AS \"Government\",\n       h.public       AS \"Public\",\n       h.others       AS \"Others\",\n       h.shareholders AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period DESC",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(h.period,1,4) AS \"Quarter\",\n       h.promoters    AS \"Promoters\",\n       h.fiis         AS \"FII\",\n       h.diis         AS \"DII\",\n       h.government   AS \"Government\",\n       h.public       AS \"Public\",\n       h.others       AS \"Others\",\n       h.shareholders AS \"Shareholders\"\nFROM company_holding h\nJOIN instrument i ON i.id = h.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY h.period DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "unit": "percent",
+          "decimals": 2,
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quarter"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Shareholders"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Compared with the other companies",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Every company with a screener.in profile: $symbol, then its peers, then the rest",
+      "description": "One row per company whose screener.in page has been read, at the latest price. **Peer**: *same industry* shares the first two levels of screener.in's classification with the symbol picked (say Financial Services › Banks), *same sector* only the first; within each, the largest first. Click a symbol to show it on this page, a column header to sort, the filter icon on Industry to narrow the list.\n\n**Mkt cap** market capitalisation in ₹ crore; **D/E** debt to equity; **Rev 3Y, Profit 3Y** screener.in's compounded growth per year over three years; **Rev YoY, Profit YoY** the latest reported quarter against the same quarter a year earlier (blank when that was zero or a loss); **Margin** its net profit as a share of revenue; **Promoters** their holding in the latest shareholding pattern; **vs 52w high** how far the latest price is from the 52-week high.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 24,
+        "h": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH c AS (\n  SELECT f.*,\n         substr(f.classification, 1, instr(f.classification || ' › ', ' › ') - 1) AS sector,\n         substr(substr(f.classification, instr(f.classification || ' › ', ' › ') + 3), 1,\n                instr(substr(f.classification, instr(f.classification || ' › ', ' › ') + 3) || ' › ', ' › ') - 1)\n           AS industry_group,\n         trim(replace(f.classification, rtrim(f.classification, replace(f.classification, '›', '')), '')) AS industry\n  FROM v_company_fundamentals f\n  WHERE f.market_cap_now_cr IS NOT NULL OR f.results_quarter IS NOT NULL\n)\nSELECT c.symbol AS \"Symbol\",\n       CASE WHEN c.symbol = s.symbol THEN 'selected'\n            WHEN c.sector = s.sector AND c.industry_group = s.industry_group AND c.industry_group <> ''\n              THEN 'same industry'\n            WHEN c.sector = s.sector AND c.sector <> '' THEN 'same sector'\n       END AS \"Peer\",\n       c.industry                        AS \"Industry\",\n       ROUND(c.market_cap_now_cr)        AS \"Mkt cap ₹ Cr\",\n       ROUND(c.pe_now, 1)                AS \"P/E\",\n       ROUND(c.pb_now, 2)                AS \"P/B\",\n       ROUND(c.roe, 1)                   AS \"ROE\",\n       ROUND(c.roce, 1)                  AS \"ROCE\",\n       ROUND(c.debt_to_equity, 2)        AS \"D/E\",\n       c.sales_growth_3y                 AS \"Rev 3Y\",\n       c.profit_growth_3y                AS \"Profit 3Y\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 1)                AS \"Rev YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 1) AS \"Profit YoY\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 1)              AS \"Margin\",\n       h.promoters                       AS \"Promoters\",\n       ROUND(c.pct_from_52w_high, 1)     AS \"vs 52w high\"\nFROM c\nLEFT JOIN c s ON s.symbol = '$symbol'\nLEFT JOIN company_quarter q\n  ON q.instrument_id = c.instrument_id\n AND q.period = (SELECT MAX(x.period) FROM company_quarter x WHERE x.instrument_id = c.instrument_id)\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nLEFT JOIN company_holding h\n  ON h.instrument_id = c.instrument_id\n AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = c.instrument_id)\nORDER BY CASE WHEN c.symbol = s.symbol THEN 0\n              WHEN c.sector = s.sector AND c.industry_group = s.industry_group AND c.industry_group <> '' THEN 1\n              WHEN c.sector = s.sector AND c.sector <> '' THEN 2\n              ELSE 3 END,\n         c.market_cap_now_cr DESC",
+          "queryText": "WITH c AS (\n  SELECT f.*,\n         substr(f.classification, 1, instr(f.classification || ' › ', ' › ') - 1) AS sector,\n         substr(substr(f.classification, instr(f.classification || ' › ', ' › ') + 3), 1,\n                instr(substr(f.classification, instr(f.classification || ' › ', ' › ') + 3) || ' › ', ' › ') - 1)\n           AS industry_group,\n         trim(replace(f.classification, rtrim(f.classification, replace(f.classification, '›', '')), '')) AS industry\n  FROM v_company_fundamentals f\n  WHERE f.market_cap_now_cr IS NOT NULL OR f.results_quarter IS NOT NULL\n)\nSELECT c.symbol AS \"Symbol\",\n       CASE WHEN c.symbol = s.symbol THEN 'selected'\n            WHEN c.sector = s.sector AND c.industry_group = s.industry_group AND c.industry_group <> ''\n              THEN 'same industry'\n            WHEN c.sector = s.sector AND c.sector <> '' THEN 'same sector'\n       END AS \"Peer\",\n       c.industry                        AS \"Industry\",\n       ROUND(c.market_cap_now_cr)        AS \"Mkt cap ₹ Cr\",\n       ROUND(c.pe_now, 1)                AS \"P/E\",\n       ROUND(c.pb_now, 2)                AS \"P/B\",\n       ROUND(c.roe, 1)                   AS \"ROE\",\n       ROUND(c.roce, 1)                  AS \"ROCE\",\n       ROUND(c.debt_to_equity, 2)        AS \"D/E\",\n       c.sales_growth_3y                 AS \"Rev 3Y\",\n       c.profit_growth_3y                AS \"Profit 3Y\",\n       ROUND(CASE WHEN y.sales > 0 THEN (q.sales / y.sales - 1) * 100 END, 1)                AS \"Rev YoY\",\n       ROUND(CASE WHEN y.net_profit > 0 THEN (q.net_profit / y.net_profit - 1) * 100 END, 1) AS \"Profit YoY\",\n       ROUND(CASE WHEN q.sales > 0 THEN q.net_profit * 100.0 / q.sales END, 1)              AS \"Margin\",\n       h.promoters                       AS \"Promoters\",\n       ROUND(c.pct_from_52w_high, 1)     AS \"vs 52w high\"\nFROM c\nLEFT JOIN c s ON s.symbol = '$symbol'\nLEFT JOIN company_quarter q\n  ON q.instrument_id = c.instrument_id\n AND q.period = (SELECT MAX(x.period) FROM company_quarter x WHERE x.instrument_id = c.instrument_id)\nLEFT JOIN company_quarter y\n  ON y.instrument_id = q.instrument_id AND y.period = strftime('%Y-%m', q.period || '-01', '-12 months')\nLEFT JOIN company_holding h\n  ON h.instrument_id = c.instrument_id\n AND h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = c.instrument_id)\nORDER BY CASE WHEN c.symbol = s.symbol THEN 0\n              WHEN c.sector = s.sector AND c.industry_group = s.industry_group AND c.industry_group <> '' THEN 1\n              WHEN c.sector = s.sector AND c.sector <> '' THEN 2\n              ELSE 3 END,\n         c.market_cap_now_cr DESC"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "decimals": 2,
+          "custom": {
+            "align": "auto",
+            "minWidth": 60,
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Show ${__value.raw} on this page",
+                    "url": "/d/stockanalyzer-company/company-details?orgId=1&var-symbol=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Peer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "selected": {
+                        "color": "#3b82c4",
+                        "index": 0
+                      },
+                      "same industry": {
+                        "color": "#3aa76d",
+                        "index": 1
+                      },
+                      "same sector": {
+                        "color": "#8aa0b8",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Industry"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 215
+              },
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mkt cap ₹ Cr"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P/E"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ROCE"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rev 3Y"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Profit 3Y"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Rev YoY"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Profit YoY"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Margin"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Promoters"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs 52w high"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
