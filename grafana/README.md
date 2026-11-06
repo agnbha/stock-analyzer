@@ -144,7 +144,7 @@ the time range unless you pick some), and the page refreshes every minute.
   shows the move across the range; a session in between that is not picked does not change it.
 - Beside it: the **Previous close** the difference is measured from, the **Open** of the first session picked, the
   **High**, **Low** and **Volume** across the sessions picked, how far the price sits above or below their VWAP (for
-  one session, the purple line), and **As of**, when the newest price was read.
+  one session, the purple line), and **As of**, when the newest price was read, to the second (6 Nov 14:45:18).
 
 With no close before the first session (it is the first one stored for the symbol, or the session before is missing
 for it), the difference is measured from the first session's open and the tile says *(open)*.
@@ -269,19 +269,19 @@ pick. The scripts that produced the numbers are in `scripts/research/` and open 
 (`python3 -I scripts/research/market_backtest.py [path/to/stock-analyzer.db]`); rerun them as the history grows.
 
 **Last data refresh** — a one-line label in the top-right corner of every page
-except CAN SLIM (which has its own *Last scan*), showing how long ago the page's
+except CAN SLIM (which has its own *Last scan*) and Candles and Calls (whose
+header carries **As of**, to the second), showing how long ago the page's
 data was last written. It is a small stat panel without a title, so it takes one
 row and sits beside or above the first panel. What it counts differs by page:
 
 | Page | Newest of |
 |---|---|
 | Account Overview | last fill imported, last balance recorded, last reasons worked out |
-| Candles and Calls | last live candle (daemon, every poll in market hours), last session ingested, last fill imported |
 | Decision Reasons | when the reasons were last worked out (each fill import) |
 | Stock Trend, Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
 | Company Details | last company page read from screener.in (any company; this one's is its *Read on* date), last live candle, last session ingested, since the ratios are restated at the latest price |
 
-On Candles and Calls, a figure much older than a few minutes during market hours
+On Candles and Calls, **As of** much older than a few minutes during market hours
 means the daemon is not running or cannot reach Groww.
 
 One number to read carefully: the overview's charges are **all charges paid on

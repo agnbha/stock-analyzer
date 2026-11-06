@@ -121,21 +121,10 @@ class LastDataRefreshTest {
     @Test
     @DisplayName("with nothing recorded yet the tiles have nothing to show")
     void empty() throws IOException {
-        for (String dashboard : new String[]{"01-overview.json", "02-candles-and-calls.json", "03-decision-reasons.json",
+        for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json"}) {
             assertNull(refreshedAt(dashboard), dashboard);
         }
-    }
-
-    @Test
-    @DisplayName("the live chart page reports the newest of the live candle, the last session ingested and the last fill")
-    void candlesAndCalls() throws IOException {
-        tradingDay(1_000);
-        trade(2_000);
-        assertEquals(2_000_000L, refreshedAt("02-candles-and-calls.json"), "the fill is newest");
-
-        liveCandle(3_000);
-        assertEquals(3_000_000L, refreshedAt("02-candles-and-calls.json"), "then the live candle, while the market is open");
     }
 
     @Test
@@ -181,12 +170,18 @@ class LastDataRefreshTest {
     }
 
     @Test
-    @DisplayName("every dashboard has the tile, as a time-since stat like CAN SLIM's Last scan")
+    @DisplayName("every dashboard has the tile, as a time-since stat like CAN SLIM's Last scan, but Candles and Calls")
     void everyDashboardHasTheTile() throws IOException {
         int checked = 0;
         try (var files = Files.list(DASHBOARDS)) {
             for (Path file : files.filter(f -> f.toString().endsWith(".json")).toList()) {
                 JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+                if (file.getFileName().toString().equals("02-candles-and-calls.json")) {
+                    assertNull(tile(root, "Last data refresh"),
+                            "its header's As of, to the second, says when the price was read");
+                    checked++;
+                    continue;
+                }
                 String title = file.getFileName().toString().equals("06-canslim.json") ? "Last scan" : "Last data refresh";
                 JsonNode tile = tile(root, title);
                 assertTrue(tile != null, file.getFileName() + " needs a '" + title + "' tile");
@@ -202,7 +197,7 @@ class LastDataRefreshTest {
     @Test
     @DisplayName("the tile is a one-line label in the top right corner, so it takes no room from the panels")
     void isASmallLabelInTheTopRightCorner() throws IOException {
-        for (String dashboard : new String[]{"01-overview.json", "02-candles-and-calls.json", "03-decision-reasons.json",
+        for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json"}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
             JsonNode tile = tile(root, "Last data refresh");
