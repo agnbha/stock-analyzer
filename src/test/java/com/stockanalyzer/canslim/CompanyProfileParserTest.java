@@ -142,6 +142,43 @@ class CompanyProfileParserTest {
     }
 
     @Test
+    @DisplayName("a holder the quarterly shareholding lacks is blank, not taken from the yearly table under it")
+    void aHolderTheQuartersLackIsNotReadFromTheYears() throws IOException {
+        // HDFC Bank's consolidated page, cut from the real one. Since its 2023 merger it has no promoters, so the
+        // quarterly table has no Promoters row; the yearly table below it still has one (26.00% in Mar 2017 ...
+        // 25.97% in Mar 2021 ... 0.00% from Mar 2024), and neither table has an Others row. The quarterly table,
+        // as printed for Sep 2026: FIIs 39.39%, DIIs 43.44%, Government 0.19%, Public 16.96%, 48,07,998 holders;
+        // for Jun 2026: FIIs 41.82%.
+        String page;
+        try (InputStream in = CompanyProfileParserTest.class.getResourceAsStream("/screener/company-hdfcbank-consolidated.html")) {
+            page = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        CompanyProfile bank = ScreenerCompanyParser.profile(page);
+
+        assertEquals(8, bank.holdings().size());
+        assertEquals(YearMonth.of(2024, 12), bank.holdings().getFirst().period());
+        assertEquals(YearMonth.of(2026, 9), bank.holdings().getLast().period());
+        for (CompanyProfile.Holding quarter : bank.holdings()) {
+            assertNull(quarter.promoters(), quarter.period() + ": no promoters, not a year's figure");
+            assertNull(quarter.others(), quarter.period() + ": no Others row in either table");
+            double whole = quarter.fiis() + quarter.diis() + quarter.government() + quarter.publicShare();
+            assertEquals(100.0, whole, 0.05, quarter.period() + ": the parts make the whole company");
+        }
+        CompanyProfile.Holding latest = bank.holdings().getLast();
+        assertEquals(39.39, latest.fiis(), 1e-9);
+        assertEquals(43.44, latest.diis(), 1e-9);
+        assertEquals(0.19, latest.government(), 1e-9);
+        assertEquals(16.96, latest.publicShare(), 1e-9);
+        assertEquals(4_807_998.0, latest.shareholders(), 1e-9);
+        assertEquals(YearMonth.of(2026, 9), bank.holdingQuarter());
+
+        CompanyFundamentals forCanSlim = ScreenerCompanyParser.fundamentals(page);
+        assertEquals(39.39 - 41.82, forCanSlim.ratios().get(ScreenerRatios.FII_CHANGE), 1e-9,
+                "the CAN SLIM scan reads the same table");
+        assertEquals(YearMonth.of(2026, 9), forCanSlim.holdingQuarter());
+    }
+
+    @Test
     @DisplayName("a page with no figures, such as an ETF, is an empty profile")
     void anEtfHasNoProfile() throws IOException {
         CompanyProfile etf = profile("company-etf.html");

@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 public final class ScreenerCompanyParser {
 
     private static final Pattern SECTION_END = Pattern.compile("</section>", Pattern.DOTALL);
+    /** The element itself, not a tab button naming it in {@code data-tab-id="quarterly-shp"}. */
+    private static final Pattern QUARTERLY_SHAREHOLDING = Pattern.compile("\\sid=\"quarterly-shp\"");
     private static final Pattern TOP_RATIO = Pattern.compile(
             "<span class=\"name\">\\s*(.*?)\\s*</span>\\s*<span class=\"nowrap value\">(.*?)</span>\\s*</li>",
             Pattern.DOTALL);
@@ -60,7 +62,7 @@ public final class ScreenerCompanyParser {
     /** The ratios together with the latest quarter each quarterly table shows. */
     public static CompanyFundamentals fundamentals(String html) {
         return new CompanyFundamentals(parse(html),
-                lastQuarter(section(html, "quarters")), lastQuarter(section(html, "quarterly-shp")));
+                lastQuarter(section(html, "quarters")), lastQuarter(quarterlyShareholding(html)));
     }
 
     /**
@@ -72,7 +74,7 @@ public final class ScreenerCompanyParser {
         Map<String, List<Double>> top = topRatioNumbers(section(html, "top-ratios"));
         List<Double> highLow = top.getOrDefault("High / Low", List.of());
         String quarters = section(html, "quarters");
-        String holding = section(html, "quarterly-shp");
+        String holding = quarterlyShareholding(html);
         return new CompanyProfile(
                 about(html), classification(html),
                 first(top, "Market Cap"), first(top, "Current Price"),
@@ -290,7 +292,7 @@ public final class ScreenerCompanyParser {
 
         put(ratios, ScreenerRatios.PROFIT_GROWTH_3Y, compoundedProfitGrowth3y(html));
 
-        String holding = section(html, "quarterly-shp");
+        String holding = quarterlyShareholding(html);
         put(ratios, ScreenerRatios.FII_CHANGE, lastChange(holding, "FIIs"));
         put(ratios, ScreenerRatios.DII_CHANGE, lastChange(holding, "DIIs"));
         return ratios;
@@ -300,6 +302,22 @@ public final class ScreenerCompanyParser {
         if (value != null) {
             map.put(key, value);
         }
+    }
+
+    /**
+     * The quarterly shareholding table and nothing after it. The shareholding section holds a quarterly and a yearly
+     * table one after the other, and its tab buttons carry both names in {@code data-tab-id}. Read to the end of the
+     * section, a row the quarterly table lacks was found in the yearly one instead and its years read as quarters:
+     * HDFC Bank, which has had no promoters since its 2023 merger, showed the 25.97% of March 2021 as December 2024's.
+     */
+    private static String quarterlyShareholding(String html) {
+        Matcher element = QUARTERLY_SHAREHOLDING.matcher(html);
+        if (!element.find()) {
+            return "";
+        }
+        int start = element.start();
+        int stop = html.indexOf("</table>", start);
+        return html.substring(start, stop < 0 ? Math.min(html.length(), start + 80_000) : stop);
     }
 
     /** The markup from {@code id="<id>"} to the end of its section; empty when the page lacks it. */
