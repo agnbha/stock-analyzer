@@ -133,25 +133,26 @@ marked with the buys (blue) and sells (orange) you actually took, plotted at the
 average fill price for that session or week. Underneath, every call with its
 reason attached.
 
-The page opens with the share price, written as Groww writes it; the page refreshes every minute.
+The page opens with one row of figures, written as Groww writes them. It follows the **Session** box (every session in
+the time range unless you pick some), and the page refreshes every minute.
 
-- *Share price*, whatever the Session box picks: **Share price** ₹1,311.50, **Difference from close** -1.90 (0.14%)
-  (red for a fall, green for a rise) and **Range** 1D. The price is the close of the newest minute stored: during
-  market hours the minute still forming, which moves with every poll of the live monitor. Before the first poll of a
-  day, and after the close, it is the last session's.
-- *The latest session*, beside it: the previous close, the session's open, high, low and volume so far, how far the
-  price sits above or below VWAP (the purple line), and **As of**, when the price was read.
-- *Move over the selected sessions*, below: **Range** counts the market days covered and names them (5D · 2 Nov → 6
-  Nov); the **Difference** runs from the close before the first session picked to the last price of the newest, and
-  **High** and **Low** are those traded in the sessions picked. One session shows that day's move; the default, every
-  session in the time range, shows the move across the range, as Groww's 1W or 1M figures do. With no close before
-  the first session (it is the first one stored for the symbol, or the session before is missing for it), the move is
-  measured from the first session's open, and **From** says which price was used (₹220.41 · 30 Oct close).
+- **Share price** ₹1,311.50, **Difference from close** -1.90 (0.14%) (red for a fall, green for a rise) and **Range**
+  1D · 6 Nov, large on the left. The price is the close of the newest minute in the sessions picked: during market
+  hours the minute still forming, which moves with every poll of the live monitor. The difference runs from the close
+  before the first session picked to that price. **Range** counts the market days covered and names them (5D · 2
+  Nov → 6 Nov): 1D for one session, 5D for a week, as Groww's 1W or 1M. The default, every session in the time range,
+  shows the move across the range; a session in between that is not picked does not change it.
+- Beside it: the **Previous close** the difference is measured from, the **Open** of the first session picked, the
+  **High**, **Low** and **Volume** across the sessions picked, how far the price sits above or below their VWAP (for
+  one session, the purple line), and **As of**, when the newest price was read.
+
+With no close before the first session (it is the first one stored for the symbol, or the session before is missing
+for it), the difference is measured from the first session's open and the tile says *(open)*.
 
 Amounts use Indian grouping (₹1,23,456.78; volume 1,55,57,042). The previous close is the last trade of the session
 before, the level of the chart's dotted *Previous close* line. NSE's official closing price is an average of the last
 30 minutes, so Groww's difference can differ by a few paise. If that session is missing for the symbol, there is no
-difference rather than one measured from an older close.
+difference from an older close.
 
 The minute-candle chart on this page draws at most **200** candles unless you change the **Max candles** box at the
 top (type a number, press Enter). When the sessions you pick hold more minutes than that, minutes are combined into
