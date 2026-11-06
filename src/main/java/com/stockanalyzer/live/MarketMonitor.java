@@ -88,8 +88,14 @@ public final class MarketMonitor {
 
     private final Map<String, LiveSessionState> states = new LinkedHashMap<>();
     private final Map<String, EventDetector.PriorSessionContext> priorContexts = new HashMap<>();
-    /** Symbols bought today that are not in the tracked list: polled too, so their sell targets can be watched. */
-    private final Set<String> untrackedBuys = new LinkedHashSet<>();
+    /** Symbols traded today that are not in the tracked list: polled too, so a position can be watched. */
+    private final Set<String> untrackedTraded = new LinkedHashSet<>();
+    /** Tracked symbols already announced as having a fill today, so the log says so once. */
+    private final Set<String> announcedActive = new LinkedHashSet<>();
+    /** The latest analysis of each tracked symbol: what the view shows for those not fetched this tick. */
+    private final Map<String, LiveSymbolState> latest = new LinkedHashMap<>();
+    /** When every symbol was last fetched, in epoch seconds; negative until the first tick. */
+    private long lastFullPollEpoch = -1;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final List<Alert> recentAlerts = new ArrayList<>();
 
@@ -179,8 +185,7 @@ public final class MarketMonitor {
 
         long closeEpoch = clock.sessionCloseEpoch(sessionDate);
         while (running.get() && nowEpoch() <= closeEpoch + settings.postCloseGraceSeconds()) {
-            tick(sessionDate);
-            sleep(settings.pollIntervalSeconds());
+            sleep(tick(sessionDate));
         }
 
         Map<String, List<GainOpportunity>> liveTop = new LinkedHashMap<>();
@@ -198,27 +203,52 @@ public final class MarketMonitor {
         loadPriorContexts(sessionDate);
     }
 
-    /** One poll: fetch, analyse, alert, render. Package-private so tests can drive it directly. */
-    void tick(LocalDate sessionDate) {
+    /**
+     * One poll: fetch, analyse, alert, render. Package-private so tests can drive it directly.
+     *
+     * <p>Two speeds. A symbol with a fill today, bought or sold, is fetched on every tick, and the loop
+     * ticks every {@code activePollIntervalSeconds} while there is one, so a position is watched closely
+     * and its sell targets are announced within seconds of the price getting there. Every other symbol is
+     * fetched once per {@code pollIntervalSeconds}; between those polls the view and the heartbeat carry
+     * its last analysis, which is as old as that interval allows. A fill is known once it is in the
+     * journal, so a new trade is picked up within the live fill import interval.
+     *
+     * @return how many seconds to wait before the next tick
+     */
+    int tick(LocalDate sessionDate) {
         long now = nowEpoch();
         List<String> degradedSymbols = new ArrayList<>();
 
         List<Trade> fills = todaysFills(sessionDate);
         Set<String> bought = new LinkedHashSet<>();
+        Set<String> traded = new LinkedHashSet<>();
         for (Trade fill : fills) {
+            String symbol = fill.symbol();
+            traded.add(symbol);
             if (fill.side() == Side.BUY) {
-                bought.add(fill.symbol());
-                if (!settings.symbols().contains(fill.symbol()) && untrackedBuys.add(fill.symbol())) {
-                    states.put(fill.symbol(), new LiveSessionState(fill.symbol(), settings.intervalMinutes()));
-                    log.info("{} was bought today and is not a tracked symbol: polling it for its sell targets",
-                            fill.symbol());
-                }
+                bought.add(symbol);
+            }
+            boolean tracked = settings.symbols().contains(symbol);
+            if (!tracked && untrackedTraded.add(symbol)) {
+                states.put(symbol, new LiveSessionState(symbol, settings.intervalMinutes()));
+                log.info("{} was traded today and is not a tracked symbol: polling it every {}s",
+                        symbol, settings.activePollIntervalSeconds());
+            } else if (tracked && announcedActive.add(symbol)) {
+                log.info("{} has a fill today: polling it every {}s instead of every {}s",
+                        symbol, settings.activePollIntervalSeconds(), settings.pollIntervalSeconds());
             }
         }
 
+        boolean fullPoll = lastFullPollEpoch < 0 || now - lastFullPollEpoch >= settings.pollIntervalSeconds();
+        Set<String> toFetch = new LinkedHashSet<>();
+        if (fullPoll) {
+            toFetch.addAll(settings.symbols());
+            toFetch.addAll(untrackedTraded);
+            lastFullPollEpoch = now;
+        }
+        traded.stream().filter(states::containsKey).forEach(toFetch::add);
+
         Map<String, List<String>> failuresByCause = new LinkedHashMap<>();
-        List<String> toFetch = new ArrayList<>(settings.symbols());
-        toFetch.addAll(untrackedBuys);
         List<CompletableFuture<Void>> fetches = toFetch.stream()
                 .map(symbol -> CompletableFuture.runAsync(() -> {
                     try {
@@ -233,11 +263,17 @@ public final class MarketMonitor {
                 }, executor))
                 .toList();
         fetches.forEach(CompletableFuture::join);
-        logFailures(failuresByCause);
+        logFailures(failuresByCause, toFetch.size());
 
         List<LiveSymbolState> symbolStates = new ArrayList<>();
         for (String symbol : settings.symbols()) {
-            symbolStates.add(analyse(symbol, sessionDate, now));
+            if (toFetch.contains(symbol)) {
+                latest.put(symbol, analyse(symbol, sessionDate, now));
+            }
+            LiveSymbolState state = latest.get(symbol);
+            if (state != null) {
+                symbolStates.add(state);
+            }
         }
 
         fireSellTargets(sessionDate, fills, bought, now);
@@ -245,13 +281,26 @@ public final class MarketMonitor {
         long staleness = symbolStates.stream()
                 .mapToLong(state -> now - state.lastUpdatedEpoch())
                 .max().orElse(0);
-        LiveSnapshot snapshot = new LiveSnapshot(sessionDate, now, now + settings.pollIntervalSeconds(),
+        int pause = secondsToNextTick(traded);
+        LiveSnapshot snapshot = new LiveSnapshot(sessionDate, now, nowEpoch() + pause,
                 Math.max(staleness, 0), !degradedSymbols.isEmpty(),
                 degradedSymbols.isEmpty() ? null : degradedSymbols.size() + " symbols not refreshed",
                 symbolStates, List.copyOf(recentAlerts));
         heartbeatRepository.beat(sessionDate, symbolStates.size(), !degradedSymbols.isEmpty(),
                 degradedSymbols.isEmpty() ? "ok" : "degraded: " + degradedSymbols);
         view.render(snapshot);
+        return pause;
+    }
+
+    /**
+     * The active interval while any symbol being watched has a fill today, otherwise the time left until
+     * every symbol is next due; never longer than the latter, and never less than a second.
+     */
+    private int secondsToNextTick(Set<String> traded) {
+        long untilFullPoll = lastFullPollEpoch + settings.pollIntervalSeconds() - nowEpoch();
+        boolean watchingATrade = traded.stream().anyMatch(states::containsKey);
+        long pause = watchingATrade ? Math.min(settings.activePollIntervalSeconds(), untilFullPoll) : untilFullPoll;
+        return (int) Math.max(pause, 1);
     }
 
     /**
@@ -259,13 +308,13 @@ public final class MarketMonitor {
      * fails every symbol with the identical message, and fifty copies of it per
      * tick buries anything that only went wrong for one stock.
      */
-    private void logFailures(Map<String, List<String>> failuresByCause) {
+    private void logFailures(Map<String, List<String>> failuresByCause, int attempted) {
         failuresByCause.forEach((cause, symbols) -> {
             if (symbols.size() == 1) {
                 log.warn("Poll failed for {}: {}", symbols.getFirst(), cause);
             } else {
                 log.warn("Poll failed for {} of {} symbols ({}{}): {}",
-                        symbols.size(), settings.symbols().size(),
+                        symbols.size(), attempted,
                         String.join(", ", symbols.subList(0, Math.min(3, symbols.size()))),
                         symbols.size() > 3 ? ", ..." : "", cause);
             }
@@ -490,6 +539,7 @@ public final class MarketMonitor {
                                   String segment,
                                   int intervalMinutes,
                                   int pollIntervalSeconds,
+                                  int activePollIntervalSeconds,
                                   int postCloseGraceSeconds,
                                   int horizonMinutes,
                                   boolean persistLiveCandles) {

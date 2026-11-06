@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 08:58 IST, weekdays. Starts the market-hours daemon (Parts 3 and 4).
 #
-# The daemon plans the day's alerts at startup, polls every 2.5 minutes through
-# the session, reconciles against the authoritative tape after the close, and
+# The daemon plans the day's alerts at startup, polls every 3 minutes through
+# the session (every 10 seconds for symbols traded today), reconciles against the authoritative tape after the close, and
 # then exits on its own - so this runs once a day and is not a service to keep
 # alive. It also checks the trading calendar itself and exits immediately on a
 # holiday, so no weekday logic is needed here.

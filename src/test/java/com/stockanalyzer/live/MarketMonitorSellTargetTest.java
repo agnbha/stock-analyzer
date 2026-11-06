@@ -325,7 +325,7 @@ class MarketMonitorSellTargetTest {
                 new SqliteLiveCandleRepository(database), new SqliteLiveOpportunityRepository(database),
                 new SqliteMarketEventRepository(database), new SqliteTradingDayRepository(database), weekdays, null,
                 snapshot -> { }, CLOCK, executor,
-                new MarketMonitor.MonitorSettings(tracked, "NSE", "CASH", 1, 150, 120, 30, true),
+                new MarketMonitor.MonitorSettings(tracked, "NSE", "CASH", 1, 150, 10, 120, 30, true),
                 now::get);
     }
 
