@@ -1,9 +1,13 @@
 package com.stockanalyzer;
 
 import com.stockanalyzer.canslim.CanSlimReport;
+import com.stockanalyzer.canslim.CompanyProfileService;
 import com.stockanalyzer.config.AppConfig;
 import com.stockanalyzer.report.CanSlimReporter;
 import com.stockanalyzer.util.Args;
+
+import java.util.List;
+import java.util.Locale;
 
 /**
  * CAN SLIM entry point: screen for growth stocks, then read each one's chart
@@ -18,6 +22,10 @@ import com.stockanalyzer.util.Args;
  *                              does this on every scan; --no-market skips it for one)
  *   ... --limit N              with --market, only about N listings spread through the list: a trial run
  *   ... --top N                list the N strongest stocks by RS rating (50 for a market scan)
+ *   profiles                   read the tracked symbols' screener.in pages for the Candles and Calls page's
+ *                              company details: the stalest first, at most company.profile.max.pages.per.run
+ *   profiles --symbol S        one company, now, whatever its copy's age
+ *   profiles --max-pages N     a different budget for this run; 0 reads every company that is due
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -30,9 +38,14 @@ public final class CanSlimMain {
     public static void main(String[] args) {
         Args parsed = Args.parse(args);
         String command = parsed.command("scan");
+        if (command.equals("profiles")) {
+            profiles(parsed);
+            return;
+        }
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
-            System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]");
+            System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
+                    + " | profiles [--symbol S] [--max-pages N]");
             System.exit(2);
         }
 
@@ -54,6 +67,31 @@ public final class CanSlimMain {
             // configured is the one thing a person has to act on, so it leaves a status behind.
             if (report.screenerFailed()) {
                 System.exit(report.needsLogin() ? 3 : 1);
+            }
+        }
+    }
+
+    /**
+     * Refreshes the company profiles the Candles and Calls page shows. A run that read nothing because
+     * screener.in refused leaves a failing status for the evening log; one that simply had nothing due, or
+     * stopped after reading some, does not: what is left is picked up on a later night.
+     */
+    private static void profiles(Args parsed) {
+        AppConfig config = AppConfig.load();
+        boolean one = parsed.has("symbol");
+        try (AppContext context = new AppContext(config)) {
+            List<String> symbols = one ? List.of(parsed.require("symbol").toUpperCase(Locale.ROOT))
+                    : config.stockSymbols();
+            int maxPages = parsed.integer("max-pages", one ? 0 : config.companyProfileMaxPagesPerRun());
+            CompanyProfileService.Result result = context.companyProfileService()
+                    .refresh(symbols, maxPages, config.companyProfileRefreshDays() * 86_400L, one);
+            System.out.printf("Company profiles: %d read, %d with nothing on screener.in, %d still due%n",
+                    result.fetched(), result.withoutProfile(), result.notAttempted());
+            if (result.stoppedBy() != null) {
+                System.out.println("Stopped early: " + result.stoppedBy());
+                if (result.fetched() == 0 && result.withoutProfile() == 0) {
+                    System.exit(1);
+                }
             }
         }
     }
