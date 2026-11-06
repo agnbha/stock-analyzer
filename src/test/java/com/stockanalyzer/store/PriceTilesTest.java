@@ -39,7 +39,6 @@ class PriceTilesTest {
     private static final Path DASHBOARD = Path.of("grafana", "dashboards", "02-candles-and-calls.json");
     private static final int NOW = 40;
     private static final int DETAILS = 42;
-    private static final int REFRESH_LABEL = 90;
     private static final String D0 = "2026-08-25";
     private static final String D1 = "2026-08-26";
     private static final String D2 = "2026-08-27";
@@ -270,26 +269,25 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("the header is one row: the share price from the top, the figures beside it, the chart straight under")
+    @DisplayName("the header is one row: the share price and the figures level across the top, the chart straight under")
     void layout() throws Exception {
         for (JsonNode panel : dashboard().path("panels")) {
             assertTrue(panel.path("id").asInt() != 41, "the second row of tiles is gone");
+            assertTrue(panel.path("id").asInt() != 90 && !"Last data refresh".equals(
+                            panel.path("fieldConfig").path("defaults").path("displayName").asText()),
+                    "the refresh label is gone: the header's As of says when the price was read");
         }
         JsonNode now = panel(NOW).path("gridPos");
         JsonNode details = panel(DETAILS).path("gridPos");
-        JsonNode label = panel(REFRESH_LABEL).path("gridPos");
 
         assertEquals(0, now.path("x").asInt());
-        assertEquals(0, now.path("y").asInt(), "from the top: lower down, Grafana floats it up beside the refresh label");
+        assertEquals(0, now.path("y").asInt(), "from the top");
+        assertEquals(now.path("y").asInt(), details.path("y").asInt(), "level with it, nothing above");
         assertEquals(now.path("w").asInt(), details.path("x").asInt(), "beside it");
         assertEquals(24, details.path("x").asInt() + details.path("w").asInt(), "to the right edge");
-        assertEquals(label.path("y").asInt() + label.path("h").asInt(), details.path("y").asInt(),
-                "under the refresh label");
-        assertTrue(label.path("x").asInt() >= details.path("x").asInt(),
-                "the label sits over the figures, so they cannot float up either");
         assertEquals(bottom(now), bottom(details), "both end level");
         assertEquals(bottom(now), panel(20).path("gridPos").path("y").asInt(),
-                "the minute chart follows straight after, with no gap where the second row was");
+                "the minute chart follows straight after, with no gap");
 
         List<JsonNode> panels = new ArrayList<>();
         dashboard().path("panels").forEach(panels::add);
@@ -328,6 +326,18 @@ class PriceTilesTest {
         }
         assertEquals(List.of("Share price", "Difference from close", "Range"), headline);
         assertEquals(List.of("Previous close", "Open", "High", "Low", "Volume", "vs VWAP", "As of"), beside);
+    }
+
+    @Test
+    @DisplayName("As of is shown to the second, since a poll's time is stored in seconds")
+    void asOfToTheSecond() throws Exception {
+        assertEquals("time:D MMM HH:mm:ss", property(panel(DETAILS), "As of", "unit").asText());
+
+        session(test, D1, 100.0);
+        live(test, D2, 0, 100, 101, 99, 100.5, 500, ts(D2, 0) + 37);
+
+        long shown = (long) number(header(D2), "As of");
+        assertEquals(37, shown / 1000 % 60, "the poll's seconds reach the tile, not rounded to the minute");
     }
 
     @Test

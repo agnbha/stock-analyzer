@@ -450,9 +450,9 @@
       },
       "gridPos": {
         "x": 11,
-        "y": 1,
+        "y": 0,
         "w": 13,
-        "h": 3
+        "h": 4
       },
       "targets": [
         {
@@ -527,7 +527,7 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "time:D MMM HH:mm"
+                "value": "time:D MMM HH:mm:ss"
               }
             ]
           }
@@ -1245,61 +1245,6 @@
         "overrides": []
       },
       "description": "Every note written on a chart for this symbol, newest first, copied from Grafana by `chartnotes sync` (evening.sh runs it). A note with no symbol tag is listed too, as \"(no symbol tag)\", so none can be lost.\n\n- **Sentiment** — the first tag that is BULLISH, BEARISH or NEUTRAL; a label such as UP or LEVEL counts as the generic one it stands for.\n- Give a note with no symbol tag a symbol with `chartnotes assign --id N --symbol S`; it is then drawn on that symbol's charts."
-    },
-    {
-      "id": 90,
-      "type": "stat",
-      "title": "",
-      "description": "Updated by the market-day daemon every poll while the market is open, by the evening batch after the close. It is the newest of: the last live candle written, the last session ingested, and the last fill imported. If it is much older than a few minutes during market hours, the daemon is not running or cannot reach Groww.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "stock-analyzer-sqlite"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 0,
-        "w": 8,
-        "h": 1
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "none",
-        "graphMode": "none",
-        "textMode": "value_and_name",
-        "justifyMode": "center",
-        "wideLayout": true,
-        "text": {
-          "valueSize": 14,
-          "titleSize": 14
-        }
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "dateTimeFromNow",
-          "displayName": "Last data refresh"
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "stock-analyzer-sqlite"
-          },
-          "refId": "A",
-          "queryType": "table",
-          "rawQueryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(updated_at) AS t FROM live_candle\n  UNION ALL SELECT MAX(ingested_at) FROM trading_day\n  UNION ALL SELECT MAX(imported_at) FROM trade)",
-          "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\" FROM (\n  SELECT MAX(updated_at) AS t FROM live_candle\n  UNION ALL SELECT MAX(ingested_at) FROM trading_day\n  UNION ALL SELECT MAX(imported_at) FROM trade)",
-          "timeColumns": []
-        }
-      ],
-      "transparent": true
     },
     {
       "id": 30,
