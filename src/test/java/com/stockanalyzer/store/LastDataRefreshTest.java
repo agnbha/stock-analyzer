@@ -122,7 +122,7 @@ class LastDataRefreshTest {
     @DisplayName("with nothing recorded yet the tiles have nothing to show")
     void empty() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "02-candles-and-calls.json", "03-decision-reasons.json",
-                "04-stock-trend.json", "05-watchlist.json"}) {
+                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json"}) {
             assertNull(refreshedAt(dashboard), dashboard);
         }
     }
@@ -170,6 +170,17 @@ class LastDataRefreshTest {
     }
 
     @Test
+    @DisplayName("Company Details reports the newest of the last company page read and the latest price")
+    void companyDetails() throws IOException {
+        tradingDay(1_000);
+        liveCandle(2_000);
+        assertEquals(2_000_000L, refreshedAt("07-company-details.json"), "the price the ratios are restated at");
+
+        execute("INSERT INTO company_profile (instrument_id, fetched_at) VALUES (?, 5000)", instrument);
+        assertEquals(5_000_000L, refreshedAt("07-company-details.json"), "then the page read from screener.in");
+    }
+
+    @Test
     @DisplayName("every dashboard has the tile, as a time-since stat like CAN SLIM's Last scan")
     void everyDashboardHasTheTile() throws IOException {
         int checked = 0;
@@ -185,14 +196,14 @@ class LastDataRefreshTest {
                 checked++;
             }
         }
-        assertEquals(6, checked);
+        assertEquals(7, checked);
     }
 
     @Test
     @DisplayName("the tile is a one-line label in the top right corner, so it takes no room from the panels")
     void isASmallLabelInTheTopRightCorner() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "02-candles-and-calls.json", "03-decision-reasons.json",
-                "04-stock-trend.json", "05-watchlist.json"}) {
+                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json"}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
             JsonNode tile = tile(root, "Last data refresh");
             JsonNode at = tile.path("gridPos");
