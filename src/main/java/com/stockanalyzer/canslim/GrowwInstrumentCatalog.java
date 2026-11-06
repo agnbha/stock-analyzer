@@ -135,6 +135,7 @@ public final class GrowwInstrumentCatalog implements MarketCatalog {
     }
 
     /** Pure so it can be tested on a small file; the real one has 140,000 rows. */
+    @SuppressWarnings("resource")
     static List<MarketListing> parse(Reader reader, Settings settings) throws IOException {
         BufferedReader lines = reader instanceof BufferedReader b ? b : new BufferedReader(reader);
         String header = lines.readLine();

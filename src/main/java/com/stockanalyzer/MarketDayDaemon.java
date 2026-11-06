@@ -21,7 +21,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 
 /**
  * Parts 3 and 4: the market-hours process. Polls for new candles, keeps the
