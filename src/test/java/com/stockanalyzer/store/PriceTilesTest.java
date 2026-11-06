@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,14 +31,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The two rows of price tiles at the top of Candles and Calls, checked by running each panel's own query over seeded
- * minutes and sessions.
+ * The price header at the top of Candles and Calls, checked by running each panel's own query over seeded minutes and
+ * sessions.
  */
 class PriceTilesTest {
 
     private static final Path DASHBOARD = Path.of("grafana", "dashboards", "02-candles-and-calls.json");
     private static final int NOW = 40;
     private static final int SELECTED = 41;
+    private static final int DETAILS = 42;
+    private static final int REFRESH_LABEL = 90;
     private static final String D0 = "2026-08-25";
     private static final String D1 = "2026-08-26";
     private static final String D2 = "2026-08-27";
@@ -64,7 +67,7 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("the price is the newest minute, measured from the close of the session before")
+    @DisplayName("the share price is the newest minute, its difference measured from the close of the session before")
     void latestPriceAndTodaysMove() throws Exception {
         session(test, D1, 100.0);
         settled(test, D1, 0, 99, 101, 98, 100, 900);
@@ -73,14 +76,14 @@ class PriceTilesTest {
 
         Map<String, Object> now = now();
 
-        assertEquals(103.0, number(now, "Price"), "the close of the newest minute, still forming");
-        assertEquals(100.0, number(now, "Previous close"));
-        assertEquals(3.0, number(now, "Change"), 1e-9);
-        assertEquals(3.0, number(now, "Change %"), 1e-9);
-        assertEquals(101.0, number(now, "Open"), "the first minute's open");
-        assertEquals(104.0, number(now, "High"));
-        assertEquals(99.0, number(now, "Low"));
-        assertEquals(4000.0, number(now, "Volume"), "today's minutes only, not the session before");
+        assertEquals("₹103.00", now.get("Share price"), "the close of the newest minute, still forming");
+        assertEquals("+3.00 (3.00%)", now.get("Difference from close"));
+        assertEquals("1D", now.get("Range"));
+        assertEquals("₹100.00", now.get("Previous close"));
+        assertEquals("₹101.00", now.get("Open"), "the first minute's open");
+        assertEquals("₹104.00", now.get("High"));
+        assertEquals("₹99.00", now.get("Low"));
+        assertEquals("4,000", now.get("Volume"), "today's minutes only, not the session before");
         double vwap = ((103 + 100.5 + 102) / 3.0 * 1000 + (104 + 99 + 103) / 3.0 * 3000) / 4000;
         assertEquals((103 - vwap) / vwap * 100.0, number(now, "vs VWAP"), 1e-9);
         assertEquals((ts(D2, 1) + 25) * 1000.0, number(now, "As of"), "when the last poll wrote it");
@@ -96,12 +99,36 @@ class PriceTilesTest {
 
         Map<String, Object> now = now();
 
-        assertEquals(98.0, number(now, "Price"));
-        assertEquals(-2.0, number(now, "Change"), 1e-9);
-        assertEquals(-2.0, number(now, "Change %"), 1e-9);
-        assertEquals(99.0, number(now, "Open"));
-        assertEquals(1200.0, number(now, "Volume"));
+        assertEquals("₹98.00", now.get("Share price"));
+        assertEquals("-2.00 (2.00%)", now.get("Difference from close"), "a fall: the sign on the rupees, as on Groww");
+        assertEquals("₹99.00", now.get("Open"));
+        assertEquals("1,200", now.get("Volume"));
         assertEquals((ts(D2, 374) + 60) * 1000.0, number(now, "As of"), "15:30, the end of the 15:29 minute");
+    }
+
+    @Test
+    @DisplayName("amounts are written the Indian way, with every paisa shown")
+    void amountsTheIndianWay() throws Exception {
+        session(test, D1, 100_000.0);
+        live(test, D2, 0, 99_999.9, 1_23_456.78, 99_999.9, 1_23_456.78, 1_23_45_678, ts(D2, 0) + 30);
+
+        Map<String, Object> now = now();
+
+        assertEquals("₹1,23,456.78", now.get("Share price"));
+        assertEquals("₹1,00,000.00", now.get("Previous close"));
+        assertEquals("₹99,999.90", now.get("Open"), "the trailing zero kept");
+        assertEquals("+23,456.78 (23.46%)", now.get("Difference from close"));
+        assertEquals("1,23,45,678", now.get("Volume"));
+    }
+
+    @Test
+    @DisplayName("a difference that rounds to nothing has no sign, so it is neither red nor green")
+    void aFlatDay() throws Exception {
+        session(test, D1, 100.0);
+        live(test, D2, 0, 100, 100.01, 99.99, 100.004, 500, ts(D2, 0) + 30);
+
+        assertEquals("0.00 (0.00%)", now().get("Difference from close"));
+        assertEquals("₹100.00", now().get("Share price"));
     }
 
     @Test
@@ -112,11 +139,11 @@ class PriceTilesTest {
         live(test, D2, 0, 100, 101, 99, 100, 500, ts(D2, 0) + 60);
         live(test, D2, 1, 100, 102, 100, 101, 200, ts(D2, 1) + 30);
 
-        assertEquals(700.0, number(now(), "Volume"));
+        assertEquals("700", now().get("Volume"));
     }
 
     @Test
-    @DisplayName("with the session before missing for this symbol there is no change, not one from an older close")
+    @DisplayName("with the session before missing for this symbol there is no difference, not one from an older close")
     void aHoleGivesNoChange() throws Exception {
         session(test, D0, 90.0);
         session(other, D1, 50.0);
@@ -124,10 +151,9 @@ class PriceTilesTest {
 
         Map<String, Object> now = now();
 
-        assertEquals(100.0, number(now, "Price"));
+        assertEquals("₹100.00", now.get("Share price"));
         assertNull(now.get("Previous close"), "D1 was a session (OTHER has it); TEST's D0 close must not stand in");
-        assertNull(now.get("Change"));
-        assertNull(now.get("Change %"));
+        assertNull(now.get("Difference from close"));
     }
 
     @Test
@@ -153,12 +179,11 @@ class PriceTilesTest {
 
         Map<String, Object> range = selected(D2, D1);
 
-        assertEquals("26 Aug → 27 Aug", range.get("Sessions"));
-        assertEquals(100.0, number(range, "From"), "D0's close");
-        assertEquals(2.0, number(range, "Change"), 1e-9);
-        assertEquals(2.0, number(range, "Change %"), 1e-9);
-        assertEquals(108.0, number(range, "High"));
-        assertEquals(99.0, number(range, "Low"));
+        assertEquals("2D · 26 Aug → 27 Aug", range.get("Range"));
+        assertEquals("₹100.00 · 25 Aug close", range.get("From"));
+        assertEquals("+2.00 (2.00%)", range.get("Difference"));
+        assertEquals("₹108.00", range.get("High"));
+        assertEquals("₹99.00", range.get("Low"));
     }
 
     @Test
@@ -171,27 +196,28 @@ class PriceTilesTest {
 
         Map<String, Object> day = selected(D2);
 
-        assertEquals("27 Aug", day.get("Sessions"));
-        assertEquals(105.0, number(day, "From"));
-        assertEquals(-3.0, number(day, "Change"), 1e-9);
-        assertEquals(108.0, number(day, "High"));
-        assertEquals(101.0, number(day, "Low"));
+        assertEquals("1D · 27 Aug", day.get("Range"));
+        assertEquals("₹105.00 · 26 Aug close", day.get("From"));
+        assertEquals("-3.00 (2.86%)", day.get("Difference"));
+        assertEquals("₹108.00", day.get("High"));
+        assertEquals("₹101.00", day.get("Low"));
     }
 
     @Test
-    @DisplayName("a session left out in between moves the change but not the high and low")
+    @DisplayName("a session left out in between moves the difference and the day count, but not the high and low")
     void aSessionLeftOut() throws Exception {
         session(test, D0, 100.0);
+        session(other, D2, 60.0);
         settled(test, D1, 0, 100, 103, 99, 102, 100);
         settled(test, D2, 0, 102, 200, 50, 150, 100);
         settled(test, D3, 0, 150, 151, 148, 149, 100);
 
         Map<String, Object> range = selected(D1, D3);
 
-        assertEquals("26 Aug → 28 Aug", range.get("Sessions"));
-        assertEquals(49.0, number(range, "Change"), 1e-9, "from D0's close to D3's last price");
-        assertEquals(151.0, number(range, "High"), "D2 was not picked");
-        assertEquals(99.0, number(range, "Low"), "D2 was not picked");
+        assertEquals("3D · 26 Aug → 28 Aug", range.get("Range"), "D2 was a market day, though not picked");
+        assertEquals("+49.00 (49.00%)", range.get("Difference"), "from D0's close to D3's last price");
+        assertEquals("₹151.00", range.get("High"), "D2 was not picked");
+        assertEquals("₹99.00", range.get("Low"), "D2 was not picked");
     }
 
     @Test
@@ -203,9 +229,8 @@ class PriceTilesTest {
 
         Map<String, Object> range = selected(D1);
 
-        assertEquals(80.0, number(range, "From"), "D0 was a session, but TEST has nothing before D1");
-        assertEquals(8.0, number(range, "Change"), 1e-9);
-        assertEquals(10.0, number(range, "Change %"), 1e-9);
+        assertEquals("₹80.00 · 26 Aug open", range.get("From"), "D0 was a session, but TEST has nothing before D1");
+        assertEquals("+8.00 (10.00%)", range.get("Difference"));
     }
 
     @Test
@@ -214,20 +239,34 @@ class PriceTilesTest {
         settled(test, "2025-12-31", 0, 100, 101, 99, 100, 100);
         settled(test, "2026-01-01", 0, 100, 101, 99, 100, 100);
 
-        assertEquals("31 Dec 25 → 1 Jan 26", selected("2026-01-01", "2025-12-31").get("Sessions"));
+        Map<String, Object> range = selected("2026-01-01", "2025-12-31");
+
+        assertEquals("2D · 31 Dec 25 → 1 Jan 26", range.get("Range"));
+        assertEquals("₹100.00 · 31 Dec 25 open", range.get("From"));
     }
 
     @Test
-    @DisplayName("the tiles sit at the top, above the minute chart, and no two panels overlap")
+    @DisplayName("the share price heads the page, the session's figures beside it from the same query")
     void layout() throws Exception {
-        JsonNode now = panel(NOW);
-        JsonNode selected = panel(SELECTED);
-        assertEquals(1, now.path("gridPos").path("y").asInt(), "under the one-line refresh label");
-        assertEquals(24, now.path("gridPos").path("w").asInt());
-        assertEquals(now.path("gridPos").path("y").asInt() + now.path("gridPos").path("h").asInt(),
-                selected.path("gridPos").path("y").asInt());
-        assertEquals(selected.path("gridPos").path("y").asInt() + selected.path("gridPos").path("h").asInt(),
-                panel(20).path("gridPos").path("y").asInt(), "the minute chart follows straight after");
+        JsonNode now = panel(NOW).path("gridPos");
+        JsonNode details = panel(DETAILS).path("gridPos");
+        JsonNode label = panel(REFRESH_LABEL).path("gridPos");
+        JsonNode selected = panel(SELECTED).path("gridPos");
+
+        assertEquals(0, now.path("x").asInt());
+        assertEquals(0, now.path("y").asInt(), "from the top: lower down, Grafana floats it up beside the refresh label");
+        assertEquals(now.path("w").asInt(), details.path("x").asInt(), "beside it");
+        assertEquals(24, details.path("x").asInt() + details.path("w").asInt(), "to the right edge");
+        assertEquals(label.path("y").asInt() + label.path("h").asInt(), details.path("y").asInt(),
+                "under the refresh label");
+        assertTrue(label.path("x").asInt() >= details.path("x").asInt(),
+                "the label sits over the figures, so they cannot float up either");
+        assertEquals(bottom(now), bottom(details), "both end level");
+        assertEquals(bottom(now), selected.path("y").asInt(), "the selected sessions straight under");
+        assertEquals(0, selected.path("x").asInt());
+        assertEquals(24, selected.path("w").asInt());
+        assertEquals(bottom(selected), panel(20).path("gridPos").path("y").asInt(),
+                "the minute chart follows straight after");
 
         List<JsonNode> panels = new ArrayList<>();
         dashboard().path("panels").forEach(panels::add);
@@ -237,8 +276,8 @@ class PriceTilesTest {
                 JsonNode q = panels.get(b).path("gridPos");
                 boolean apart = p.path("x").asInt() + p.path("w").asInt() <= q.path("x").asInt()
                         || q.path("x").asInt() + q.path("w").asInt() <= p.path("x").asInt()
-                        || p.path("y").asInt() + p.path("h").asInt() <= q.path("y").asInt()
-                        || q.path("y").asInt() + q.path("h").asInt() <= p.path("y").asInt();
+                        || bottom(p) <= q.path("y").asInt()
+                        || bottom(q) <= p.path("y").asInt();
                 assertTrue(apart, "panels " + panels.get(a).path("id") + " and " + panels.get(b).path("id")
                         + " overlap");
             }
@@ -246,27 +285,87 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("a fall is red and a rise green, and a missing change is not painted as a fall")
+    @DisplayName("between them the two panels show every figure of the query, each once")
+    void theTwoPanelsShareOneQuery() throws Exception {
+        JsonNode details = panel(DETAILS);
+        assertEquals("-- Dashboard --", details.path("datasource").path("uid").asText());
+        assertEquals(NOW, details.path("targets").get(0).path("panelId").asInt(), "the share price's own query");
+
+        session(test, D1, 100.0);
+        live(test, D2, 0, 100, 101, 99, 100.5, 500, ts(D2, 0) + 30);
+        List<String> headline = new ArrayList<>();
+        List<String> beside = new ArrayList<>();
+        Pattern shownHere = fields(panel(NOW));
+        Pattern shownBeside = fields(details);
+        for (String column : now().keySet()) {
+            boolean here = shownHere.matcher(column).find();
+            boolean there = shownBeside.matcher(column).find();
+            assertTrue(here ^ there, column + " should show in exactly one of the two");
+            (here ? headline : beside).add(column);
+        }
+        assertEquals(List.of("Share price", "Difference from close", "Range"), headline);
+        assertEquals(List.of("Previous close", "Open", "High", "Low", "Volume", "vs VWAP", "As of"), beside);
+    }
+
+    @Test
+    @DisplayName("a fall is red and a rise green, and a missing or flat difference is plain")
     void signColours() throws Exception {
-        int signed = 0;
-        for (int id : new int[] {NOW, SELECTED}) {
-            for (JsonNode override : panel(id).path("fieldConfig").path("overrides")) {
+        for (var tile : Map.of(NOW, "Difference from close", SELECTED, "Difference").entrySet()) {
+            JsonNode mappings = property(panel(tile.getKey()), tile.getValue(), "mappings");
+            assertEquals("red", mapped(mappings, "-1.90 (0.14%)"), tile.getValue());
+            assertEquals("red", mapped(mappings, "-2,070.00 (7.70%)"), tile.getValue());
+            assertEquals("green", mapped(mappings, "+31.60 (2.47%)"), tile.getValue());
+            assertNull(mapped(mappings, "0.00 (0.00%)"), tile.getValue() + ": flat keeps the text colour");
+        }
+        JsonNode panelDefaults = panel(NOW).path("fieldConfig").path("defaults");
+        assertEquals("text", panelDefaults.path("color").path("fixedColor").asText(), "the colour of a dash");
+
+        JsonNode steps = property(panel(DETAILS), "vs VWAP", "thresholds").path("steps");
+        assertEquals("text", steps.get(0).path("color").asText(), "the colour of no value");
+        assertEquals("red", colour(steps, -0.01));
+        assertEquals("red", colour(steps, -250_000));
+        assertEquals("text", colour(steps, 0));
+        assertEquals("green", colour(steps, 0.01));
+    }
+
+    /** The colour a regex value mapping gives a text, or null when none matches. */
+    private static String mapped(JsonNode mappings, String text) {
+        for (JsonNode mapping : mappings) {
+            assertEquals("regex", mapping.path("type").asText());
+            if (grafanaRegex(mapping.path("options").path("pattern").asText()).matcher(text).find()) {
+                return mapping.path("options").path("result").path("color").asText();
+            }
+        }
+        return null;
+    }
+
+    /** Grafana's reading of a pattern: "/.../" is a regex as written; anything else must match the whole text. */
+    private static Pattern grafanaRegex(String pattern) {
+        if (pattern.startsWith("/") && pattern.lastIndexOf('/') > 0) {
+            return Pattern.compile(pattern.substring(1, pattern.lastIndexOf('/')));
+        }
+        return Pattern.compile("^" + pattern + "$");
+    }
+
+    private static Pattern fields(JsonNode panel) {
+        return grafanaRegex(panel.path("options").path("reduceOptions").path("fields").asText());
+    }
+
+    private static JsonNode property(JsonNode panel, String field, String id) {
+        for (JsonNode override : panel.path("fieldConfig").path("overrides")) {
+            if (field.equals(override.path("matcher").path("options").asText())) {
                 for (JsonNode property : override.path("properties")) {
-                    if (!"thresholds".equals(property.path("id").asText())) {
-                        continue;
+                    if (id.equals(property.path("id").asText())) {
+                        return property.path("value");
                     }
-                    JsonNode steps = property.path("value").path("steps");
-                    String field = override.path("matcher").path("options").asText();
-                    assertEquals("text", steps.get(0).path("color").asText(), field + ": the colour of no value");
-                    assertEquals("red", colour(steps, -0.01), field);
-                    assertEquals("red", colour(steps, -250_000), field);
-                    assertEquals("text", colour(steps, 0), field);
-                    assertEquals("green", colour(steps, 0.01), field);
-                    signed++;
                 }
             }
         }
-        assertEquals(5, signed, "Change and Change % in both rows, and vs VWAP");
+        throw new AssertionError("no " + id + " for " + field + " on panel " + panel.path("id"));
+    }
+
+    private static int bottom(JsonNode gridPos) {
+        return gridPos.path("y").asInt() + gridPos.path("h").asInt();
     }
 
     /** The colour Grafana gives a value: that of the last step at or below it. */
@@ -295,7 +394,7 @@ class PriceTilesTest {
         return ((Number) value).doubleValue();
     }
 
-    /** The first row; it also proves the tiles do not depend on the Session box, which is left unfilled. */
+    /** The share price's query; it also proves the tiles do not depend on the Session box, which is left unfilled. */
     private Map<String, Object> now() throws Exception {
         return run(NOW, null);
     }
