@@ -11,7 +11,7 @@
   "graphTooltip": 1,
   "schemaVersion": 39,
   "version": 1,
-  "refresh": "5m",
+  "refresh": "1m",
   "time": {
     "from": "now-3M",
     "to": "now"
@@ -348,6 +348,386 @@
   },
   "panels": [
     {
+      "id": 40,
+      "type": "stat",
+      "title": "$symbol - latest price and today's move",
+      "description": "The last price read for $symbol and its move today, whichever sessions the Session box picks (the row below follows those).\n\n**Price** is the close of the newest minute stored: during market hours the minute still forming, updated at every poll of the live monitor; after the close, the session's last minute. **As of** is when it was read.\n\n**Change** is measured from the **previous close**, the level of the chart's dotted *Previous close* line: the last trade of the session before. NSE's official closing price is an average of the last 30 minutes, so Groww's day change can differ from this one by a little. If that session is missing for this symbol there is no previous close, rather than one from days earlier.\n\n**Open**, **High**, **Low** and **Volume** cover the session's minutes so far. **vs VWAP** is how far the price is above or below the session's volume-weighted average price, the purple line on the chart.\n\nBefore the first poll of a market day, and after the close, this is the last session's move. A symbol with no minute data shows dashes.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 3
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH\n-- The newest minute stored for this symbol, live or settled, whatever the Session box picks.\nlast_minute AS (\n  SELECT MAX(ts) AS ts FROM (\n    SELECT MAX(l.ts_epoch) AS ts FROM live_candle l JOIN instrument i ON i.id = l.instrument_id WHERE i.symbol = '$symbol'\n    UNION ALL\n    SELECT MAX(c.ts_epoch) FROM candle c JOIN instrument i ON i.id = c.instrument_id WHERE i.symbol = '$symbol')\n),\nday AS MATERIALIZED (SELECT date(ts, 'unixepoch', '+5 hours', '+30 minutes') AS session_date FROM last_minute),\n-- That session's minutes so far. Read once: the query uses them five times, and the view is slow to rebuild.\nmins AS MATERIALIZED (\n  SELECT ts_epoch, open, high, low, close, volume, vwap\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date = (SELECT session_date FROM day)\n),\n-- The close of the session before, by the rule of the chart's \"Previous close\" line: \"before\" is the latest session\n-- stored for any symbol, so a hole in this symbol's own history gives no figure rather than a close from days earlier.\nprev AS (\n  SELECT (SELECT t.close FROM trading_day t JOIN instrument i ON i.id = t.instrument_id\n           WHERE i.symbol = '$symbol'\n             AND t.session_date = (SELECT MAX(p.session_date) FROM trading_day p\n                                    WHERE p.session_date < (SELECT session_date FROM day))\n           ORDER BY t.interval_minutes LIMIT 1) AS close\n)\nSELECT l.close                                                              AS \"Price\",\n       l.close - p.close                                                    AS \"Change\",\n       CASE WHEN p.close > 0 THEN (l.close - p.close) / p.close * 100.0 END AS \"Change %\",\n       p.close                                                              AS \"Previous close\",\n       f.open                                                               AS \"Open\",\n       (SELECT MAX(high) FROM mins)                                         AS \"High\",\n       (SELECT MIN(low) FROM mins)                                          AS \"Low\",\n       (SELECT SUM(volume) FROM mins)                                       AS \"Volume\",\n       CASE WHEN l.vwap > 0 THEN (l.close - l.vwap) / l.vwap * 100.0 END    AS \"vs VWAP\",\n       -- When the price was read: the last poll, while the session is still in staging; after the evening batch has\n       -- settled it, the end of its last minute.\n       COALESCE((SELECT MAX(lc.updated_at) FROM live_candle lc JOIN instrument i ON i.id = lc.instrument_id\n                  WHERE i.symbol = '$symbol' AND lc.session_date = (SELECT session_date FROM day)),\n                l.ts_epoch + 60) * 1000                                     AS \"As of\"\nFROM mins l\nJOIN mins f ON f.ts_epoch = (SELECT MIN(ts_epoch) FROM mins)\nCROSS JOIN prev p\nWHERE l.ts_epoch = (SELECT MAX(ts_epoch) FROM mins)",
+          "queryText": "WITH\n-- The newest minute stored for this symbol, live or settled, whatever the Session box picks.\nlast_minute AS (\n  SELECT MAX(ts) AS ts FROM (\n    SELECT MAX(l.ts_epoch) AS ts FROM live_candle l JOIN instrument i ON i.id = l.instrument_id WHERE i.symbol = '$symbol'\n    UNION ALL\n    SELECT MAX(c.ts_epoch) FROM candle c JOIN instrument i ON i.id = c.instrument_id WHERE i.symbol = '$symbol')\n),\nday AS MATERIALIZED (SELECT date(ts, 'unixepoch', '+5 hours', '+30 minutes') AS session_date FROM last_minute),\n-- That session's minutes so far. Read once: the query uses them five times, and the view is slow to rebuild.\nmins AS MATERIALIZED (\n  SELECT ts_epoch, open, high, low, close, volume, vwap\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date = (SELECT session_date FROM day)\n),\n-- The close of the session before, by the rule of the chart's \"Previous close\" line: \"before\" is the latest session\n-- stored for any symbol, so a hole in this symbol's own history gives no figure rather than a close from days earlier.\nprev AS (\n  SELECT (SELECT t.close FROM trading_day t JOIN instrument i ON i.id = t.instrument_id\n           WHERE i.symbol = '$symbol'\n             AND t.session_date = (SELECT MAX(p.session_date) FROM trading_day p\n                                    WHERE p.session_date < (SELECT session_date FROM day))\n           ORDER BY t.interval_minutes LIMIT 1) AS close\n)\nSELECT l.close                                                              AS \"Price\",\n       l.close - p.close                                                    AS \"Change\",\n       CASE WHEN p.close > 0 THEN (l.close - p.close) / p.close * 100.0 END AS \"Change %\",\n       p.close                                                              AS \"Previous close\",\n       f.open                                                               AS \"Open\",\n       (SELECT MAX(high) FROM mins)                                         AS \"High\",\n       (SELECT MIN(low) FROM mins)                                          AS \"Low\",\n       (SELECT SUM(volume) FROM mins)                                       AS \"Volume\",\n       CASE WHEN l.vwap > 0 THEN (l.close - l.vwap) / l.vwap * 100.0 END    AS \"vs VWAP\",\n       -- When the price was read: the last poll, while the session is still in staging; after the evening batch has\n       -- settled it, the end of its last minute.\n       COALESCE((SELECT MAX(lc.updated_at) FROM live_candle lc JOIN instrument i ON i.id = lc.instrument_id\n                  WHERE i.symbol = '$symbol' AND lc.session_date = (SELECT session_date FROM day)),\n                l.ts_epoch + 60) * 1000                                     AS \"As of\"\nFROM mins l\nJOIN mins f ON f.ts_epoch = (SELECT MIN(ts_epoch) FROM mins)\nCROSS JOIN prev p\nWHERE l.ts_epoch = (SELECT MAX(ts_epoch) FROM mins)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "prefix:₹",
+          "decimals": 2,
+          "noValue": "-",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -1000000000
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -1000000000
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Volume"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "vs VWAP"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -1000000000
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "As of"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:D MMM HH:mm"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": false,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 20,
+          "titleSize": 12
+        }
+      }
+    },
+    {
+      "id": 41,
+      "type": "stat",
+      "title": "$symbol - move over the selected sessions",
+      "description": "How $symbol moved across the sessions picked in the Session box (every session in the time range unless you pick some).\n\n**Change** runs **from** the close of the session before the first one picked to the last price of the newest one picked, so a single session shows that day's move and a range shows the move across it, as Groww's 1W or 1M figures do. Sessions in between that are not picked do not change it, since it compares two prices. **High** and **Low** are the highest and lowest prices traded in the sessions picked.\n\nThe close before the first session picked is found as for the chart's dotted *Previous close* line. When there is none (the first session stored for the symbol, or that session missing for it), the move is measured from the open of the first session picked, and **From** shows that price.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 3
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH\n-- Every minute of this symbol in the sessions picked, live or settled.\npicked AS MATERIALIZED (\n  SELECT session_date, ts_epoch, open, high, low, close\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\nspan AS MATERIALIZED (\n  SELECT MIN(session_date) AS first_day, MAX(session_date) AS last_day,\n         MIN(ts_epoch) AS first_ts, MAX(ts_epoch) AS last_ts,\n         MAX(high) AS high, MIN(low) AS low\n  FROM picked\n),\n-- '3 Nov', with the year as well ('29 Dec 25') when the sessions picked run into another year.\nnamed AS (\n  SELECT x.*,\n         CAST(strftime('%d', first_day) AS INTEGER) || ' '\n           || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', first_day) * 3 - 2, 3)\n           || CASE WHEN substr(first_day, 1, 4) <> substr(last_day, 1, 4) THEN ' ' || substr(first_day, 3, 2) ELSE '' END\n           AS first_name,\n         CAST(strftime('%d', last_day) AS INTEGER) || ' '\n           || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', last_day) * 3 - 2, 3)\n           || CASE WHEN substr(first_day, 1, 4) <> substr(last_day, 1, 4) THEN ' ' || substr(last_day, 3, 2) ELSE '' END\n           AS last_name\n  FROM span x\n),\n-- What the move is measured from: the close of the session before the first one picked, found by the rule of the\n-- chart's \"Previous close\" line, so a hole in this symbol's history never brings in a close from days earlier. Without\n-- that close (the first session stored for the symbol, or a hole) the move is measured from the first session's open.\nstart AS (\n  SELECT COALESCE(\n           (SELECT t.close FROM trading_day t JOIN instrument i ON i.id = t.instrument_id\n             WHERE i.symbol = '$symbol'\n               AND t.session_date = (SELECT MAX(p.session_date) FROM trading_day p\n                                      WHERE p.session_date < (SELECT first_day FROM span))\n             ORDER BY t.interval_minutes LIMIT 1),\n           (SELECT open FROM picked WHERE ts_epoch = (SELECT first_ts FROM span))) AS price\n)\nSELECT CASE WHEN first_day = last_day THEN first_name ELSE first_name || ' → ' || last_name END AS \"Sessions\",\n       s.price                                                              AS \"From\",\n       e.close - s.price                                                    AS \"Change\",\n       CASE WHEN s.price > 0 THEN (e.close - s.price) / s.price * 100.0 END AS \"Change %\",\n       x.high                                                               AS \"High\",\n       x.low                                                                AS \"Low\"\nFROM named x\nJOIN picked e ON e.ts_epoch = x.last_ts\nCROSS JOIN start s",
+          "queryText": "WITH\n-- Every minute of this symbol in the sessions picked, live or settled.\npicked AS MATERIALIZED (\n  SELECT session_date, ts_epoch, open, high, low, close\n  FROM v_intraday_merged\n  WHERE symbol = '$symbol' AND session_date IN (${session:sqlstring})\n),\nspan AS MATERIALIZED (\n  SELECT MIN(session_date) AS first_day, MAX(session_date) AS last_day,\n         MIN(ts_epoch) AS first_ts, MAX(ts_epoch) AS last_ts,\n         MAX(high) AS high, MIN(low) AS low\n  FROM picked\n),\n-- '3 Nov', with the year as well ('29 Dec 25') when the sessions picked run into another year.\nnamed AS (\n  SELECT x.*,\n         CAST(strftime('%d', first_day) AS INTEGER) || ' '\n           || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', first_day) * 3 - 2, 3)\n           || CASE WHEN substr(first_day, 1, 4) <> substr(last_day, 1, 4) THEN ' ' || substr(first_day, 3, 2) ELSE '' END\n           AS first_name,\n         CAST(strftime('%d', last_day) AS INTEGER) || ' '\n           || substr('JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', last_day) * 3 - 2, 3)\n           || CASE WHEN substr(first_day, 1, 4) <> substr(last_day, 1, 4) THEN ' ' || substr(last_day, 3, 2) ELSE '' END\n           AS last_name\n  FROM span x\n),\n-- What the move is measured from: the close of the session before the first one picked, found by the rule of the\n-- chart's \"Previous close\" line, so a hole in this symbol's history never brings in a close from days earlier. Without\n-- that close (the first session stored for the symbol, or a hole) the move is measured from the first session's open.\nstart AS (\n  SELECT COALESCE(\n           (SELECT t.close FROM trading_day t JOIN instrument i ON i.id = t.instrument_id\n             WHERE i.symbol = '$symbol'\n               AND t.session_date = (SELECT MAX(p.session_date) FROM trading_day p\n                                      WHERE p.session_date < (SELECT first_day FROM span))\n             ORDER BY t.interval_minutes LIMIT 1),\n           (SELECT open FROM picked WHERE ts_epoch = (SELECT first_ts FROM span))) AS price\n)\nSELECT CASE WHEN first_day = last_day THEN first_name ELSE first_name || ' → ' || last_name END AS \"Sessions\",\n       s.price                                                              AS \"From\",\n       e.close - s.price                                                    AS \"Change\",\n       CASE WHEN s.price > 0 THEN (e.close - s.price) / s.price * 100.0 END AS \"Change %\",\n       x.high                                                               AS \"High\",\n       x.low                                                                AS \"Low\"\nFROM named x\nJOIN picked e ON e.ts_epoch = x.last_ts\nCROSS JOIN start s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "prefix:₹",
+          "decimals": 2,
+          "noValue": "-",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -1000000000
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -1000000000
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.005
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "auto",
+        "justifyMode": "center",
+        "wideLayout": false,
+        "showPercentChange": false,
+        "text": {
+          "valueSize": 20,
+          "titleSize": 12
+        }
+      }
+    },
+    {
       "id": 20,
       "type": "candlestick",
       "title": "$symbol - minute candles for the selected sessions (up to $candles candles)",
@@ -358,7 +738,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 1,
+        "y": 7,
         "w": 24,
         "h": 11
       },
@@ -656,7 +1036,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 12,
+        "y": 18,
         "w": 11,
         "h": 7
       },
@@ -763,7 +1143,7 @@
       },
       "gridPos": {
         "x": 11,
-        "y": 12,
+        "y": 18,
         "w": 13,
         "h": 7
       },
@@ -872,7 +1252,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 25,
         "w": 24,
         "h": 9
       },
@@ -1007,7 +1387,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 34,
         "w": 24,
         "h": 8
       },
@@ -1105,7 +1485,7 @@
       "description": "From the company's page on screener.in, read by `CanSlimMain profiles` (evening.sh does a few each night). **Market cap, P/E, P/B and dividend yield** are restated at the latest price this database holds (today's last candle, else the last session's close) from the figures that do not move with it: earnings per share over the trailing twelve months, book value, the share count and the dividend per share. **Debt / equity** is borrowings over equity capital plus reserves in the latest balance sheet. **ROE, ROCE, book value and face value** are as the page shows them. The 52-week range is this database's own where it has one, else the page's. Empty until the company's page has been read.",
       "gridPos": {
         "x": 0,
-        "y": 36,
+        "y": 42,
         "w": 24,
         "h": 5
       },
@@ -1379,7 +1759,7 @@
       "description": "The company's latest eight reported quarters, from screener.in. Revenue is its \"Sales\" line (a bank's \"Revenue\"); net profit is after tax.",
       "gridPos": {
         "x": 0,
-        "y": 41,
+        "y": 47,
         "w": 12,
         "h": 9
       },
@@ -1471,7 +1851,7 @@
       "description": "The shareholding pattern at the end of each of the last eight quarters, from screener.in: promoters, foreign institutions (FII), domestic institutions (DII) and the public. Government and other holders, a percent or so, are left out, so the bars fall a little short of 100.",
       "gridPos": {
         "x": 12,
-        "y": 41,
+        "y": 47,
         "w": 12,
         "h": 9
       },
@@ -1596,7 +1976,7 @@
       "description": "Compounded growth in revenue and profit as screener.in prints it: over the trailing twelve months, and per year over three years.",
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 56,
         "w": 24,
         "h": 4
       },
@@ -1672,7 +2052,7 @@
       "description": "What the company does, and the sector it is filed under, from its page on screener.in.",
       "gridPos": {
         "x": 0,
-        "y": 54,
+        "y": 60,
         "w": 24,
         "h": 6
       },
