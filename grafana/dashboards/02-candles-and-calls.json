@@ -24,6 +24,11 @@
         "to": "now"
       },
       {
+        "display": "This week (Monday 9:15 → now)",
+        "from": "now/w+9h+15m",
+        "to": "now"
+      },
+      {
         "display": "Last 2 days",
         "from": "now-2d",
         "to": "now"
@@ -248,6 +253,18 @@
   },
   "links": [
     {
+      "title": "Yesterday's trading hours",
+      "type": "link",
+      "icon": "clock-nine",
+      "url": "/d/stockanalyzer-candles/candles-and-calls?${symbol:queryparam}&${detector:queryparam}&${candles:queryparam}&var-session=${prev_day}&from=${prev_from}&to=${prev_to}",
+      "includeVars": false,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The previous trading session, 9:15 to 15:30. Weekends and holidays are skipped: it is the last session with minutes stored before today."
+    },
+    {
       "title": "Company Details",
       "type": "link",
       "icon": "doc",
@@ -343,6 +360,57 @@
           }
         ],
         "hide": 0
+      },
+      {
+        "name": "prev_day",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT MAX(session_date) FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "definition": "SELECT MAX(session_date) FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "refresh": 2,
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "description": "The previous trading session's date.",
+        "current": {}
+      },
+      {
+        "name": "prev_from",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT (CAST(strftime('%s', MAX(session_date) || ' 09:15:00') AS INTEGER) - 19800) * 1000 FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "definition": "SELECT (CAST(strftime('%s', MAX(session_date) || ' 09:15:00') AS INTEGER) - 19800) * 1000 FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "refresh": 2,
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "description": "09:15 IST of the previous trading session, in epoch milliseconds.",
+        "current": {}
+      },
+      {
+        "name": "prev_to",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT (CAST(strftime('%s', MAX(session_date) || ' 15:30:00') AS INTEGER) - 19800) * 1000 FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "definition": "SELECT (CAST(strftime('%s', MAX(session_date) || ' 15:30:00') AS INTEGER) - 19800) * 1000 FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
+        "refresh": 2,
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "sort": 0,
+        "description": "15:30 IST of the previous trading session, in epoch milliseconds.",
+        "current": {}
       }
     ]
   },
@@ -1937,5 +2005,6 @@
         ]
       }
     }
-  ]
+  ],
+  "weekStart": "monday"
 }

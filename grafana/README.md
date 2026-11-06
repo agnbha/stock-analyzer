@@ -154,6 +154,18 @@ before, the level of the chart's dotted *Previous close* line. NSE's official cl
 30 minutes, so Groww's difference can differ by a few paise. If that session is missing for the symbol, there is no
 difference from an older close.
 
+**Time ranges.** Besides Grafana's usual ones, the time picker on this page has **Today's trading hours** (9:15 to
+now) and **This week (Monday 9:15 → now)**. The week starts on Monday whatever the browser's locale. Before the
+open (before 9:15 on the day) the start is still ahead of now: Grafana flags the picker with a warning triangle but
+the page still draws.
+
+**Yesterday's trading hours** is a button beside *Company Details*, not a picker entry: a picker entry is a fixed
+expression such as "yesterday 9:15 to 15:30", which cannot skip a Sunday or a holiday. The button looks up the last
+session with minutes stored before today (so weekends and holidays are skipped), and opens the page on that session,
+9:15 to 15:30 IST, with the symbol, detector and candle count you had. On a Monday it is Friday's. Three hidden
+variables (`prev_day`, `prev_from`, `prev_to`) hold the lookup and refresh when the time range changes; a page left
+open past midnight catches up on the next range pick or reload.
+
 The minute-candle chart on this page draws at most **200** candles unless you change the **Max candles** box at the
 top (type a number, press Enter). When the sessions you pick hold more minutes than that, minutes are combined into
 longer candles so the chart still covers all of them: 4- to 6-minute candles for two or three days, 2-minute for a
