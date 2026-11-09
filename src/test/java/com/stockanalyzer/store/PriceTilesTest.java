@@ -1,7 +1,11 @@
 package com.stockanalyzer.store;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
+import com.stockanalyzer.store.jdbc.SqliteRealizedLotRepository;
+import com.stockanalyzer.store.jdbc.SqliteTradeRepository;
+import com.stockanalyzer.trade.FifoLotMatcher;
 import com.stockanalyzer.util.JsonMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +43,9 @@ class PriceTilesTest {
     private static final Path DASHBOARD = Path.of("grafana", "dashboards", "02-candles-and-calls.json");
     private static final int NOW = 40;
     private static final int DETAILS = 42;
+    private static final int MORE_DETAILS = 43;
+    /** Today by the market's clock, as the header's query writes it; a test fixes it to a date of its own. */
+    private static final String TODAY = "date('now', '+5 hours', '+30 minutes')";
     private static final String D0 = "2026-08-25";
     private static final String D1 = "2026-08-26";
     private static final String D2 = "2026-08-27";
@@ -50,6 +57,8 @@ class PriceTilesTest {
     private Database database;
     private long test;
     private long other;
+    /** What the query's "today" is for the test: the second session by default. */
+    private String today = "2026-08-27";
 
     @BeforeEach
     void setUp() {
@@ -156,13 +165,25 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("no minutes in the sessions picked, or none picked, shows nothing")
-    void noMinutesNoRow() throws Exception {
+    @DisplayName("no minutes in the sessions picked, or none picked: dashes, but the day's gain or loss is not this symbol's")
+    void noMinutesNoPrice() throws Exception {
         session(test, D1, 100.0);
         settled(other, D2, 0, 100, 101, 99, 100, 500);
+        buy(other, D2, 10, 100.0);
+        sell(other, D2, 10, 105.0);                                       // +50 on another stock
 
-        assertNull(header(D1, D2), "TEST has no minutes in either");
-        assertNull(header(), "nothing picked");
+        for (Map<String, Object> row : List.of(header(D1, D2), header())) {
+            java.util.Set<String> shown = new java.util.TreeSet<>();
+            row.forEach((column, value) -> {
+                if (value != null) {
+                    shown.add(column);
+                }
+            });
+            assertEquals(java.util.Set.of("Difference from bought", "Today's gain/loss"), shown,
+                    "TEST has no minutes in either; nothing else has a value");
+            assertEquals("+50.00", row.get("Today's gain/loss"));
+            assertEquals("0.00 (0.00%)", row.get("Difference from bought"));
+        }
     }
 
     @Test
@@ -278,16 +299,22 @@ class PriceTilesTest {
                     "the refresh label is gone: the header's As of says when the price was read");
         }
         JsonNode now = panel(NOW).path("gridPos");
-        JsonNode details = panel(DETAILS).path("gridPos");
+        JsonNode top = panel(DETAILS).path("gridPos");
+        JsonNode lower = panel(MORE_DETAILS).path("gridPos");
 
         assertEquals(0, now.path("x").asInt());
         assertEquals(0, now.path("y").asInt(), "from the top");
-        assertEquals(now.path("y").asInt(), details.path("y").asInt(), "level with it, nothing above");
-        assertEquals(now.path("w").asInt(), details.path("x").asInt(), "beside it");
-        assertEquals(24, details.path("x").asInt() + details.path("w").asInt(), "to the right edge");
-        assertEquals(bottom(now), bottom(details), "both end level");
+        assertEquals(now.path("w").asInt(), top.path("x").asInt(), "the figures beside it");
+        assertEquals(now.path("w").asInt(), lower.path("x").asInt());
+        assertEquals(top.path("w").asInt(), lower.path("w").asInt(), "one grid of tiles");
+        assertEquals(24, top.path("x").asInt() + top.path("w").asInt(), "to the right edge");
+        assertEquals(now.path("y").asInt(), top.path("y").asInt(), "level with the share price, nothing above");
+        assertEquals(bottom(top), lower.path("y").asInt(), "the second row of tiles straight under the first");
+        assertEquals(bottom(now), bottom(lower), "all end level");
         assertEquals(bottom(now), panel(20).path("gridPos").path("y").asInt(),
                 "the minute chart follows straight after, with no gap");
+        assertEquals("", panel(DETAILS).path("title").asText(), "no title row: it would eat half of a two-row panel");
+        assertEquals("", panel(MORE_DETAILS).path("title").asText());
 
         List<JsonNode> panels = new ArrayList<>();
         dashboard().path("panels").forEach(panels::add);
@@ -306,26 +333,33 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("between them the two panels show every figure of the query, each once")
-    void theTwoPanelsShareOneQuery() throws Exception {
-        JsonNode details = panel(DETAILS);
-        assertEquals("-- Dashboard --", details.path("datasource").path("uid").asText());
-        assertEquals(NOW, details.path("targets").get(0).path("panelId").asInt(), "the share price's own query");
+    @DisplayName("between them the three panels show every figure of the query, each once")
+    void theThreePanelsShareOneQuery() throws Exception {
+        for (int id : new int[] {DETAILS, MORE_DETAILS}) {
+            JsonNode details = panel(id);
+            assertEquals("-- Dashboard --", details.path("datasource").path("uid").asText());
+            assertEquals(NOW, details.path("targets").get(0).path("panelId").asInt(), "the share price's own query");
+        }
 
         session(test, D1, 100.0);
         live(test, D2, 0, 100, 101, 99, 100.5, 500, ts(D2, 0) + 30);
         List<String> headline = new ArrayList<>();
-        List<String> beside = new ArrayList<>();
+        List<String> top = new ArrayList<>();
+        List<String> bottom = new ArrayList<>();
         Pattern shownHere = fields(panel(NOW));
-        Pattern shownBeside = fields(details);
+        Pattern shownTop = fields(panel(DETAILS));
+        Pattern shownBottom = fields(panel(MORE_DETAILS));
         for (String column : header(D2).keySet()) {
             boolean here = shownHere.matcher(column).find();
-            boolean there = shownBeside.matcher(column).find();
-            assertTrue(here ^ there, column + " should show in exactly one of the two");
-            (here ? headline : beside).add(column);
+            boolean above = shownTop.matcher(column).find();
+            boolean below = shownBottom.matcher(column).find();
+            assertEquals(1, (here ? 1 : 0) + (above ? 1 : 0) + (below ? 1 : 0), column + " shows in exactly one panel");
+            (here ? headline : above ? top : bottom).add(column);
         }
-        assertEquals(List.of("Share price", "Difference from close", "Difference from bought", "Range"), headline);
-        assertEquals(List.of("Previous close", "Open", "High", "Low", "Volume", "vs VWAP", "As of"), beside);
+        assertEquals(List.of("Share price", "Difference from close", "Difference from bought", "Today's gain/loss",
+                "Range"), headline);
+        assertEquals(List.of("Previous close", "Open", "High", "Low"), top);
+        assertEquals(List.of("Volume", "vs VWAP", "As of"), bottom);
     }
 
     @Test
@@ -387,24 +421,58 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("sells are not netted off: it is the payout of the purchases")
-    void sellsAreNotNettedOff() throws Exception {
+    @DisplayName("a purchase sold out is worth nothing here: only unsold shares count, so it reads 0")
+    void aSoldOutPurchaseIsZero() throws Exception {
         live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
         buy(test, D2, 10, 100.0);
         sell(test, D2, 10, 105.0);
 
-        assertEquals("+30.00 (3.00%)", header(D2).get("Difference from bought"));
+        assertEquals("0.00 (0.00%)", header(D2).get("Difference from bought"),
+                "bought and sold again, so nothing is held: no payout of the purchase, and no sign");
     }
 
     @Test
-    @DisplayName("without a purchase in the session there is no figure, whatever else was traded")
-    void noPurchaseNoFigure() throws Exception {
+    @DisplayName("a purchase half sold counts what is left, at its own price")
+    void aPartlySoldPurchase() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 4, 101.0);
+
+        assertEquals("+18.00 (3.00%)", header(D2).get("Difference from bought"), "6 left, 3.00 up each, on 600");
+    }
+
+    @Test
+    @DisplayName("the earliest buys are sold first: what is left is the later buy, at its higher price")
+    void theEarliestBuysGoFirst() throws Exception {
+        live(test, D2, 0, 100, 120, 99, 118, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        buy(test, D2, 10, 110.0);
+        sell(test, D2, 10, 112.0);
+
+        assertEquals("+80.00 (7.27%)", header(D2).get("Difference from bought"),
+                "the second buy is what is unsold: 10 x (118 - 110), on 1,100");
+    }
+
+    @Test
+    @DisplayName("a sale of shares bought on an earlier day leaves today's buy unsold")
+    void aSaleOfAnOlderPurchase() throws Exception {
+        live(test, D2, 0, 100, 120, 99, 118, 500, ts(D2, 0) + 30);
+        buy(test, D1, 10, 100.0);
+        buy(test, D2, 10, 110.0);
+        sell(test, D2, 10, 112.0);                                       // the yesterday's shares go first
+
+        assertEquals("+80.00 (7.27%)", header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("without a purchase in the session it is 0, whatever else was traded")
+    void noPurchaseIsZero() throws Exception {
         live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
         buy(other, D2, 50, 90.0);          // another stock, today
         buy(test, D1, 50, 90.0);           // this stock, another day
         sell(test, D2, 10, 105.0);         // this stock, today, but a sale
 
-        assertNull(header(D2).get("Difference from bought"));
+        assertEquals("0.00 (0.00%)", header(D2).get("Difference from bought"));
     }
 
     @Test
@@ -431,9 +499,88 @@ class PriceTilesTest {
     }
 
     @Test
+    @DisplayName("Today's gain/loss is everything realized today, over every stock, gains and losses added")
+    void todaysGainIsTheSumOfWhatWasRealized() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 105.0);                                       // +50 on this stock
+        buy(other, D2, 5, 200.0);
+        sell(other, D2, 5, 196.0);                                       // -20 on another
+
+        assertEquals("+30.00", header(D2).get("Today's gain/loss"));
+    }
+
+    @Test
+    @DisplayName("a net loss reads negative")
+    void aLossToday() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 98.0);
+
+        assertEquals("-20.00", header(D2).get("Today's gain/loss"));
+    }
+
+    @Test
+    @DisplayName("it is after the charges allocated to the lots, as the day's net P&L is")
+    void chargesAreTakenOff() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        trade(test, D2, "BUY", 10, 100.0, 1.00);
+        trade(test, D2, "SELL", 10, 105.0, 1.50);
+
+        assertEquals("+47.50", header(D2).get("Today's gain/loss"), "50 gained, 2.50 of charges");
+    }
+
+    @Test
+    @DisplayName("only what was closed today: a round trip of another day is not in it")
+    void onlyWhatWasClosedToday() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D1, 10, 100.0);
+        sell(test, D1, 10, 150.0);                                       // +500, but yesterday
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 101.0);                                       // +10, today
+
+        assertEquals("+10.00", header(D2).get("Today's gain/loss"));
+    }
+
+    @Test
+    @DisplayName("shares bought on an earlier day and sold today are realized today")
+    void anOvernightPositionClosedToday() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D1, 10, 100.0);
+        sell(test, D2, 10, 105.0);
+
+        assertEquals("+50.00", header(D2).get("Today's gain/loss"));
+    }
+
+    @Test
+    @DisplayName("nothing sold yet is 0, with no sign: a buy alone realizes nothing")
+    void nothingRealizedYet() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        assertEquals("0.00", header(D2).get("Today's gain/loss"), "no trades at all");
+
+        buy(test, D2, 10, 100.0);
+        assertEquals("0.00", header(D2).get("Today's gain/loss"), "a buy and no sale");
+    }
+
+    @Test
+    @DisplayName("it is today's whatever sessions the page shows, and the next day starts again at 0")
+    void todayIsTodayWhateverIsShown() throws Exception {
+        settled(test, D1, 0, 100, 101, 99, 100, 500);
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 105.0);
+
+        assertEquals("+50.00", header(D1).get("Today's gain/loss"), "an older session picked: still today's");
+        assertEquals("+50.00", header(D1, D2).get("Today's gain/loss"));
+
+        today = D3;
+        assertEquals("0.00", header(D1, D2).get("Today's gain/loss"), "a day later, what was realized is yesterday's");
+    }
+
+    @Test
     @DisplayName("As of is shown to the second, since a poll's time is stored in seconds")
     void asOfToTheSecond() throws Exception {
-        assertEquals("time:D MMM HH:mm:ss", property(panel(DETAILS), "As of", "unit").asText());
+        assertEquals("time:D MMM HH:mm:ss", property(panel(MORE_DETAILS), "As of", "unit").asText());
 
         session(test, D1, 100.0);
         live(test, D2, 0, 100, 101, 99, 100.5, 500, ts(D2, 0) + 37);
@@ -454,10 +601,14 @@ class PriceTilesTest {
         assertEquals("red", mapped(bought, "-10.00 (1.00%)"), "a loss on the purchases");
         assertEquals("green", mapped(bought, "+1,250.00 (0.50%)"), "a gain on the purchases");
         assertNull(mapped(bought, "0.00 (0.00%)"));
+        JsonNode day = property(panel(NOW), "Today's gain/loss", "mappings");
+        assertEquals("green", mapped(day, "+7,153.19"), "a gain today");
+        assertEquals("red", mapped(day, "-1,250.00"), "a loss today");
+        assertNull(mapped(day, "0.00"), "nothing realized yet: plain");
         JsonNode panelDefaults = panel(NOW).path("fieldConfig").path("defaults");
         assertEquals("text", panelDefaults.path("color").path("fixedColor").asText(), "the colour of a dash");
 
-        JsonNode steps = property(panel(DETAILS), "vs VWAP", "thresholds").path("steps");
+        JsonNode steps = property(panel(MORE_DETAILS), "vs VWAP", "thresholds").path("steps");
         assertEquals("text", steps.get(0).path("color").asText(), "the colour of no value");
         assertEquals("red", colour(steps, -0.01));
         assertEquals("red", colour(steps, -250_000));
@@ -546,7 +697,8 @@ class PriceTilesTest {
         JsonNode target = panel(NOW).path("targets").get(0);
         String sql = target.path("queryText").asText();
         assertEquals(sql, target.path("rawQueryText").asText(), "the plugin runs queryText; the editor shows the raw");
-        sql = sql.replace("$symbol", "TEST").replace("${session:sqlstring}", sessions);
+        assertTrue(sql.contains(TODAY), "today is read by the market's clock");
+        sql = sql.replace(TODAY, "'" + today + "'").replace("$symbol", "TEST").replace("${session:sqlstring}", sessions);
         assertFalse(sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         String query = sql;
         return database.read(connection -> {
@@ -586,33 +738,37 @@ class PriceTilesTest {
 
     private int fills;
 
-    /** A fill of the broker's: the journal row the Difference from bought adds up. */
-    private void trade(long instrument, String date, String side, int quantity, double price) {
+    /** A fill of the broker's, with the lots matched afterwards as the journal does on every import. */
+    private void trade(long instrument, String date, String side, int quantity, double price, double charges) {
         long id = ++fills;
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO trade (instrument_id, broker_trade_id, order_id, session_date, executed_ts, side,
-                                       quantity, price, product, charges_source, source, imported_at)
-                    VALUES (?,?,?,?,?,?,?,?,'MIS','MODELLED','BROKER',0)""")) {
+                                       quantity, price, product, charges_total, charges_source, source, imported_at)
+                    VALUES (?,?,?,?,?,?,?,?,'MIS',?,'MODELLED','BROKER',0)""")) {
                 insert.setLong(1, instrument);
                 insert.setString(2, "t" + id);
                 insert.setString(3, "o" + id);
                 insert.setString(4, date);
-                insert.setLong(5, ts(date, 5));
+                insert.setLong(5, ts(date, 5) + id);
                 insert.setString(6, side);
                 insert.setInt(7, quantity);
                 insert.setDouble(8, price);
+                insert.setDouble(9, charges);
                 insert.executeUpdate();
             }
         });
+        List<Trade> stored = new SqliteTradeRepository(database).findAllOrdered();
+        FifoLotMatcher.Result matched = new FifoLotMatcher().match(stored);
+        new SqliteRealizedLotRepository(database).replaceAll(matched.lots(), matched.openPositions(), "NSE", "CASH");
     }
 
     private void buy(long instrument, String date, int quantity, double price) {
-        trade(instrument, date, "BUY", quantity, price);
+        trade(instrument, date, "BUY", quantity, price, 0);
     }
 
     private void sell(long instrument, String date, int quantity, double price) {
-        trade(instrument, date, "SELL", quantity, price);
+        trade(instrument, date, "SELL", quantity, price, 0);
     }
 
     /** A minute on the settled tape, written by the evening batch. */
