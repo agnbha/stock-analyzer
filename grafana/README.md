@@ -115,6 +115,11 @@ What each tab needs:
 With a single session ingested and no trades, expect one candle in the daily
 panel, one bar in the weekly panel, and two empty tabs.
 
+The weekly panel draws each week from the minute-derived sessions where the database has them, and from the daily
+candles (`daily_bar`, the whole market's, kept by the nightly ingest) for the sessions it does not. A symbol added to
+the tracked list has minute history for only about three months, and one outside the list has none, but both still
+show six months of weeks. A day held both ways is counted once, as the session, and the two agree to a few paise.
+
 ## The three tabs
 
 **Account Overview** — money in the account, total staked, gains and losses, and
@@ -180,7 +185,7 @@ A candle opens where its first minute opened, closes where its last closed, and 
 and total volume of its minutes; VWAP and the averages are read as they stand at its end, and your buys, sells and the
 detector's windows sit on the candle they fall in (an average, if several do). A candle never spans two sessions, and
 the total never exceeds the number typed. A blank, non-numeric, zero or negative entry means 200. The weekly chart is
-not capped: it draws one candle a week over the time range picked at the top.
+not capped: it draws one candle a week over the last six months, whatever time range is picked at the top.
 
 One thing the box cannot change: the chart's time axis always spans the time range picked at the top. A single
 session shown on a three-month range is a thin strip at the right edge however many candles it has, so narrow the
