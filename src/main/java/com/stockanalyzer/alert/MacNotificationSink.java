@@ -18,14 +18,17 @@ import java.util.function.Consumer;
  *
  * <p>osascript posts the banner as Script Editor, so macOS shows nothing unless
  * Script Editor is allowed to send notifications (System Settings > Notifications).
- * A failed or hung osascript is logged rather than thrown, because the alert
- * has already been recorded and printed by then.
+ * The sound is played by {@code afplay} instead of by the notification
+ * ({@code sound name}): a banner can show with its own sound switched off, and a
+ * sell target is not something to miss. A failed or hung command is logged
+ * rather than thrown, because the alert has already been recorded and printed by then.
  */
 public final class MacNotificationSink implements AlertSink {
 
     private static final Logger log = LoggerFactory.getLogger(MacNotificationSink.class);
 
-    private static final String URGENT_SOUND = "Glass";
+    /** Played for an URGENT alert; part of macOS, so there is nothing to install. */
+    static final String URGENT_SOUND_FILE = "/System/Library/Sounds/Glass.aiff";
     private static final long OSASCRIPT_TIMEOUT_SECONDS = 10;
 
     private final AlertSeverity minimumSeverity;
@@ -50,6 +53,13 @@ public final class MacNotificationSink implements AlertSink {
         if (alert.severity().ordinal() < minimumSeverity.ordinal()) {
             return;
         }
+        if (alert.severity() == AlertSeverity.URGENT) {
+            try {
+                launcher.accept(List.of("afplay", URGENT_SOUND_FILE));
+            } catch (RuntimeException e) {
+                log.warn("Could not play the alert sound: {}", e.getMessage());
+            }
+        }
         launcher.accept(List.of("osascript", "-e", script(alert)));
     }
 
@@ -58,9 +68,6 @@ public final class MacNotificationSink implements AlertSink {
         StringBuilder script = new StringBuilder("display notification ")
                 .append(quote(alert.message()))
                 .append(" with title ").append(quote(title));
-        if (alert.severity() == AlertSeverity.URGENT) {
-            script.append(" sound name ").append(quote(URGENT_SOUND));
-        }
         return script.toString();
     }
 
@@ -72,14 +79,14 @@ public final class MacNotificationSink implements AlertSink {
                     .whenComplete((finished, failure) -> {
                         if (failure != null) {
                             process.destroyForcibly();
-                            log.warn("Desktop notification gave up after {}s", OSASCRIPT_TIMEOUT_SECONDS);
+                            log.warn("Desktop alert command {} gave up after {}s", command.getFirst(), OSASCRIPT_TIMEOUT_SECONDS);
                         } else if (finished.exitValue() != 0) {
-                            log.warn("Desktop notification failed (osascript exit {}): {}",
-                                    finished.exitValue(), output(finished));
+                            log.warn("Desktop notification failed ({} exit {}): {}",
+                                    command.getFirst(), finished.exitValue(), output(finished));
                         }
                     });
         } catch (IOException e) {
-            log.warn("Could not post desktop notification: {}", e.getMessage());
+            log.warn("Could not post desktop notification ({}): {}", command.getFirst(), e.getMessage());
         }
     }
 

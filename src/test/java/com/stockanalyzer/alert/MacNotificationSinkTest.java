@@ -35,8 +35,9 @@ class MacNotificationSinkTest {
         sink.publish(alert("INFY", AlertSeverity.NOTABLE, "Volume 3x normal"));
         sink.publish(alert("INFY", AlertSeverity.URGENT, "Entry window"));
 
-        assertEquals(2, launched.size());
-        assertEquals(List.of("osascript", "-e"), launched.get(0).subList(0, 2));
+        List<List<String>> banners = launched.stream().filter(c -> c.getFirst().equals("osascript")).toList();
+        assertEquals(2, banners.size());
+        assertEquals(List.of("osascript", "-e"), banners.get(0).subList(0, 2));
     }
 
     @Test
@@ -65,12 +66,51 @@ class MacNotificationSinkTest {
     }
 
     @Test
-    @DisplayName("only URGENT plays a sound")
-    void urgentPlaysASound() {
-        assertTrue(MacNotificationSink.script(alert("INFY", AlertSeverity.URGENT, "Go"))
-                .endsWith(" sound name \"Glass\""));
-        assertFalse(MacNotificationSink.script(alert("INFY", AlertSeverity.NOTABLE, "Go"))
-                .contains("sound name"));
+    @DisplayName("an URGENT alert plays the Glass chime itself, before the banner, and nothing less does")
+    void urgentPlaysASoundItself() {
+        MacNotificationSink sink = sink(AlertSeverity.INFO);
+
+        sink.publish(alert("INFY", AlertSeverity.NOTABLE, "Go"));
+        assertEquals(1, launched.size(), "a notable alert is a banner only");
+        assertEquals("osascript", launched.getFirst().getFirst());
+
+        launched.clear();
+        sink.publish(alert("INFY", AlertSeverity.URGENT, "Sell now"));
+        assertEquals(2, launched.size());
+        assertEquals(List.of("afplay", "/System/Library/Sounds/Glass.aiff"), launched.get(0), "the sound first");
+        assertEquals("osascript", launched.get(1).getFirst(), "then the banner");
+    }
+
+    @Test
+    @DisplayName("the banner carries no sound of its own: it would double the chime, or be silent when muted for Script Editor")
+    void theBannerIsSilent() {
+        assertFalse(MacNotificationSink.script(alert("INFY", AlertSeverity.URGENT, "Go")).contains("sound name"));
+        assertFalse(MacNotificationSink.script(alert("INFY", AlertSeverity.NOTABLE, "Go")).contains("sound name"));
+    }
+
+    @Test
+    @DisplayName("a sound that cannot be started does not cost the banner")
+    void aBrokenSoundKeepsTheBanner() {
+        List<List<String>> posted = new ArrayList<>();
+        MacNotificationSink sink = new MacNotificationSink(AlertSeverity.NOTABLE, command -> {
+            if (command.getFirst().equals("afplay")) {
+                throw new IllegalStateException("no audio device");
+            }
+            posted.add(command);
+        });
+
+        sink.publish(alert("INFY", AlertSeverity.URGENT, "Sell now"));
+
+        assertEquals(1, posted.size());
+        assertEquals("osascript", posted.getFirst().getFirst());
+    }
+
+    @Test
+    @DisplayName("the chime is a file macOS ships, so it is there on every Mac")
+    void theChimeExistsOnMac() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(MacNotificationSink.supportedHere());
+
+        assertTrue(java.nio.file.Files.isRegularFile(java.nio.file.Path.of(MacNotificationSink.URGENT_SOUND_FILE)));
     }
 
     @Test

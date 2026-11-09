@@ -143,7 +143,8 @@ reads them), but they no longer interrupt you, and there are no session or
 
 **Desktop notifications.** Alerts go to the console and, on macOS, to a
 notification banner (`alerts.sinks=console,macos`). Sell alerts are `URGENT`, so
-the banner also plays a sound. `alerts.desktop.min-severity` sets the lowest
+the banner comes with a sound (the system's Glass chime, played by `afplay`, so it does not depend on
+the notification's own sound setting). `alerts.desktop.min-severity` sets the lowest
 severity that reaches the desktop; drop `macos` from `alerts.sinks` to turn the
 banners off. `--dry-run` never posts one.
 
@@ -153,7 +154,8 @@ check that Focus modes are not hiding it). To test the channel without waiting
 for a market event:
 
 ```bash
-osascript -e 'display notification "test" with title "stock-analyzer" sound name "Glass"'
+afplay /System/Library/Sounds/Glass.aiff
+osascript -e 'display notification "test" with title "stock-analyzer"'
 ```
 
 A banner that fails to post is logged as `Desktop notification failed` in
