@@ -324,8 +324,110 @@ class PriceTilesTest {
             assertTrue(here ^ there, column + " should show in exactly one of the two");
             (here ? headline : beside).add(column);
         }
-        assertEquals(List.of("Share price", "Difference from close", "Range"), headline);
+        assertEquals(List.of("Share price", "Difference from close", "Difference from bought", "Range"), headline);
         assertEquals(List.of("Previous close", "Open", "High", "Low", "Volume", "vs VWAP", "As of"), beside);
+    }
+
+    @Test
+    @DisplayName("Difference from bought is what today's purchase is worth at the share price")
+    void aPurchaseIsMeasuredAtTheSharePrice() throws Exception {
+        session(test, D1, 100.0);
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+
+        Map<String, Object> now = header(D2);
+
+        assertEquals("₹103.00", now.get("Share price"));
+        assertEquals("+30.00 (3.00%)", now.get("Difference from bought"), "10 shares, 3.00 up each");
+    }
+
+    @Test
+    @DisplayName("several purchases are each taken at their own price, and the percent is on the whole outlay")
+    void severalPurchases() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 100, 100.0);
+        buy(test, D2, 300, 101.0);
+
+        // 100 x (103 - 100) + 300 x (103 - 101) = 900 on 10,000 + 30,300 laid out
+        assertEquals("+900.00 (2.23%)", header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("a purchase under water is a negative payout")
+    void aLoss() throws Exception {
+        live(test, D2, 0, 100, 104, 98, 99, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+
+        assertEquals("-10.00 (1.00%)", header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("a purchase at the share price pays nothing, and the figure carries no sign")
+    void aFlatPurchase() throws Exception {
+        live(test, D2, 0, 100, 104, 98, 100, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+
+        assertEquals("0.00 (0.00%)", header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("the payout is rounded to the paisa before its sign is read: 0.6 paisa is a gain, 0.4 is nothing")
+    void thePayoutIsRoundedToThePaisa() throws Exception {
+        live(test, D2, 0, 100, 104, 98, 100, 500, ts(D2, 0) + 30);
+        buy(test, D2, 1, 99.994);          // 0.006 up
+
+        assertEquals("+0.01 (0.01%)", header(D2).get("Difference from bought"));
+
+        database.inTransaction(connection -> {
+            try (Statement statement = connection.createStatement()) {
+                statement.executeUpdate("UPDATE trade SET price = 99.996");   // 0.004 up
+            }
+        });
+        assertEquals("0.00 (0.00%)", header(D2).get("Difference from bought"), "no sign, so neither red nor green");
+    }
+
+    @Test
+    @DisplayName("sells are not netted off: it is the payout of the purchases")
+    void sellsAreNotNettedOff() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 105.0);
+
+        assertEquals("+30.00 (3.00%)", header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("without a purchase in the session there is no figure, whatever else was traded")
+    void noPurchaseNoFigure() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(other, D2, 50, 90.0);          // another stock, today
+        buy(test, D1, 50, 90.0);           // this stock, another day
+        sell(test, D2, 10, 105.0);         // this stock, today, but a sale
+
+        assertNull(header(D2).get("Difference from bought"));
+    }
+
+    @Test
+    @DisplayName("picking an older session measures that session's purchases at that session's last price")
+    void purchasesOfAnOlderSession() throws Exception {
+        settled(test, D1, 0, 100, 106, 99, 104, 500);
+        live(test, D2, 0, 104, 120, 103, 118, 500, ts(D2, 0) + 30);
+        buy(test, D1, 10, 100.0);
+        buy(test, D2, 10, 110.0);
+
+        assertEquals("+40.00 (4.00%)", header(D1).get("Difference from bought"), "D1's buy at D1's 104");
+        assertEquals("+80.00 (7.27%)", header(D2).get("Difference from bought"), "D2's buy at D2's 118");
+        assertEquals("+80.00 (7.27%)", header(D1, D2).get("Difference from bought"),
+                "the newest session picked is D2, whose price and purchases are used; D1's buy is not added");
+    }
+
+    @Test
+    @DisplayName("the payout is written the Indian way, with every paisa")
+    void aPayoutTheIndianWay() throws Exception {
+        live(test, D2, 0, 1000, 1240, 999, 1235.5, 500, ts(D2, 0) + 30);
+        buy(test, D2, 1000, 1000.0);
+
+        assertEquals("+2,35,500.00 (23.55%)", header(D2).get("Difference from bought"));
     }
 
     @Test
@@ -348,6 +450,10 @@ class PriceTilesTest {
         assertEquals("red", mapped(mappings, "-2,070.00 (7.70%)"));
         assertEquals("green", mapped(mappings, "+31.60 (2.47%)"));
         assertNull(mapped(mappings, "0.00 (0.00%)"), "flat keeps the text colour");
+        JsonNode bought = property(panel(NOW), "Difference from bought", "mappings");
+        assertEquals("red", mapped(bought, "-10.00 (1.00%)"), "a loss on the purchases");
+        assertEquals("green", mapped(bought, "+1,250.00 (0.50%)"), "a gain on the purchases");
+        assertNull(mapped(bought, "0.00 (0.00%)"));
         JsonNode panelDefaults = panel(NOW).path("fieldConfig").path("defaults");
         assertEquals("text", panelDefaults.path("color").path("fixedColor").asText(), "the colour of a dash");
 
@@ -476,6 +582,37 @@ class PriceTilesTest {
                 insert.executeUpdate();
             }
         });
+    }
+
+    private int fills;
+
+    /** A fill of the broker's: the journal row the Difference from bought adds up. */
+    private void trade(long instrument, String date, String side, int quantity, double price) {
+        long id = ++fills;
+        database.inTransaction(connection -> {
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO trade (instrument_id, broker_trade_id, order_id, session_date, executed_ts, side,
+                                       quantity, price, product, charges_source, source, imported_at)
+                    VALUES (?,?,?,?,?,?,?,?,'MIS','MODELLED','BROKER',0)""")) {
+                insert.setLong(1, instrument);
+                insert.setString(2, "t" + id);
+                insert.setString(3, "o" + id);
+                insert.setString(4, date);
+                insert.setLong(5, ts(date, 5));
+                insert.setString(6, side);
+                insert.setInt(7, quantity);
+                insert.setDouble(8, price);
+                insert.executeUpdate();
+            }
+        });
+    }
+
+    private void buy(long instrument, String date, int quantity, double price) {
+        trade(instrument, date, "BUY", quantity, price);
+    }
+
+    private void sell(long instrument, String date, int quantity, double price) {
+        trade(instrument, date, "SELL", quantity, price);
     }
 
     /** A minute on the settled tape, written by the evening batch. */
