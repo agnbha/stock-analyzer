@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.IntConsumer;
 import java.util.function.LongSupplier;
 
 /**
@@ -63,6 +64,12 @@ import java.util.function.LongSupplier;
 public final class MarketMonitor {
 
     private static final Logger log = LoggerFactory.getLogger(MarketMonitor.class);
+
+    /**
+     * How often, while waiting between two ticks, the loop looks in the journal for a new fill. A trade can be
+     * imported at any moment, and the wait can be three minutes long, so it cannot be left to the next tick.
+     */
+    static final int FILL_CHECK_SECONDS = 2;
 
     private final CandleDataClient candleDataClient;
     private final GainOpportunityDetector detector;
@@ -96,6 +103,10 @@ public final class MarketMonitor {
     private final Map<String, LiveSymbolState> latest = new LinkedHashMap<>();
     /** When every symbol was last fetched, in epoch seconds; negative until the first tick. */
     private long lastFullPollEpoch = -1;
+    /** How many of today's fills the last tick saw: a different count while the loop waits is a new trade. */
+    private int fillsSeen;
+    /** How the loop waits; package-private so a test can swap it for one that moves a clock instead of sleeping. */
+    IntConsumer sleeper = this::sleep;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final List<Alert> recentAlerts = new ArrayList<>();
 
@@ -183,10 +194,7 @@ public final class MarketMonitor {
 
         prepare(sessionDate);
 
-        long closeEpoch = clock.sessionCloseEpoch(sessionDate);
-        while (running.get() && nowEpoch() <= closeEpoch + settings.postCloseGraceSeconds()) {
-            sleep(tick(sessionDate));
-        }
+        loop(sessionDate);
 
         Map<String, List<GainOpportunity>> liveTop = new LinkedHashMap<>();
         states.forEach((symbol, state) ->
@@ -194,6 +202,43 @@ public final class MarketMonitor {
         reconciler.reconcile(sessionDate, settings.symbols(), settings.exchange(), settings.segment(),
                 settings.intervalMinutes(), liveTop);
         view.close();
+    }
+
+    /** Ticks until shortly after the close, or until stopped; package-private so a test can run it on a fake clock. */
+    void loop(LocalDate sessionDate) {
+        long closeEpoch = clock.sessionCloseEpoch(sessionDate);
+        while (running.get() && nowEpoch() <= closeEpoch + settings.postCloseGraceSeconds()) {
+            waitForNextTick(sessionDate, tick(sessionDate));
+        }
+    }
+
+    /**
+     * Waits out the pause before the next tick, but gives it up as soon as a new fill is in the journal.
+     *
+     * <p>With nothing traded the pause is whatever is left of the three minutes between full polls, and a
+     * position bought during it would otherwise wait there for the next full poll, on top of the time the
+     * fill import itself takes. Looking every {@link #FILL_CHECK_SECONDS} seconds puts it on the fast scan within
+     * moments of being imported. Waiting in short slices also lets {@link #stop()} end the wait promptly.
+     */
+    void waitForNextTick(LocalDate sessionDate, int pauseSeconds) {
+        int left = pauseSeconds;
+        while (left > 0 && running.get()) {
+            int slice = Math.min(left, FILL_CHECK_SECONDS);
+            sleeper.accept(slice);
+            left -= slice;
+            if (left > 0 && newFillSince(sessionDate)) {
+                return;
+            }
+        }
+    }
+
+    /** Whether today's journal holds a different number of fills than the last tick saw. A failed read is no news. */
+    private boolean newFillSince(LocalDate sessionDate) {
+        try {
+            return tradeRepository.findRange(sessionDate, sessionDate).size() != fillsSeen;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** Per-symbol session state and the prior session's context; package-private so a test can set up a tick. */
@@ -211,7 +256,8 @@ public final class MarketMonitor {
      * and its sell targets are announced within seconds of the price getting there. Every other symbol is
      * fetched once per {@code pollIntervalSeconds}; between those polls the view and the heartbeat carry
      * its last analysis, which is as old as that interval allows. A fill is known once it is in the
-     * journal, so a new trade is picked up within the live fill import interval.
+     * journal, and the wait between ticks ends as soon as one arrives ({@link #waitForNextTick}), so a new trade is
+     * picked up within the live fill import interval and a couple of seconds.
      *
      * @return how many seconds to wait before the next tick
      */
@@ -220,6 +266,7 @@ public final class MarketMonitor {
         List<String> degradedSymbols = new ArrayList<>();
 
         List<Trade> fills = todaysFills(sessionDate);
+        fillsSeen = fills.size();
         Set<String> bought = new LinkedHashSet<>();
         Set<String> traded = new LinkedHashSet<>();
         for (Trade fill : fills) {

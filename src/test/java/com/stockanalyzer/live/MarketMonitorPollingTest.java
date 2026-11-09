@@ -36,6 +36,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -218,6 +219,123 @@ class MarketMonitorPollingTest {
         assertEquals(List.of("sell.target.0.6"), delivered.stream().map(Alert::rule).toList());
         assertEquals(Map.of("AAA", 1, "BBB", 2, "CCC", 1), fetchCounts(),
                 "the announcement came from a tick that fetched only the traded symbol");
+    }
+
+    @Test
+    @DisplayName("a buy imported while the loop idles ends the wait, so the next tick scans it at once")
+    void aFillImportedDuringTheWaitEndsIt() {
+        MarketMonitor monitor = monitor(List.of("AAA", "BBB", "CCC"));
+        monitor.prepare(DAY);
+        assertEquals(SLOW, monitor.tick(DAY));               // 09:32:00, nothing traded: three minutes of quiet
+        List<Integer> slept = new ArrayList<>();
+        monitor.sleeper = seconds -> {
+            slept.add(seconds);
+            now.addAndGet(seconds);
+            if (now.get() == at(9, 33, 0)) {
+                fill("BBB", Side.BUY, at(9, 32, 55));        // the import lands a minute into the wait
+            }
+        };
+
+        monitor.waitForNextTick(DAY, SLOW);
+
+        assertEquals(60, slept.stream().mapToInt(Integer::intValue).sum(),
+                "the wait ended when the fill appeared, not after the three minutes");
+        assertTrue(slept.stream().allMatch(seconds -> seconds <= MarketMonitor.FILL_CHECK_SECONDS), "" + slept);
+        int pause = monitor.tick(DAY);
+        assertEquals(Map.of("AAA", 1, "BBB", 2, "CCC", 1), fetchCounts(), "the bought symbol, and only it");
+        assertEquals(ACTIVE, pause);
+    }
+
+    @Test
+    @DisplayName("with nothing new the wait lasts the whole pause, whatever its length")
+    void aQuietWaitLastsThePause() {
+        MarketMonitor monitor = monitor(List.of("AAA"));
+        monitor.prepare(DAY);
+        monitor.tick(DAY);
+        List<Integer> slept = new ArrayList<>();
+        monitor.sleeper = slept::add;
+
+        monitor.waitForNextTick(DAY, 110);
+        assertEquals(110, slept.stream().mapToInt(Integer::intValue).sum());
+        assertTrue(slept.stream().allMatch(seconds -> seconds <= MarketMonitor.FILL_CHECK_SECONDS), "" + slept);
+
+        slept.clear();
+        monitor.waitForNextTick(DAY, 7);
+        assertEquals(List.of(2, 2, 2, 1), slept, "an odd pause ends on the remainder");
+    }
+
+    @Test
+    @DisplayName("a fill the last tick already saw does not cut the wait short")
+    void aKnownFillDoesNotEndTheWait() {
+        MarketMonitor monitor = monitor(List.of("AAA", "BBB"));
+        monitor.prepare(DAY);
+        fill("BBB", Side.BUY, at(9, 31, 0));
+        monitor.tick(DAY);
+        List<Integer> slept = new ArrayList<>();
+        monitor.sleeper = slept::add;
+
+        monitor.waitForNextTick(DAY, ACTIVE);
+
+        assertEquals(ACTIVE, slept.stream().mapToInt(Integer::intValue).sum(), "or the loop would spin");
+    }
+
+    @Test
+    @DisplayName("a second trade, even in a symbol already watched, ends the wait too")
+    void aSecondFillEndsTheWait() {
+        MarketMonitor monitor = monitor(List.of("AAA", "BBB"));
+        monitor.prepare(DAY);
+        fill("BBB", Side.BUY, at(9, 31, 0));
+        monitor.tick(DAY);
+        List<Integer> slept = new ArrayList<>();
+        monitor.sleeper = seconds -> {
+            slept.add(seconds);
+            if (slept.size() == 2) {
+                fill("BBB", Side.SELL, at(9, 32, 3));
+            }
+        };
+
+        monitor.waitForNextTick(DAY, ACTIVE);
+
+        assertEquals(List.of(2, 2), slept, "a sell may be what the sell targets are waiting for");
+    }
+
+    @Test
+    @DisplayName("a stopped monitor does not wait at all")
+    void aStoppedMonitorDoesNotWait() {
+        MarketMonitor monitor = monitor(List.of("AAA"));
+        monitor.prepare(DAY);
+        monitor.tick(DAY);
+        List<Integer> slept = new ArrayList<>();
+        monitor.sleeper = slept::add;
+        monitor.stop();
+
+        monitor.waitForNextTick(DAY, SLOW);
+
+        assertEquals(List.of(), slept);
+    }
+
+    @Test
+    @Timeout(20)
+    @DisplayName("run as the loop runs it, a buy lands on the fast scan a minute after the full poll, not three")
+    void theLoopMovesABoughtSymbolToTheFastScanAtOnce() {
+        MarketMonitor monitor = monitor(List.of("AAA", "BBB"));
+        monitor.prepare(DAY);
+        monitor.sleeper = seconds -> {
+            now.addAndGet(seconds);
+            if (now.get() == at(9, 33, 0)) {
+                fill("BBB", Side.BUY, at(9, 32, 55));        // imported a minute into the quiet interval
+            }
+            if (snapshots.size() >= 3) {
+                monitor.stop();
+            }
+        };
+
+        monitor.loop(DAY);
+
+        assertEquals(List.of(at(9, 32, 0), at(9, 33, 0), at(9, 33, 10)),
+                snapshots.stream().limit(3).map(LiveSnapshot::asOfEpoch).toList(),
+                "the full poll, the moment the fill arrived (the old loop slept to 09:35:00), then ten seconds on");
+        assertEquals(Map.of("AAA", 1, "BBB", 3), fetchCounts());
     }
 
     // ---- harness -------------------------------------------------------------------------------------------------
