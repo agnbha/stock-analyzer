@@ -426,6 +426,16 @@ public final class AppConfig {
         return Integer.parseInt(get("company.profile.max.pages.per.run", "12"));
     }
 
+    /** How old the profile of a symbol outside symbols.txt may be before its page is read again: three months. */
+    public int companyProfileUntrackedRefreshDays() {
+        return Integer.parseInt(get("company.profile.untracked.refresh.days", "90"));
+    }
+
+    /** The most such pages one nightly run reads, traded stocks first; zero turns this round off. */
+    public int companyProfileUntrackedMaxPagesPerRun() {
+        return Integer.parseInt(get("company.profile.untracked.max.pages.per.run", "50"));
+    }
+
     /** How long to wait after screener.in answers 429, unless it says how long itself. */
     public long screenerRateLimitBackoffMillis() {
         return Long.parseLong(get("canslim.screener.rate.limit.backoff.ms", "60000"));

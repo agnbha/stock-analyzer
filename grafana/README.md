@@ -194,8 +194,15 @@ and three years, who holds the shares over the same quarters (promoters, FII, DI
 They come from the company's public page, read by `CanSlimMain profiles`. `evening.sh` reads a dozen of the stalest
 each night, 12 seconds apart because screener.in refuses a faster pace, so the symbols in `symbols.txt` turn over in
 about a week (`company.profile.refresh.days`, `company.profile.max.pages.per.run`); `profiles --symbol RELIANCE` reads
-one now, and `profiles --max-pages 0` everything due. Until a company has been read its panels are empty, and so are
-those of a symbol outside `symbols.txt`.
+one now, and `profiles --max-pages 0` everything due. Until a company has been read its panels are empty.
+
+Every other symbol the database holds (the whole market's daily bars, and any stock you traded outside `symbols.txt`)
+gets the same details on a slower round: after the tracked symbols, `evening.sh` reads up to 50 of them a night, stocks
+you have traded first, then those never read, then the oldest copies, and reads each again after 90 days
+(`company.profile.untracked.max.pages.per.run`, `company.profile.untracked.refresh.days`; 0 pages turns it off,
+`profiles --max-other-pages N` overrides it for a run). The first pass over the market takes about eleven weeks; after
+that it is a steady three-month turnover. A refusal from screener.in only ends that night's round and the rest waits
+for the next, so a throttle delays it and never loses anything.
 
 Market cap, P/E, P/B and dividend yield are not the page's figures from the day it was read: they are restated at
 the latest price this database holds (today's last candle, else the last session's close) from the figures that do not

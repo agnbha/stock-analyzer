@@ -201,7 +201,9 @@ java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stocka
 # time-of-day prior reads the new series too.
 
 # Read one company's screener.in page for the company details on Candles and Calls, now, whatever the age
-# of its copy (evening.sh reads a few of the stalest each night). Slow by design: pages are 12 s apart.
+# of its copy (evening.sh reads a few of the stalest each night, then up to 50 of the symbols outside
+# symbols.txt, traded ones first, each again after 90 days; --max-other-pages N changes that for a run).
+# Slow by design: pages are 12 s apart.
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.CanSlimMain \
      profiles --symbol RELIANCE
 
