@@ -57,6 +57,8 @@ run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$
 # The company details on Candles and Calls (fundamentals, quarterly revenue and profit, shareholding, about)
 # come from screener.in's public pages. A few of the stalest are read each night, 12 s apart, ahead of the
 # long scan so a slow scan cannot starve them; a company is read again after company.profile.refresh.days.
+# Then up to company.profile.untracked.max.pages.per.run pages of every other symbol the database holds (traded
+# ones first), each read again after 90 days: about ten more minutes a night, and a refusal only ends the round.
 run_step "refresh company profiles" com.stockanalyzer.CanSlimMain profiles
 run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan --market
 

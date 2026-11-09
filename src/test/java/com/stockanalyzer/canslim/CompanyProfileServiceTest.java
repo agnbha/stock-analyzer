@@ -44,6 +44,7 @@ class CompanyProfileServiceTest {
 
     private static final long NOW = 1_793_000_000L;
     private static final long WEEK = 7 * 86_400L;
+    private static final long QUARTER_YEAR = 90 * 86_400L;
     private static final Path DASHBOARD = Path.of("grafana", "dashboards", "02-candles-and-calls.json");
 
     @TempDir
@@ -263,6 +264,123 @@ class CompanyProfileServiceTest {
     /** What the fake client answers for a symbol. */
     private interface ProfileSource {
         Optional<CompanyProfile> profile(String symbol);
+    }
+
+    @Test
+    @DisplayName("the slow round reads the symbols outside the tracked list, and never the tracked ones")
+    void theSlowRoundLeavesTheTrackedAlone() {
+        id("TRACKED");
+        id("AAA");
+        id("BBB");
+
+        CompanyProfileService.Result result = service(symbol -> Optional.of(welspun))
+                .refreshUntracked(List.of("TRACKED"), List.of(), 0, QUARTER_YEAR);
+
+        assertEquals(List.of("AAA", "BBB"), asked, "TRACKED has its own weekly round");
+        assertEquals(2, result.fetched());
+    }
+
+    @Test
+    @DisplayName("a copy is read again only after three months, so one from last month is left alone")
+    void aQuarterOfAYearBetweenReads() {
+        profiles.save(id("RECENT"), welspun, NOW - 30 * 86_400L);
+        profiles.save(id("OLD"), welspun, NOW - 100 * 86_400L);
+        profiles.save(id("EDGE"), welspun, NOW - 90 * 86_400L);
+
+        service(symbol -> Optional.of(welspun)).refreshUntracked(List.of(), List.of(), 0, QUARTER_YEAR);
+
+        assertEquals(List.of("OLD", "EDGE"), asked, "the oldest first; 90 days old is due, 30 days old is not");
+    }
+
+    @Test
+    @DisplayName("a few pages a night: never-read first, then the oldest, the rest left for a later night")
+    void partByPart() {
+        id("NEW1");
+        id("NEW2");
+        profiles.save(id("OLDEST"), welspun, NOW - 200 * 86_400L);
+        profiles.save(id("OLDER"), welspun, NOW - 150 * 86_400L);
+
+        CompanyProfileService.Result result = service(symbol -> Optional.of(welspun))
+                .refreshUntracked(List.of(), List.of(), 3, QUARTER_YEAR);
+
+        assertEquals(List.of("NEW1", "NEW2", "OLDEST"), asked);
+        assertEquals(3, result.fetched());
+        assertEquals(1, result.notAttempted(), "OLDER waits for tomorrow night");
+    }
+
+    @Test
+    @DisplayName("a stock you traded comes ahead of the never-read rest, and shares the same page budget")
+    void tradedStocksFirst() {
+        id("AAA");
+        id("BBB");
+        id("TRADED");
+        profiles.save(id("TRADEDOLD"), welspun, NOW - 200 * 86_400L);
+
+        CompanyProfileService.Result result = service(symbol -> Optional.of(welspun))
+                .refreshUntracked(List.of(), List.of("traded", "TRADEDOLD"), 3, QUARTER_YEAR);
+
+        assertEquals(List.of("TRADED", "TRADEDOLD", "AAA"), asked,
+                "traded ones first (never-read, then oldest, whatever the case of the name), then the rest");
+        assertEquals(1, result.notAttempted());
+    }
+
+    @Test
+    @DisplayName("an instrument of another exchange or segment is not read, whatever its name")
+    void onlyThisMarket() {
+        id("AAA");
+        instruments.findOrCreate("FUT1", "NSE", "FNO");
+        instruments.findOrCreate("BSE1", "BSE", "CASH");
+
+        service(symbol -> Optional.of(welspun)).refreshUntracked(List.of(), List.of(), 0, QUARTER_YEAR);
+
+        assertEquals(List.of("AAA"), asked);
+    }
+
+    @Test
+    @DisplayName("a refusal ends the slow round, keeps what was read, and says how much is still due")
+    void aRefusalEndsTheSlowRound() {
+        id("AAA");
+        id("BBB");
+        id("CCC");
+        CompanyFundamentalsClient limited = new CompanyFundamentalsClient() {
+            @Override
+            public Optional<CompanyFundamentals> fetch(String symbol) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<CompanyProfile> fetchProfile(String symbol) {
+                asked.add(symbol);
+                if (symbol.equals("BBB")) {
+                    throw new ScreenerException("screener.in is still rate limiting (HTTP 429)", false);
+                }
+                return Optional.of(welspun);
+            }
+        };
+
+        CompanyProfileService.Result result = new CompanyProfileService(limited, profiles, instruments,
+                Clock.fixed(Instant.ofEpochSecond(NOW), ZoneOffset.UTC), "NSE", "CASH")
+                .refreshUntracked(List.of(), List.of(), 10, QUARTER_YEAR);
+
+        assertEquals(List.of("AAA", "BBB"), asked, "nothing is asked after the refusal");
+        assertEquals(1, result.fetched());
+        assertEquals(2, result.notAttempted());
+        assertTrue(result.stoppedBy().contains("429"));
+        assertTrue(profiles.fetchedAt(id("AAA")).isPresent());
+        assertTrue(profiles.fetchedAt(id("CCC")).isEmpty(), "CCC is picked up on a later night");
+    }
+
+    @Test
+    @DisplayName("a page with nothing on it is remembered for three months, not asked again each night")
+    void anEmptyPageIsRememberedForAQuarter() {
+        long id = id("ETFX");
+
+        service(symbol -> Optional.empty()).refreshUntracked(List.of(), List.of(), 0, QUARTER_YEAR);
+        assertEquals(Optional.of(NOW), profiles.fetchedAt(id));
+
+        asked.clear();
+        service(symbol -> Optional.empty()).refreshUntracked(List.of(), List.of(), 0, QUARTER_YEAR);
+        assertTrue(asked.isEmpty());
     }
 
     private CompanyProfileService service(ProfileSource source) {

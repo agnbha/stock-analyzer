@@ -45,7 +45,7 @@ public final class CanSlimMain {
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
-                    + " | profiles [--symbol S] [--max-pages N]");
+                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N]");
             System.exit(2);
         }
 
@@ -92,7 +92,33 @@ public final class CanSlimMain {
                 if (result.fetched() == 0 && result.withoutProfile() == 0) {
                     System.exit(1);
                 }
+                return;
             }
+            if (!one) {
+                untrackedProfiles(parsed, config, context, symbols);
+            }
+        }
+    }
+
+    /**
+     * The slow round over every other symbol the database holds, a few pages a night: stocks you have traded
+     * first, then the never-read, then the oldest copies, each read again after three months. Not read when
+     * screener.in refused the first round; a refusal here only ends the round, since the rest is picked up
+     * on a later night, so it never fails the evening log.
+     */
+    private static void untrackedProfiles(Args parsed, AppConfig config, AppContext context, List<String> tracked) {
+        int maxPages = parsed.integer("max-other-pages", config.companyProfileUntrackedMaxPagesPerRun());
+        if (maxPages <= 0) {
+            return;
+        }
+        List<String> traded = context.tradeRepository().findAllOrdered().stream()
+                .map(trade -> trade.symbol()).distinct().toList();
+        CompanyProfileService.Result result = context.companyProfileService().refreshUntracked(tracked, traded,
+                maxPages, config.companyProfileUntrackedRefreshDays() * 86_400L);
+        System.out.printf("Company profiles of other symbols: %d read, %d with nothing on screener.in, %d still due%n",
+                result.fetched(), result.withoutProfile(), result.notAttempted());
+        if (result.stoppedBy() != null) {
+            System.out.println("Stopped early: " + result.stoppedBy());
         }
     }
 }
