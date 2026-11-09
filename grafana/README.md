@@ -147,12 +147,19 @@ the time range unless you pick some), and the page refreshes every minute.
   before the first session picked to that price. **Range** counts the market days covered and names them (5D · 2
   Nov → 6 Nov): 1D for one session, 5D for a week, as Groww's 1W or 1M. The default, every session in the time range,
   shows the move across the range; a session in between that is not picked does not change it.
-- **Difference from bought**, beside the share price: what all your purchases of the stock in the newest session
-  picked (today, by default) are worth at the share price. Each buy counts its quantity times how far the price is
-  from what was paid, and they are added up: +1,250.00 (0.50%) is the payout in rupees, then as a percent of the money
-  laid out. It is before charges, sells are not netted off (it is the payout of the purchases), and it is a dash when
-  you bought none. Pick an older session and it is that session's purchases at that session's last price.
-- Beside it: the **Previous close** the difference is measured from, the **Open** of the first session picked, the
+- **Difference from bought**, beside the share price: what the shares of the stock you still hold are worth at the share
+  price. Of the buys in the newest session picked (today, by default), what has not been sold since: the journal's
+  lots say how much of each buy has gone, the earliest buys first, so a buy half sold counts what is left, at its own
+  price, and one sold out counts for nothing. Each unsold share counts how far the price is from what was paid, added
+  up: +1,250.00 (0.50%) is the gain in rupees, then as a percent of the money laid out. It is before charges, and it is
+  0.00 when nothing is unsold (you bought none, or sold it all). Pick an older session and it is that session's
+  purchases at that session's last price.
+- **Today's gain/loss**, next to it: everything you have **realized today, over every stock**, losses taken off gains.
+  It is the lots closed so far today, after the charges allocated to them, so it is the same figure as the day's net P&L
+  on the Account Overview. It moves when a sell is imported (every minute while the market is open), is 0.00 before the
+  first sale, and is today's whatever sessions the page shows (it starts again at 0.00 the next day). It shows even for
+  a symbol with no minute data, since it is not the symbol's.
+- On the right, in two rows of tiles: the **Previous close** the difference is measured from, the **Open** of the first session picked, the
   **High**, **Low** and **Volume** across the sessions picked, how far the price sits above or below their VWAP (for
   one session, the purple line), and **As of**, when the newest price was read, to the second (6 Nov 14:45:18).
 
