@@ -154,11 +154,11 @@ the time range unless you pick some), and the page refreshes every minute.
   up: +1,250.00 (0.50%) is the gain in rupees, then as a percent of the money laid out. It is before charges, and it is
   0.00 when nothing is unsold (you bought none, or sold it all). Pick an older session and it is that session's
   purchases at that session's last price.
-- **Today's gain/loss**, next to it: everything you have **realized today, over every stock**, losses taken off gains.
-  It is the lots closed so far today, after the charges allocated to them, so it is the same figure as the day's net P&L
-  on the Account Overview. It moves when a sell is imported (every minute while the market is open), is 0.00 before the
-  first sale, and is today's whatever sessions the page shows (it starts again at 0.00 the next day). It shows even for
-  a symbol with no minute data, since it is not the symbol's.
+- **Today's gain/loss**, next to it: what the symbol on the page has **made today**, losses taken off gains. It is the
+  gain on every share of it sold so far today, **before charges** (the lots its sells closed), so the tiles of the
+  stocks you traded add up to the day's gross P&L on the Account Overview. It moves when a sell is imported (every
+  minute while the market is open), is 0.00 before the stock's first sale today, and is today's whatever sessions the
+  page shows (it starts again at 0.00 the next day). It shows even for a symbol with no minute data.
 - On the right, in two rows of tiles: the **Previous close** the difference is measured from, the **Open** of the first session picked, the
   **High**, **Low** and **Volume** across the sessions picked, how far the price sits above or below their VWAP (for
   one session, the purple line), and **As of**, when the newest price was read, to the second (6 Nov 14:45:18).

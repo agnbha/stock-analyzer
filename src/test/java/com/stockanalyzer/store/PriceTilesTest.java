@@ -59,6 +59,8 @@ class PriceTilesTest {
     private long other;
     /** What the query's "today" is for the test: the second session by default. */
     private String today = "2026-08-27";
+    /** The symbol the page is showing. */
+    private String symbol = "TEST";
 
     @BeforeEach
     void setUp() {
@@ -165,12 +167,13 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("no minutes in the sessions picked, or none picked: dashes, but the day's gain or loss is not this symbol's")
+    @DisplayName("no minutes in the sessions picked, or none picked: dashes, but the day's gain still shows")
     void noMinutesNoPrice() throws Exception {
         session(test, D1, 100.0);
-        settled(other, D2, 0, 100, 101, 99, 100, 500);
-        buy(other, D2, 10, 100.0);
-        sell(other, D2, 10, 105.0);                                       // +50 on another stock
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 105.0);                                        // +50, a sale needs no minute data
+        buy(other, D2, 5, 200.0);
+        sell(other, D2, 5, 220.0);                                        // +100 on another stock, not this one's
 
         for (Map<String, Object> row : List.of(header(D1, D2), header())) {
             java.util.Set<String> shown = new java.util.TreeSet<>();
@@ -499,15 +502,32 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("Today's gain/loss is everything realized today, over every stock, gains and losses added")
-    void todaysGainIsTheSumOfWhatWasRealized() throws Exception {
+    @DisplayName("Today's gain/loss is the stock on the page's own: what another stock made is not in it")
+    void todaysGainIsTheStocksOwn() throws Exception {
         live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        live(other, D2, 0, 200, 201, 195, 197, 500, ts(D2, 0) + 30);
         buy(test, D2, 10, 100.0);
         sell(test, D2, 10, 105.0);                                       // +50 on this stock
         buy(other, D2, 5, 200.0);
         sell(other, D2, 5, 196.0);                                       // -20 on another
 
-        assertEquals("+30.00", header(D2).get("Today's gain/loss"));
+        assertEquals("+50.00", header(D2).get("Today's gain/loss"));
+        symbol = "OTHER";
+        assertEquals("-20.00", header(D2).get("Today's gain/loss"), "each stock shows its own");
+    }
+
+    @Test
+    @DisplayName("several sales of one stock are added, gains and losses together")
+    void salesOfOneStockAreAdded() throws Exception {
+        live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 105.0);                                       // +50
+        buy(test, D2, 10, 100.0);
+        sell(test, D2, 10, 98.0);                                        // -20
+        buy(test, D2, 4, 100.0);
+        sell(test, D2, 4, 110.0);                                        // +40
+
+        assertEquals("+70.00", header(D2).get("Today's gain/loss"));
     }
 
     @Test
@@ -521,13 +541,13 @@ class PriceTilesTest {
     }
 
     @Test
-    @DisplayName("it is after the charges allocated to the lots, as the day's net P&L is")
-    void chargesAreTakenOff() throws Exception {
+    @DisplayName("it is before charges, as the figure a trader counts as earned and as Difference from bought is")
+    void chargesAreNotTakenOff() throws Exception {
         live(test, D2, 0, 100, 104, 99, 103, 500, ts(D2, 0) + 30);
         trade(test, D2, "BUY", 10, 100.0, 1.00);
         trade(test, D2, "SELL", 10, 105.0, 1.50);
 
-        assertEquals("+47.50", header(D2).get("Today's gain/loss"), "50 gained, 2.50 of charges");
+        assertEquals("+50.00", header(D2).get("Today's gain/loss"), "50 gained; the 2.50 of charges is not taken off");
     }
 
     @Test
@@ -602,7 +622,7 @@ class PriceTilesTest {
         assertEquals("green", mapped(bought, "+1,250.00 (0.50%)"), "a gain on the purchases");
         assertNull(mapped(bought, "0.00 (0.00%)"));
         JsonNode day = property(panel(NOW), "Today's gain/loss", "mappings");
-        assertEquals("green", mapped(day, "+7,153.19"), "a gain today");
+        assertEquals("green", mapped(day, "+4,321.50"), "a gain today");
         assertEquals("red", mapped(day, "-1,250.00"), "a loss today");
         assertNull(mapped(day, "0.00"), "nothing realized yet: plain");
         JsonNode panelDefaults = panel(NOW).path("fieldConfig").path("defaults");
@@ -698,7 +718,7 @@ class PriceTilesTest {
         String sql = target.path("queryText").asText();
         assertEquals(sql, target.path("rawQueryText").asText(), "the plugin runs queryText; the editor shows the raw");
         assertTrue(sql.contains(TODAY), "today is read by the market's clock");
-        sql = sql.replace(TODAY, "'" + today + "'").replace("$symbol", "TEST").replace("${session:sqlstring}", sessions);
+        sql = sql.replace(TODAY, "'" + today + "'").replace("$symbol", symbol).replace("${session:sqlstring}", sessions);
         assertFalse(sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         String query = sql;
         return database.read(connection -> {
