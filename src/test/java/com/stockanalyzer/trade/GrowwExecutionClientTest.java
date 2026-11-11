@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -144,6 +145,109 @@ class GrowwExecutionClientTest {
 
         assertTrue(trades.isEmpty());
         assertEquals(List.of("order/list"), requested);
+    }
+
+    private static final String BIG_ORDER = """
+            {"status":"SUCCESS","payload":{"order_list":[
+              {"groww_order_id":"GMK260903125400BIGSELL","trading_symbol":"BIGCO",
+               "order_status":"EXECUTED","quantity":120,"filled_quantity":120,
+               "exchange":"NSE","transaction_type":"SELL","segment":"CASH","product":"MIS",
+               "trade_date":"2026-09-03T00:00:00"}
+            ]}}""";
+
+    /** A page of {@code count} one-share fills of the big order, numbered from {@code first}. */
+    private static String fills(int first, int count) {
+        StringBuilder list = new StringBuilder();
+        for (int n = first; n < first + count; n++) {
+            list.append(n == first ? "" : ",").append("""
+                    {"price":100.5,"quantity":1,"groww_order_id":"GMK260903125400BIGSELL",
+                     "groww_trade_id":"GMK260903125400BIGSELLT%d","exchange_trade_id":"%d",
+                     "trade_status":"EXECUTED","trading_symbol":"BIGCO","exchange":"NSE","segment":"CASH",
+                     "product":"MIS","transaction_type":"SELL","trade_date_time":"2026-09-03T12:54:00"}
+                    """.formatted(n, n));
+        }
+        return "{\"status\":\"SUCCESS\",\"payload\":{\"trade_list\":[" + list + "]}}";
+    }
+
+    /** A server whose fills come page by page: {@code pages} maps the page number to its body (empty past the end). */
+    private GrowwExecutionClient clientWithPages(String orderList, Map<Integer, String> pages) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/order/list", exchange -> respond(exchange, orderList));
+        server.createContext("/order/trades/", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            int page = Integer.parseInt(query.replaceAll(".*page=(\\d+).*", "$1"));
+            requested.add("order/trades?page=" + page);
+            respond(exchange, pages.getOrDefault(page, "{\"status\":\"SUCCESS\",\"payload\":{\"trade_list\":[]}}"));
+        });
+        server.start();
+        return new GrowwExecutionClient(HttpClient.newHttpClient(), () -> "token",
+                "http://localhost:" + server.getAddress().getPort(), CLOCK, Product.MIS, "CASH", tokensSpent::incrementAndGet);
+    }
+
+    private static final LocalDate THE_DAY = LocalDate.of(2026, 9, 3);
+
+    @Test
+    @DisplayName("an order the exchange split into more fills than one page holds is read to the end")
+    void readsEveryPageOfFills() throws IOException {
+        List<Trade> trades = clientWithPages(BIG_ORDER, Map.of(0, fills(1, 50), 1, fills(51, 50), 2, fills(101, 20)))
+                .fetchTrades(THE_DAY, THE_DAY);
+
+        assertEquals(120, trades.size(), "all the fills, not the first page's 50");
+        assertEquals(120, trades.stream().mapToInt(Trade::quantity).sum(), "the order's whole quantity");
+        assertEquals(120, trades.stream().map(Trade::brokerTradeId).distinct().count(), "each fill once");
+        assertEquals(List.of("order/trades?page=0", "order/trades?page=1", "order/trades?page=2"), requested);
+    }
+
+    @Test
+    @DisplayName("an order of exactly one full page asks for the next page, finds it empty and stops")
+    void aFullPageIsFollowedByAnEmptyOne() throws IOException {
+        List<Trade> trades = clientWithPages(BIG_ORDER, Map.of(0, fills(1, 50))).fetchTrades(THE_DAY, THE_DAY);
+
+        assertEquals(50, trades.size());
+        assertEquals(List.of("order/trades?page=0", "order/trades?page=1"), requested);
+    }
+
+    @Test
+    @DisplayName("a short first page is the whole order: no second request")
+    void aShortPageIsTheLastOne() throws IOException {
+        List<Trade> trades = clientWithPages(BIG_ORDER, Map.of(0, fills(1, 49))).fetchTrades(THE_DAY, THE_DAY);
+
+        assertEquals(49, trades.size());
+        assertEquals(List.of("order/trades?page=0"), requested);
+    }
+
+    @Test
+    @DisplayName("a server that ignores the page number and repeats the first page does not duplicate fills or loop")
+    void aRepeatedPageIsNotReadTwice() throws IOException {
+        String page = fills(1, 50);
+        List<Trade> trades = clientWithPages(BIG_ORDER, Map.of(0, page, 1, page, 2, page, 3, page))
+                .fetchTrades(THE_DAY, THE_DAY);
+
+        assertEquals(50, trades.size(), "each fill once");
+        assertEquals(List.of("order/trades?page=0", "order/trades?page=1"), requested, "stops at the first repeat");
+    }
+
+    @Test
+    @DisplayName("fills that do not add up to the quantity the order filled are reported, with the gap")
+    void aShortfallIsReported() {
+        assertEquals(null, GrowwExecutionClient.shortfall("ORD1", "BIGCO", 120, 120), "complete: nothing to say");
+        String message = GrowwExecutionClient.shortfall("ORD1", "BIGCO", 120, 50);
+        assertTrue(message.contains("ORD1") && message.contains("BIGCO") && message.contains("filled 120")
+                && message.contains("add up to 50") && message.contains("off by 70"), message);
+    }
+
+    @Test
+    @DisplayName("a server with no end to its pages is read up to the page limit and no further")
+    void thereIsALimitToThePages() throws IOException {
+        Map<Integer, String> endless = new java.util.HashMap<>();
+        for (int page = 0; page < 40; page++) {
+            endless.put(page, fills(page * 50 + 1, 50));
+        }
+
+        List<Trade> trades = clientWithPages(BIG_ORDER, endless).fetchTrades(THE_DAY, THE_DAY);
+
+        assertEquals(20 * 50, trades.size());
+        assertEquals(20, requested.size(), "twenty pages, then it stops");
     }
 
     private static void respond(HttpExchange exchange, String body) throws IOException {
