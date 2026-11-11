@@ -19,7 +19,9 @@ import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Reads the broker's fills.
@@ -89,16 +91,34 @@ public final class GrowwExecutionClient implements ExecutionDataClient {
                 skippedUnfilled++;
                 continue;
             }
+            int filled = 0;
             for (JsonNode fill : fetchFills(order.path("groww_order_id").asText())) {
                 Trade trade = toTrade(fill);
+                if (trade != null) {
+                    filled += trade.quantity();
+                }
                 if (trade != null && !trade.sessionDate().isBefore(from) && !trade.sessionDate().isAfter(to)) {
                     trades.add(trade);
                 }
+            }
+            String shortfall = shortfall(order.path("groww_order_id").asText(), order.path("trading_symbol").asText(),
+                    order.path("filled_quantity").asInt(0), filled);
+            if (shortfall != null) {
+                log.warn(shortfall);
             }
         }
         log.info("Broker order book: {} orders ({} unfilled), {} fills in range",
                 orders.size(), skippedUnfilled, trades.size());
         return trades;
+    }
+
+    /** What to say when an order's fills do not add up to the quantity it filled; null when they do. */
+    static String shortfall(String orderId, String symbol, int orderFilled, int fillsAddUpTo) {
+        if (orderFilled == fillsAddUpTo) {
+            return null;
+        }
+        return "Order %s (%s) filled %d shares but its fills add up to %d: the journal would be off by %d"
+                .formatted(orderId, symbol, orderFilled, fillsAddUpTo, orderFilled - fillsAddUpTo);
     }
 
     private List<JsonNode> fetchOrders() {
@@ -118,15 +138,36 @@ public final class GrowwExecutionClient implements ExecutionDataClient {
         return orders;
     }
 
-    private List<JsonNode> fetchFills(String growwOrderId) {
-        JsonNode payload = get("/order/trades/" + growwOrderId + "?page=0&page_size=" + PAGE_SIZE
-                + "&segment=" + segment, "fills for " + growwOrderId);
-        JsonNode list = payload == null ? null : payload.path("trade_list");
-        if (list == null || !list.isArray()) {
-            return List.of();
+    /**
+     * Every fill of one order, page after page. The exchange splits a big order into many fills, and the broker
+     * serves {@value #PAGE_SIZE} of them to a page: reading only the first page silently dropped the rest of an
+     * order (a sell of 120 shares was recorded as 50, which left 70 shares "held" in the journal for good).
+     */
+    List<JsonNode> fetchFills(String growwOrderId) {
+        List<JsonNode> fills = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (int page = 0; page < MAX_PAGES; page++) {
+            JsonNode payload = get("/order/trades/" + growwOrderId + "?page=" + page + "&page_size=" + PAGE_SIZE
+                    + "&segment=" + segment, "fills for " + growwOrderId);
+            JsonNode list = payload == null ? null : payload.path("trade_list");
+            if (list == null || !list.isArray() || list.isEmpty()) {
+                return fills;
+            }
+            int added = 0;
+            for (JsonNode fill : list) {
+                String id = firstNonBlank(fill.path("groww_trade_id").asText(null),
+                        fill.path("exchange_trade_id").asText(null));
+                // A server that ignores the page number would hand back the same page again and again.
+                if (id == null || seen.add(id)) {
+                    fills.add(fill);
+                    added++;
+                }
+            }
+            if (list.size() < PAGE_SIZE || added == 0) {
+                return fills;
+            }
         }
-        List<JsonNode> fills = new ArrayList<>(list.size());
-        list.forEach(fills::add);
+        log.warn("Order {} has more than {} pages of fills; the rest are not read", growwOrderId, MAX_PAGES);
         return fills;
     }
 
