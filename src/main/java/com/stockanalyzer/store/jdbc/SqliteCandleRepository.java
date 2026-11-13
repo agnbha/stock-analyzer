@@ -17,6 +17,13 @@ public final class SqliteCandleRepository implements CandleRepository {
         this.database = database;
     }
 
+    /**
+     * Stores the candles, the newest fetch of a minute winning over an older one. The same minute is fetched more
+     * than once: when the daemon starts during the session (the minute still forming is part of that fetch), at the
+     * close, and again in the evening, when the broker's tape has settled. Keeping the first copy, as this did, froze
+     * a minute's half-formed high, low, close and volume for good, and the broker's later, settled copy never landed.
+     * A minute the broker no longer returns is left as it was. Returns the candles added or changed.
+     */
     @Override
     public int saveAll(long instrumentId, int intervalMinutes, List<Candle> candles) {
         if (candles.isEmpty()) {
@@ -24,9 +31,14 @@ public final class SqliteCandleRepository implements CandleRepository {
         }
         return database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
-                    INSERT OR IGNORE INTO candle
+                    INSERT INTO candle
                       (instrument_id, interval_minutes, ts_epoch, open, high, low, close, volume)
-                    VALUES (?,?,?,?,?,?,?,?)""")) {
+                    VALUES (?,?,?,?,?,?,?,?)
+                    ON CONFLICT (instrument_id, interval_minutes, ts_epoch) DO UPDATE SET
+                      open = excluded.open, high = excluded.high, low = excluded.low,
+                      close = excluded.close, volume = excluded.volume
+                    WHERE (open, high, low, close, volume)
+                          IS NOT (excluded.open, excluded.high, excluded.low, excluded.close, excluded.volume)""")) {
                 for (Candle c : candles) {
                     insert.setLong(1, instrumentId);
                     insert.setInt(2, intervalMinutes);

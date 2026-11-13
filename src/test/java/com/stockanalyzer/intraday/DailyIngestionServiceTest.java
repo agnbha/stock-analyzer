@@ -136,6 +136,66 @@ class DailyIngestionServiceTest {
                 "the complete session replaced the partial one");
     }
 
+    @Test
+    @DisplayName("a minute stored while it was still forming takes the broker's final values when the day is fetched again")
+    void aLaterFetchCorrectsAFormingMinute() {
+        FormingThenSettledClient client = new FormingThenSettledClient();
+        DailyIngestionService service = service(client);
+        SqliteCandleRepository candles = new SqliteCandleRepository(database);
+
+        // The daemon starts during the session: the last minute it fetches is still forming.
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "daily");
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        assertEquals(List.of(FormingThenSettledClient.FORMING), candles.find(instrumentId, 1, Candles.at(3), Candles.at(3)));
+
+        // The close, and the evening: the broker serves the minute as it ended.
+        client.settled = true;
+        service.ingest(List.of("GOOD"), "NSE", "CASH", DAY, DAY, 1, "live-reconcile", true);
+
+        assertEquals(List.of(FormingThenSettledClient.SETTLED), candles.find(instrumentId, 1, Candles.at(3), Candles.at(3)),
+                "its high, low, close and volume as the broker settled them, not the half-minute first seen");
+        assertEquals(6, candles.find(instrumentId, 1, Candles.at(0), Candles.at(9)).size(), "every minute once");
+        assertEquals(1150, candles.find(instrumentId, 1, Candles.at(0), Candles.at(9)).stream()
+                .mapToLong(Candle::volume).sum(), "the day's volume is the broker's");
+    }
+
+    @Test
+    @DisplayName("fetching an unchanged day again changes nothing, and a minute the broker no longer returns is kept")
+    void anUnchangedRefetchWritesNothing() {
+        SqliteCandleRepository candles = new SqliteCandleRepository(database);
+        long instrumentId = instruments.findOrCreate("GOOD", "NSE", "CASH");
+        List<Candle> day = List.of(new Candle(Candles.at(0), 100, 101, 99, 100.5, 500),
+                new Candle(Candles.at(1), 100.5, 102, 100, 101, 700));
+
+        assertEquals(2, candles.saveAll(instrumentId, 1, day), "both new");
+        assertEquals(0, candles.saveAll(instrumentId, 1, day), "the same candles again: nothing to write");
+        assertEquals(1, candles.saveAll(instrumentId, 1, List.of(new Candle(Candles.at(1), 100.5, 102, 100, 101.5, 900))),
+                "one minute changed");
+        assertEquals(List.of(day.getFirst(), new Candle(Candles.at(1), 100.5, 102, 100, 101.5, 900)),
+                candles.find(instrumentId, 1, Candles.at(0), Candles.at(1)), "the minute not fetched again is kept");
+    }
+
+    /** The day as seen during the session (its last minute still forming), then as the broker settled it. */
+    private static final class FormingThenSettledClient implements CandleDataClient {
+        static final Candle FORMING = new Candle(Candles.at(3), 104, 104.5, 103.8, 104.2, 40);
+        static final Candle SETTLED = new Candle(Candles.at(3), 104, 105.5, 102.9, 103.1, 250);
+        private boolean settled;
+
+        @Override
+        public StockCandleSeries fetchCandles(String symbol, String exchange, String segment,
+                                               LocalDateTime start, LocalDateTime end, int intervalMinutes) {
+            List<Candle> early = List.of(new Candle(Candles.at(0), 100, 101, 99, 100.5, 200),
+                    new Candle(Candles.at(1), 100.5, 102, 100, 101.8, 300), new Candle(Candles.at(2), 101.8, 104, 101.5, 104, 150));
+            List<Candle> day = new java.util.ArrayList<>(early);
+            day.add(settled ? SETTLED : FORMING);
+            if (settled) {
+                day.add(new Candle(Candles.at(4), 103.1, 103.5, 102.5, 103, 120));
+                day.add(new Candle(Candles.at(5), 103, 104, 102.8, 103.9, 130));
+            }
+            return new StockCandleSeries(symbol, exchange, segment, day);
+        }
+    }
+
     /** Returns half a session first, then the whole thing once the market has closed. */
     private static final class PartialThenFullClient implements CandleDataClient {
         private boolean marketClosed;
