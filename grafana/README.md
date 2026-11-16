@@ -190,9 +190,16 @@ single session, and about three candles a day (a couple of hours each) across th
 one candle per minute.
 A candle opens where its first minute opened, closes where its last closed, and spans the highest high, lowest low
 and total volume of its minutes; VWAP and the averages are read as they stand at its end, and your buys, sells and the
-detector's windows sit on the candle they fall in (an average, if several do). A candle never spans two sessions, and
-the total never exceeds the number typed. A blank, non-numeric, zero or negative entry means 200. The weekly chart is
-not capped: it draws one candle a week over the last six months, whatever time range is picked at the top.
+detector's windows sit on the candle they fall in (an average, if several do). A candle never spans two sessions, nor
+a pause of three minutes or more with no trades, and the total never exceeds the number typed. A blank, non-numeric,
+zero or negative entry means 200. The weekly chart is not capped: it draws one candle a week over the last six months,
+whatever time range is picked at the top.
+
+**Why F&O stocks have no candles after 15:15.** Since 3 August 2026 NSE runs a closing auction for stocks in the F&O
+segment: continuous trading stops at 15:15 and there is one more print, at the close (15:28 or 15:29), carrying the
+auction's volume. Groww's minute data is the same, so there is nothing to fill. Because of the rule above, that print
+is a candle of its own at its own minute; before, it was folded into the candle drawn at 15:15 and the chart seemed to
+end there. Stocks outside F&O trade on to 15:29.
 
 One thing the box cannot change: the chart's time axis always spans the time range picked at the top. A single
 session shown on a three-month range is a thin strip at the right edge however many candles it has, so narrow the

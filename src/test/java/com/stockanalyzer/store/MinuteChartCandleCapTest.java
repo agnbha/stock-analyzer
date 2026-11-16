@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The "Max candles" box on Candles and Calls: the minute chart draws at most that many candles, 200 when the box is
- * left alone, by combining minutes into longer candles across everything selected. Checked by running the panel's own
- * query over seeded candles.
+ * left alone, by combining minutes into longer candles across everything selected, never across a session's end or a
+ * pause in trading such as the closing auction. Checked by running the panel's own query over seeded candles.
  *
  * <p>Candle {@code i} of a session opens at {@code 1000 + i}, closes at {@code 1000 + i}, has a high of one more and a
  * low of one less, and a volume of 1,000, so a drawn candle shows exactly which minutes it holds.
@@ -207,6 +207,69 @@ class MinuteChartCandleCapTest {
     }
 
     @Test
+    @DisplayName("the close after the closing auction is a candle of its own, drawn at its own minute")
+    void theClosingPrintStandsAlone() throws Exception {
+        // An F&O stock since August 2026: minutes 0-360 trade (9:15 to 15:15), nothing until one print at minute 373.
+        span(LATER, 0, 360);
+        span(LATER, 373, 373);
+
+        List<Candle> drawn = draw("200", LATER);
+
+        assertEquals(182, drawn.size(), "181 two-minute candles for the day, and the close");
+        Candle close = drawn.get(181);
+        assertEquals(373, close.minute(), "at the close's minute, not folded into the candle drawn at 15:15");
+        assertEquals(1373, close.open());
+        assertEquals(1373, close.close());
+        assertEquals(1000, close.volume(), "the print's own volume");
+        assertEquals(360, drawn.get(180).minute(), "the day's last minute of trading, alone after 180 pairs");
+        assertEquals(1360, drawn.get(180).close());
+
+        List<Candle> few = draw("50", LATER);
+        assertTrue(few.size() <= 50, "the cap still holds: " + few.size());
+        assertEquals(373, few.getLast().minute(), "the close stands alone however long the other candles get");
+        assertEquals(1373, few.getLast().open());
+    }
+
+    @Test
+    @DisplayName("a candle never spans a pause of three minutes or more, so each stretch of trading is drawn where it was")
+    void noCandleSpansAPause() throws Exception {
+        // The shape from mid-August to mid-September: trading to 15:15, five minutes 15:20-15:24, then the close.
+        span(LATER, 0, 360);
+        span(LATER, 365, 369);
+        span(LATER, 373, 373);
+
+        List<Candle> drawn = draw("200", LATER);
+
+        assertEquals(185, drawn.size(), "181 for the day, 3 for 15:20-15:24, 1 for the close");
+        assertEquals(List.of(360, 365, 367, 369, 373),
+                drawn.subList(180, 185).stream().map(Candle::minute).toList());
+        for (Candle candle : drawn) {
+            int first = (int) candle.open() - 1000;
+            int last = (int) candle.close() - 1000;
+            assertTrue(last - first <= 1, "two minutes at most, never across a pause: " + candle);
+        }
+    }
+
+    @Test
+    @DisplayName("a pause of two minutes, as a thinly traded stock has during the day, does not cut a candle")
+    void aShortPauseDoesNotCutACandle() throws Exception {
+        span(EARLIER, 0, 8);
+        span(EARLIER, 11, 20);
+        span(LATER, 0, 8);
+        span(LATER, 12, 21);
+
+        List<Candle> twoMissing = draw("10", EARLIER);
+        assertEquals(10, twoMissing.size());
+        assertEquals(1008, twoMissing.get(4).open(), "minutes 8 and 11 in one candle");
+        assertEquals(1011, twoMissing.get(4).close());
+
+        List<Candle> threeMissing = draw("10", LATER);
+        assertEquals(10, threeMissing.size());
+        assertEquals(1008, threeMissing.get(4).close(), "minute 8 ends its stretch");
+        assertEquals(1012, threeMissing.get(5).open(), "and minute 12 starts the next");
+    }
+
+    @Test
     @DisplayName("the page has the box, defaulting to 200, and the chart title says how many it draws at most")
     void dashboardHasTheBox() throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD));
@@ -227,8 +290,9 @@ class MinuteChartCandleCapTest {
                 .filter(p -> p.path("id").asInt() == 20).findFirst().orElseThrow();
     }
 
-    private record Candle(String session, double open, double close, double high, double low, double volume,
-                          Double vwap, Double sma60, Double entry, Double exit, Double buy, Double sell) {
+    /** {@code minute} is the index of the minute the candle is drawn at, as {@link #minuteOf} counts them. */
+    private record Candle(String session, int minute, double open, double close, double high, double low,
+                          double volume, Double vwap, Double sma60, Double entry, Double exit, Double buy, Double sell) {
     }
 
     private static double sum(List<Candle> candles) {
@@ -250,7 +314,8 @@ class MinuteChartCandleCapTest {
             try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
                 while (rs.next()) {
                     long time = rs.getLong("time");
-                    drawn.add(new Candle(LocalDate.ofEpochDay(time / 86_400L).toString(),
+                    LocalDate session = LocalDate.ofEpochDay(time / 86_400L);
+                    drawn.add(new Candle(session.toString(), (int) ((time - minuteOf(session.toString(), 0)) / 60),
                             rs.getDouble("open"), rs.getDouble("close"), rs.getDouble("high"), rs.getDouble("low"),
                             rs.getDouble("volume"), nullable(rs, "VWAP"), nullable(rs, "SMA 60m"),
                             nullable(rs, "Window entry"), nullable(rs, "Window exit"),
@@ -282,12 +347,17 @@ class MinuteChartCandleCapTest {
 
     /** {@code count} one-minute candles for the session, within its own UTC day so sessions can be told apart. */
     private void candles(String date, int count) {
+        span(date, 0, count - 1);
+    }
+
+    /** One-minute candles for minutes {@code first} to {@code last} of the session, priced as {@link #candles} does. */
+    private void span(String date, int first, int last) {
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO live_candle (instrument_id, interval_minutes, ts_epoch, session_date, open, high,
                                              low, close, volume, provisional, updated_at)
                     VALUES (?,1,?,?,?,?,?,?,1000,0,0)""")) {
-                for (int i = 0; i < count; i++) {
+                for (int i = first; i <= last; i++) {
                     double close = 1000 + i;
                     insert.setLong(1, instrument);
                     insert.setLong(2, minuteOf(date, i));
