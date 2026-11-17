@@ -147,13 +147,12 @@ class TradingRangesTest {
     void noEarlierSession() throws Exception {
         sessions(FRI28);
 
-        assertNull(variable("prev_day", FRI28));
         assertNull(variable("prev_from", FRI28));
         assertNull(variable("prev_to", FRI28));
     }
 
     @Test
-    @DisplayName("the button carries the symbol, detector and candle count, and sets the session and the range")
+    @DisplayName("the button carries the symbol, detector and candle count, sets the range, and leaves Session on All")
     void theButton() throws Exception {
         JsonNode dashboard = dashboard();
         JsonNode button = null;
@@ -172,7 +171,9 @@ class TradingRangesTest {
         assertTrue(url.startsWith("/d/stockanalyzer-candles/candles-and-calls?"), url);
         List<String> parameters = List.of(url.substring(url.indexOf('?') + 1).split("&"));
         assertEquals(1, parameters.stream().filter(p -> p.startsWith("var-session=")).count(), "one session: " + url);
-        assertTrue(parameters.contains("var-session=${prev_day}"), url);
+        // All, not the day itself: the range holds only that day, so it is what the chart shows, and a range widened
+        // afterwards shows every session in it. A day ticked by name stayed ticked, and hid the rest of the range.
+        assertTrue(parameters.contains("var-session=%24__all"), url);
         assertTrue(parameters.contains("from=${prev_from}"), url);
         assertTrue(parameters.contains("to=${prev_to}"), url);
 
@@ -201,14 +202,13 @@ class TradingRangesTest {
         }
     }
 
-    /** The three hidden variables, for a day, agree on the session and its 09:15 and 15:30 IST. */
+    /** The two hidden variables, for a day, are the previous session's 09:15 and 15:30 IST. */
     private void assertPrevious(String today, String expected) throws Exception {
         assertPrevious(today, expected, "");
     }
 
     private void assertPrevious(String today, String expected, String why) throws Exception {
         String note = "today " + today + (why.isEmpty() ? "" : ": " + why);
-        assertEquals(expected, variable("prev_day", today), note);
         assertEquals(millis(expected, LocalTime.of(9, 15)), ((Number) variable("prev_from", today)).longValue(), note);
         assertEquals(millis(expected, LocalTime.of(15, 30)), ((Number) variable("prev_to", today)).longValue(), note);
     }
