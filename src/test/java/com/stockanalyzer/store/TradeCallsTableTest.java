@@ -69,6 +69,7 @@ class TradeCallsTableTest {
                 .filter(p -> p.path("id").asInt() == 12).findFirst().orElseThrow();
         String sql = panel.path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + DAY + "'")
+                .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", symbol);
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {

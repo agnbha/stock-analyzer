@@ -306,6 +306,7 @@ class MinuteChartCandleCapTest {
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", sessionList)
                 .replace("${candles:sqlstring}", box)
+                .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
                 .replace("$detector", DETECTOR);
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);

@@ -2,6 +2,7 @@ package com.stockanalyzer.store.jdbc;
 
 import com.stockanalyzer.model.AccountSnapshot;
 import com.stockanalyzer.store.AccountBalanceRepository;
+import com.stockanalyzer.store.AccountProfileRepository;
 import com.stockanalyzer.store.Database;
 
 import java.sql.PreparedStatement;
@@ -17,13 +18,21 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
     private static final String UPSERT = """
             INSERT OR REPLACE INTO account_balance
               (session_date, cash, invested, total, source, recorded_at,
-               margin_used, available, collateral, unpriced_holdings, fetched_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)""";
+               margin_used, available, collateral, unpriced_holdings, fetched_at, profile)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""";
 
     private final Database database;
+    private final String profile;
 
+    /** For the default profile; see {@link AccountProfileRepository#DEFAULT_PROFILE}. */
     public SqliteAccountBalanceRepository(Database database) {
+        this(database, AccountProfileRepository.DEFAULT_PROFILE);
+    }
+
+    /** Sees and writes only the rows of {@code profile}. */
+    public SqliteAccountBalanceRepository(Database database, String profile) {
         this.database = database;
+        this.profile = profile;
     }
 
     @Override
@@ -43,6 +52,7 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
                 JdbcSupport.setNullableDouble(upsert, 9, null);
                 upsert.setNull(10, java.sql.Types.INTEGER);
                 upsert.setNull(11, java.sql.Types.INTEGER);
+                upsert.setString(12, profile);
                 upsert.executeUpdate();
             }
         });
@@ -63,21 +73,23 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
                 upsert.setDouble(9, snapshot.collateral());
                 upsert.setLong(10, snapshot.unpricedHoldings());
                 upsert.setLong(11, snapshot.fetchedAtEpoch());
+                upsert.setString(12, profile);
                 upsert.executeUpdate();
             }
 
             // Replace the day's holdings wholesale: a position sold today should
             // disappear, which an upsert on its own would never do.
             try (PreparedStatement delete = connection.prepareStatement(
-                    "DELETE FROM account_holding WHERE session_date = ?")) {
-                delete.setString(1, sessionDate.toString());
+                    "DELETE FROM account_holding WHERE profile = ? AND session_date = ?")) {
+                delete.setString(1, profile);
+                delete.setString(2, sessionDate.toString());
                 delete.executeUpdate();
             }
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO account_holding
                       (session_date, symbol, isin, quantity, average_price, last_price,
-                       market_value, unrealised, recorded_at)
-                    VALUES (?,?,?,?,?,?,?,?,?)""")) {
+                       market_value, unrealised, recorded_at, profile)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""")) {
                 long now = JdbcSupport.now();
                 for (AccountSnapshot.Holding holding : snapshot.holdings()) {
                     insert.setString(1, sessionDate.toString());
@@ -89,6 +101,7 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
                     insert.setDouble(7, holding.value());
                     JdbcSupport.setNullableDouble(insert, 8, holding.unrealised());
                     insert.setLong(9, now);
+                    insert.setString(10, profile);
                     insert.addBatch();
                 }
                 insert.executeBatch();
@@ -100,8 +113,10 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
     public Optional<Balance> latestOnOrBefore(LocalDate date) {
         return database.read(connection -> {
             try (PreparedStatement select = connection.prepareStatement(
-                    "SELECT * FROM account_balance WHERE session_date <= ? ORDER BY session_date DESC LIMIT 1")) {
-                select.setString(1, date.toString());
+                    "SELECT * FROM account_balance WHERE profile = ? AND session_date <= ? "
+                            + "ORDER BY session_date DESC LIMIT 1")) {
+                select.setString(1, profile);
+                select.setString(2, date.toString());
                 try (ResultSet rs = select.executeQuery()) {
                     return rs.next() ? Optional.of(map(rs)) : Optional.<Balance>empty();
                 }
@@ -114,9 +129,11 @@ public final class SqliteAccountBalanceRepository implements AccountBalanceRepos
         return database.read(connection -> {
             List<Balance> balances = new ArrayList<>();
             try (PreparedStatement select = connection.prepareStatement(
-                    "SELECT * FROM account_balance WHERE session_date BETWEEN ? AND ? ORDER BY session_date")) {
-                select.setString(1, from.toString());
-                select.setString(2, to.toString());
+                    "SELECT * FROM account_balance WHERE profile = ? AND session_date BETWEEN ? AND ? "
+                            + "ORDER BY session_date")) {
+                select.setString(1, profile);
+                select.setString(2, from.toString());
+                select.setString(3, to.toString());
                 try (ResultSet rs = select.executeQuery()) {
                     while (rs.next()) {
                         balances.add(map(rs));

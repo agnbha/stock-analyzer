@@ -1,6 +1,7 @@
 package com.stockanalyzer.store.jdbc;
 
 import com.stockanalyzer.model.Side;
+import com.stockanalyzer.store.AccountProfileRepository;
 import com.stockanalyzer.store.Database;
 import com.stockanalyzer.store.TradeNoteRepository;
 
@@ -13,9 +14,17 @@ import java.util.List;
 public final class SqliteTradeNoteRepository implements TradeNoteRepository {
 
     private final Database database;
+    private final String profile;
 
+    /** For the default profile; see {@link AccountProfileRepository#DEFAULT_PROFILE}. */
     public SqliteTradeNoteRepository(Database database) {
+        this(database, AccountProfileRepository.DEFAULT_PROFILE);
+    }
+
+    /** Lists only the trades of {@code profile}; notes are written and removed by trade id, whoever owns it. */
+    public SqliteTradeNoteRepository(Database database, String profile) {
         this.database = database;
+        this.profile = profile;
     }
 
     @Override
@@ -61,12 +70,13 @@ public final class SqliteTradeNoteRepository implements TradeNoteRepository {
                     FROM trade_note n
                     JOIN trade t ON t.id = n.trade_id
                     JOIN instrument i ON i.id = t.instrument_id
-                    WHERE t.session_date BETWEEN ? AND ? AND (? IS NULL OR i.symbol = ?)
+                    WHERE t.profile = ? AND t.session_date BETWEEN ? AND ? AND (? IS NULL OR i.symbol = ?)
                     ORDER BY t.executed_ts, t.id""")) {
-                select.setString(1, from.toString());
-                select.setString(2, to.toString());
-                select.setString(3, symbolOrNull);
+                select.setString(1, profile);
+                select.setString(2, from.toString());
+                select.setString(3, to.toString());
                 select.setString(4, symbolOrNull);
+                select.setString(5, symbolOrNull);
                 try (ResultSet rs = select.executeQuery()) {
                     while (rs.next()) {
                         found.add(new Noted(rs.getLong(1), rs.getString(2), Side.valueOf(rs.getString(3)),

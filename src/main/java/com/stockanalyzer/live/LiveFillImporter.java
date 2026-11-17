@@ -22,27 +22,44 @@ public final class LiveFillImporter implements AutoCloseable {
 
     private final Runnable job;
     private final int intervalMinutes;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "fill-import");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final String account;
+    private final ScheduledExecutorService scheduler;
 
     private int consecutiveFailures;
 
     /** @param intervalMinutes how often to run; zero or less never starts it */
     public LiveFillImporter(Runnable job, int intervalMinutes) {
+        this(job, intervalMinutes, null);
+    }
+
+    /**
+     * One account of several: each runs on its own thread, so one account's broker trouble never holds up another's
+     * fills, and its failures are logged as its own.
+     *
+     * @param account named in the thread and the log; null for the first account, which reads as before
+     */
+    public LiveFillImporter(Runnable job, int intervalMinutes, String account) {
         this.job = job;
         this.intervalMinutes = intervalMinutes;
+        this.account = account;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, account == null ? "fill-import" : "fill-import-" + account);
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    private String forAccount() {
+        return account == null ? "" : " for " + account;
     }
 
     public void start() {
         if (intervalMinutes <= 0) {
-            log.info("Live fill import is off (trades.live.import.interval.minutes={})", intervalMinutes);
+            log.info("Live fill import{} is off (trades.live.import.interval.minutes={})", forAccount(), intervalMinutes);
             return;
         }
         scheduler.scheduleWithFixedDelay(this::runOnce, 1, intervalMinutes, TimeUnit.MINUTES);
-        log.info("Importing broker fills every {} minutes during the session", intervalMinutes);
+        log.info("Importing broker fills{} every {} minutes during the session", forAccount(), intervalMinutes);
     }
 
     /** One attempt; never throws, because a scheduled task that throws is silently cancelled. */
@@ -50,16 +67,17 @@ public final class LiveFillImporter implements AutoCloseable {
         try {
             job.run();
             if (consecutiveFailures > 0) {
-                log.info("Fill import recovered after {} failed attempts", consecutiveFailures);
+                log.info("Fill import{} recovered after {} failed attempts", forAccount(), consecutiveFailures);
             }
             consecutiveFailures = 0;
         } catch (RuntimeException e) {
             consecutiveFailures++;
             if (consecutiveFailures == 1) {
-                log.warn("Could not import broker fills (will keep trying every {} minutes): {}",
-                        intervalMinutes, e.getMessage());
+                log.warn("Could not import broker fills{} (will keep trying every {} minutes): {}",
+                        forAccount(), intervalMinutes, e.getMessage());
             } else {
-                log.debug("Fill import still failing ({} in a row): {}", consecutiveFailures, e.getMessage());
+                log.debug("Fill import{} still failing ({} in a row): {}", forAccount(), consecutiveFailures,
+                        e.getMessage());
             }
         }
     }

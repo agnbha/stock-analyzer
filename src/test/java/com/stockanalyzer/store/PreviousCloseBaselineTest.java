@@ -143,6 +143,7 @@ class PreviousCloseBaselineTest {
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + list + "'")
                 .replace("${candles:sqlstring}", "'200'")
+                .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);

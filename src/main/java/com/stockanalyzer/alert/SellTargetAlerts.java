@@ -59,6 +59,18 @@ public final class SellTargetAlerts {
      * @param now     epoch seconds
      */
     public List<Alert> due(LocalDate sessionDate, String symbol, List<Trade> fills, List<Candle> candles, long now) {
+        return due(sessionDate, symbol, fills, candles, now, null);
+    }
+
+    /**
+     * The same for one of several broker accounts. Each account's position has its own average and its own alerts,
+     * so {@code fills} must be that account's alone.
+     *
+     * @param account the account's name, said in the alert and part of its key; null for the first account, whose
+     *                alerts read, and are keyed, as they did before there was more than one
+     */
+    public List<Alert> due(LocalDate sessionDate, String symbol, List<Trade> fills, List<Candle> candles, long now,
+                           String account) {
         long bought = 0;
         long sold = 0;
         BigDecimal cost = BigDecimal.ZERO;
@@ -99,11 +111,12 @@ public final class SellTargetAlerts {
             }
             String label = plain(pct);
             String message = String.format(Locale.ROOT,
-                    "%s is up %s%% on your average buy of %s (%d shares). Sell now: set the limit at %s.",
-                    symbol, label, money(average), held, money(limit));
+                    "%s is up %s%% on %s average buy of %s (%d shares). Sell now: set the limit at %s.",
+                    symbol, label, account == null ? "your" : account + "'s", money(average), held, money(limit));
             alerts.add(new Alert(sessionDate, now, symbol, RULE_PREFIX + label, AlertSeverity.URGENT,
-                    "Sell target +" + label + "%", message,
-                    "sellTarget|" + sessionDate + "|" + symbol + "|" + money(average) + "|" + label));
+                    "Sell target +" + label + "%" + (account == null ? "" : " (" + account + ")"), message,
+                    "sellTarget|" + sessionDate + "|" + symbol + "|" + money(average) + "|" + label
+                            + (account == null ? "" : "|" + account)));
         }
         return alerts;
     }

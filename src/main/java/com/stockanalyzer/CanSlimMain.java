@@ -111,7 +111,9 @@ public final class CanSlimMain {
         if (maxPages <= 0) {
             return;
         }
-        List<String> traded = context.tradeRepository().findAllOrdered().stream()
+        // Traded in any account: company details are stock data, the same for every account.
+        List<String> traded = context.profiles().stream()
+                .flatMap(profile -> profile.tradeRepository().findAllOrdered().stream())
                 .map(trade -> trade.symbol()).distinct().toList();
         CompanyProfileService.Result result = context.companyProfileService().refreshUntracked(tracked, traded,
                 maxPages, config.companyProfileUntrackedRefreshDays() * 86_400L);

@@ -71,6 +71,8 @@ class GrafanaDashboardQueryTest {
                         .replace("${candles:sqlstring}", "'200'")
                         .replace("$__from/1000", String.valueOf(FROM_EPOCH_SECONDS))
                         .replace("$__to/1000", String.valueOf(TO_EPOCH_SECONDS))
+                        // Two accounts ticked: the multi-value form a dashboard sends.
+                        .replace("${profile:sqlstring}", "'main','second'")
                         .replace("$symbol", "RELIANCE")
                         .replace("$session", "2026-08-27")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");

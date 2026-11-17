@@ -52,6 +52,7 @@ class MinuteChartTooltipOrderTest {
         String sql = panel.path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'2026-11-04'")
                 .replace("${candles:sqlstring}", "'200'")
+                .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "WIPRO")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
 

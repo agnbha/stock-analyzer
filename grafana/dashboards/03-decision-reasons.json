@@ -48,8 +48,8 @@
         "iconColor": "#8AB8FF",
         "name": "Noted buys",
         "target": {
-          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
-          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
           "queryType": "table",
           "refId": "Anno",
           "timeColumns": [
@@ -67,8 +67,8 @@
         "iconColor": "#FF9830",
         "name": "Noted sells",
         "target": {
-          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
-          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
           "queryType": "table",
           "refId": "Anno",
           "timeColumns": [
@@ -99,7 +99,29 @@
     ]
   },
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "profile",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT name FROM account_profile ORDER BY position, name",
+        "definition": "SELECT name FROM account_profile ORDER BY position, name",
+        "refresh": 1,
+        "sort": 0,
+        "includeAll": false,
+        "multi": true,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Whose buys, sells and account figures to show: one Groww account per profile. The stock data is the same whichever is picked. The page opens on the first account; tick more than one to add them together."
+      }
+    ]
   },
   "panels": [
     {
@@ -124,8 +146,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
-          "queryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "rawQueryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code AS \"Reason\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
           "timeColumns": []
         }
       ],
@@ -171,8 +193,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
-          "queryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
+          "rawQueryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_source AS \"Source\", SUM(occurrences) AS \"Times used\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_source\nORDER BY SUM(occurrences) DESC",
           "timeColumns": []
         }
       ],
@@ -223,8 +245,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
-          "queryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "rawQueryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code AS \"Reason\",\n       SUM(CASE WHEN side = 'BUY'  THEN occurrences ELSE 0 END) AS \"Buys\",\n       SUM(CASE WHEN side = 'SELL' THEN occurrences ELSE 0 END) AS \"Sells\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code\nORDER BY SUM(occurrences) DESC",
           "timeColumns": []
         }
       ],
@@ -272,8 +294,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nGROUP BY session_date, reason_code\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nGROUP BY session_date, reason_code\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date, reason_code\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       reason_code AS metric,\n       SUM(occurrences) AS value\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date, reason_code\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -326,8 +348,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
-          "queryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
+          "rawQueryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
+          "queryText": "SELECT reason_code   AS \"Reason\",\n       reason_source AS \"Source\",\n       SUM(occurrences) AS \"Times used\",\n       SUM(bet_amount)  AS \"Bet amount\",\n       SUM(net_pnl)     AS \"Net P&L\",\n       ROUND(SUM(net_pnl) / NULLIF(SUM(occurrences), 0), 2) AS \"Net per use\"\nFROM v_reason_frequency\nWHERE profile IN (${profile:sqlstring})\nGROUP BY reason_code, reason_source\nORDER BY SUM(occurrences) DESC",
           "timeColumns": []
         }
       ],

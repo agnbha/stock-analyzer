@@ -74,7 +74,8 @@ class NotedCallAnnotationsTest {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
         JsonNode query = StreamSupport.stream(root.path("annotations").path("list").spliterator(), false)
                 .filter(a -> a.path("name").asText().equals(annotation)).findFirst().orElseThrow();
-        String sql = query.path("target").path("queryText").asText().replace("$symbol", symbol == null ? "" : symbol);
+        String sql = query.path("target").path("queryText").asText().replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
+                .replace("$symbol", symbol == null ? "" : symbol);
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {
             List<Marker> found = new ArrayList<>();
