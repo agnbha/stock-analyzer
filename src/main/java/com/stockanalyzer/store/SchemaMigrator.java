@@ -90,7 +90,309 @@ public final class SchemaMigrator {
         all.put(22, v22());
         all.put(23, v23());
         all.put(24, v24());
+        all.put(25, v25());
         return all;
+    }
+
+    /**
+     * v25: more than one broker account. Each Groww login is a profile, and everything that belongs to an account -
+     * its fills and what is derived from them, its balance and its holdings - is kept per profile. Stock data stays
+     * shared: candles, sessions and windows are the same whoever looks at them.
+     *
+     * <p>Rows that were there before carry the empty profile, which means "not assigned yet": the application gives
+     * them to the first configured profile when it starts ({@code AccountProfileRepository.adoptUnassigned}), so the
+     * existing journal becomes the first account's without the migration having to know its name.
+     *
+     * <p>The trade id stays the key everything else hangs off (lots, reasons, notes and attributions follow their
+     * trade), and the broker's trade id stays unique across profiles: the same fill can never land in two accounts.
+     * The four tables keyed by date or position are rebuilt with the profile in the key. The views over them are
+     * dropped first and redefined per profile at the end, because SQLite will not rename a table while a view names
+     * one that is missing.
+     */
+    private List<String> v25() {
+        List<String> ddl = new ArrayList<>();
+        for (String view : List.of("v_account_equity", "v_equity_curve", "v_daily_pnl", "v_account_value",
+                "v_current_holdings", "v_reason_frequency", "v_trade_markers", "v_bet")) {
+            ddl.add("DROP VIEW IF EXISTS " + view);
+        }
+
+        ddl.add("ALTER TABLE trade ADD COLUMN profile TEXT NOT NULL DEFAULT ''");
+        ddl.add("CREATE INDEX ix_trade_profile ON trade (profile, session_date)");
+        ddl.add("ALTER TABLE realized_lot ADD COLUMN profile TEXT NOT NULL DEFAULT ''");
+
+        ddl.add("""
+                CREATE TABLE open_position_v25 (
+                  profile TEXT NOT NULL DEFAULT '',
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  product TEXT NOT NULL,
+                  quantity INTEGER NOT NULL,
+                  avg_cost REAL NOT NULL,
+                  opened_ts INTEGER NOT NULL,
+                  last_updated INTEGER NOT NULL,
+                  PRIMARY KEY (profile, instrument_id, product)
+                )""");
+        ddl.add("""
+                INSERT INTO open_position_v25 (profile, instrument_id, product, quantity, avg_cost, opened_ts, last_updated)
+                SELECT '', instrument_id, product, quantity, avg_cost, opened_ts, last_updated FROM open_position""");
+        ddl.add("DROP TABLE open_position");
+        ddl.add("ALTER TABLE open_position_v25 RENAME TO open_position");
+
+        ddl.add("""
+                CREATE TABLE pnl_period_v25 (
+                  id INTEGER PRIMARY KEY,
+                  profile TEXT NOT NULL DEFAULT '',
+                  period_type TEXT NOT NULL,
+                  period_start TEXT NOT NULL,
+                  period_end TEXT NOT NULL,
+                  instrument_id INTEGER,
+                  product TEXT,
+                  trades INTEGER NOT NULL,
+                  closed_lots INTEGER NOT NULL,
+                  wins INTEGER NOT NULL,
+                  losses INTEGER NOT NULL,
+                  win_rate REAL,
+                  gross_pnl REAL NOT NULL,
+                  charges REAL NOT NULL,
+                  net_pnl REAL NOT NULL,
+                  turnover REAL NOT NULL,
+                  charges_pct_turnover REAL,
+                  avg_win REAL, avg_loss REAL, profit_factor REAL,
+                  best_lot_pnl REAL, worst_lot_pnl REAL,
+                  unrealized_end REAL,
+                  computed_at INTEGER NOT NULL,
+                  UNIQUE (profile, period_type, period_start, instrument_id, product)
+                )""");
+        ddl.add("""
+                INSERT INTO pnl_period_v25 (id, profile, period_type, period_start, period_end, instrument_id, product,
+                  trades, closed_lots, wins, losses, win_rate, gross_pnl, charges, net_pnl, turnover,
+                  charges_pct_turnover, avg_win, avg_loss, profit_factor, best_lot_pnl, worst_lot_pnl, unrealized_end,
+                  computed_at)
+                SELECT id, '', period_type, period_start, period_end, instrument_id, product,
+                  trades, closed_lots, wins, losses, win_rate, gross_pnl, charges, net_pnl, turnover,
+                  charges_pct_turnover, avg_win, avg_loss, profit_factor, best_lot_pnl, worst_lot_pnl, unrealized_end,
+                  computed_at
+                FROM pnl_period""");
+        ddl.add("DROP TABLE pnl_period");
+        ddl.add("ALTER TABLE pnl_period_v25 RENAME TO pnl_period");
+
+        ddl.add("""
+                CREATE TABLE account_balance_v25 (
+                  profile TEXT NOT NULL DEFAULT '',
+                  session_date TEXT NOT NULL,
+                  cash REAL NOT NULL,
+                  invested REAL,
+                  total REAL,
+                  source TEXT NOT NULL,            -- 'manual' | 'broker'
+                  recorded_at INTEGER NOT NULL,
+                  margin_used REAL,
+                  available REAL,
+                  collateral REAL,
+                  unpriced_holdings INTEGER,
+                  fetched_at INTEGER,
+                  PRIMARY KEY (profile, session_date)
+                )""");
+        ddl.add("""
+                INSERT INTO account_balance_v25 (profile, session_date, cash, invested, total, source, recorded_at,
+                  margin_used, available, collateral, unpriced_holdings, fetched_at)
+                SELECT '', session_date, cash, invested, total, source, recorded_at,
+                  margin_used, available, collateral, unpriced_holdings, fetched_at
+                FROM account_balance""");
+        ddl.add("DROP TABLE account_balance");
+        ddl.add("ALTER TABLE account_balance_v25 RENAME TO account_balance");
+
+        ddl.add("""
+                CREATE TABLE account_holding_v25 (
+                  profile       TEXT NOT NULL DEFAULT '',
+                  session_date  TEXT NOT NULL,
+                  symbol        TEXT NOT NULL,
+                  isin          TEXT,
+                  quantity      REAL NOT NULL,
+                  average_price REAL NOT NULL,
+                  last_price    REAL,
+                  market_value  REAL NOT NULL,
+                  unrealised    REAL,
+                  recorded_at   INTEGER NOT NULL,
+                  PRIMARY KEY (profile, session_date, symbol)
+                ) WITHOUT ROWID""");
+        ddl.add("""
+                INSERT INTO account_holding_v25 (profile, session_date, symbol, isin, quantity, average_price,
+                  last_price, market_value, unrealised, recorded_at)
+                SELECT '', session_date, symbol, isin, quantity, average_price,
+                  last_price, market_value, unrealised, recorded_at
+                FROM account_holding""");
+        ddl.add("DROP TABLE account_holding");
+        ddl.add("ALTER TABLE account_holding_v25 RENAME TO account_holding");
+
+        // The profiles the application was last started with, in the order they are configured: the dashboards' Account
+        // picker lists them from here, the first one first, so it is the one a page opens on.
+        ddl.add("""
+                CREATE TABLE account_profile (
+                  name TEXT PRIMARY KEY,
+                  position INTEGER NOT NULL,
+                  updated_at INTEGER NOT NULL
+                )""");
+
+        ddl.add("""
+                CREATE VIEW v_bet AS
+                SELECT t.id                        AS trade_id,
+                       t.profile                   AS profile,
+                       t.session_date              AS session_date,
+                       t.executed_ts               AS executed_ts,
+                       i.symbol                    AS symbol,
+                       t.side                      AS side,
+                       t.product                   AS product,
+                       t.quantity                  AS quantity,
+                       t.price                     AS price,
+                       t.quantity * t.price        AS bet_amount,
+                       COALESCE(t.charges_total, 0) AS charges,
+                       COALESCE(json_extract(t.charges_json, '$.brokerage'), 0) AS brokerage,
+                       COALESCE(json_extract(t.charges_json, '$.stt'), 0)
+                         + COALESCE(json_extract(t.charges_json, '$.stamp'), 0)
+                         + COALESCE(json_extract(t.charges_json, '$.gst'), 0)      AS taxes,
+                       COALESCE(json_extract(t.charges_json, '$.exchange'), 0)
+                         + COALESCE(json_extract(t.charges_json, '$.sebi'), 0)     AS fees
+                FROM trade t JOIN instrument i ON i.id = t.instrument_id""");
+
+        // One row per profile per day it traded; a dashboard adds up the profiles it is showing.
+        ddl.add("""
+                CREATE VIEW v_daily_pnl AS
+                SELECT d.profile                            AS profile,
+                       d.session_date                       AS session_date,
+                       COALESCE(b.trades, 0)                AS trades,
+                       COALESCE(b.bet_amount, 0)            AS bet_amount,
+                       COALESCE(b.charges, 0)               AS charges,
+                       COALESCE(b.taxes, 0)                 AS taxes,
+                       COALESCE(b.brokerage, 0)             AS brokerage,
+                       COALESCE(b.fees, 0)                  AS fees,
+                       COALESCE(l.gross_pnl, 0)             AS gross_pnl,
+                       COALESCE(l.net_pnl, 0)               AS net_pnl,
+                       COALESCE(l.closed_lots, 0)           AS closed_lots,
+                       COALESCE(l.wins, 0)                  AS wins
+                FROM (SELECT DISTINCT profile, session_date FROM trade) d
+                LEFT JOIN (SELECT profile, session_date,
+                                  COUNT(*)          AS trades,
+                                  SUM(bet_amount)   AS bet_amount,
+                                  SUM(charges)      AS charges,
+                                  SUM(taxes)        AS taxes,
+                                  SUM(brokerage)    AS brokerage,
+                                  SUM(fees)         AS fees
+                           FROM v_bet GROUP BY profile, session_date) b
+                       ON b.profile = d.profile AND b.session_date = d.session_date
+                LEFT JOIN (SELECT s.profile                 AS profile,
+                                  s.session_date            AS session_date,
+                                  SUM(r.gross_pnl)          AS gross_pnl,
+                                  SUM(r.net_pnl)            AS net_pnl,
+                                  COUNT(*)                  AS closed_lots,
+                                  SUM(CASE WHEN r.net_pnl > 0 THEN 1 ELSE 0 END) AS wins
+                           FROM realized_lot r JOIN trade s ON s.id = r.sell_trade_id
+                           GROUP BY s.profile, s.session_date) l
+                       ON l.profile = d.profile AND l.session_date = d.session_date""");
+
+        ddl.add("""
+                CREATE VIEW v_equity_curve AS
+                SELECT p.profile AS profile,
+                       p.session_date AS session_date,
+                       (SELECT SUM(net_pnl) FROM v_daily_pnl x
+                         WHERE x.profile = p.profile AND x.session_date <= p.session_date) AS realized_net_cumulative,
+                       (SELECT cash FROM account_balance a
+                         WHERE a.profile = p.profile AND a.session_date <= p.session_date
+                         ORDER BY a.session_date DESC LIMIT 1) AS recorded_cash,
+                       (SELECT a.session_date FROM account_balance a
+                         WHERE a.profile = p.profile AND a.session_date <= p.session_date
+                         ORDER BY a.session_date DESC LIMIT 1) AS cash_as_of
+                FROM v_daily_pnl p""");
+
+        ddl.add("""
+                CREATE VIEW v_trade_markers AS
+                SELECT t.executed_ts AS ts_epoch,
+                       t.profile      AS profile,
+                       t.session_date AS session_date,
+                       i.symbol       AS symbol,
+                       t.side         AS side,
+                       t.product      AS product,
+                       t.quantity     AS quantity,
+                       t.price        AS price,
+                       t.quantity * t.price AS bet_amount
+                FROM trade t JOIN instrument i ON i.id = t.instrument_id""");
+
+        // net_pnl adds up the lots of every trade in the group. Until v25 the lookup sat outside the SUM, so it read
+        // the lots of whichever one trade of the group SQLite happened to pick.
+        ddl.add("""
+                CREATE VIEW v_reason_frequency AS
+                SELECT t.profile       AS profile,
+                       r.reason_code   AS reason_code,
+                       r.reason_source AS reason_source,
+                       t.side          AS side,
+                       t.session_date  AS session_date,
+                       COUNT(*)        AS occurrences,
+                       SUM(t.quantity * t.price) AS bet_amount,
+                       SUM((SELECT COALESCE(SUM(l.net_pnl), 0) FROM realized_lot l
+                             WHERE l.buy_trade_id = t.id OR l.sell_trade_id = t.id)) AS net_pnl
+                FROM trade_reason r JOIN trade t ON t.id = r.trade_id
+                GROUP BY t.profile, r.reason_code, r.reason_source, t.side, t.session_date""");
+
+        ddl.add("""
+                CREATE VIEW v_account_value AS
+                SELECT profile,
+                       session_date,
+                       cash                                   AS cash,
+                       COALESCE(margin_used, 0)               AS margin_used,
+                       COALESCE(available, cash)              AS available,
+                       COALESCE(collateral, 0)                AS collateral,
+                       COALESCE(invested, 0)                  AS holdings_value,
+                       COALESCE(total, cash + COALESCE(invested, 0)) AS total,
+                       COALESCE(unpriced_holdings, 0)         AS unpriced_holdings,
+                       source,
+                       fetched_at,
+                       recorded_at
+                FROM account_balance""");
+
+        // Every profile gets a row on every day any of them traded or was read, so a dashboard adding profiles up never
+        // drops one on a day only the other was active: that day it carries its last reading, or its P&L so far.
+        ddl.add("""
+                CREATE VIEW v_account_equity AS
+                WITH profiles AS (
+                  SELECT profile FROM trade
+                  UNION
+                  SELECT profile FROM account_balance
+                ),
+                dates AS (
+                  SELECT session_date FROM trade
+                  UNION
+                  SELECT session_date FROM account_balance
+                ),
+                days AS (SELECT p.profile, d.session_date FROM profiles p CROSS JOIN dates d)
+                SELECT d.profile AS profile,
+                       d.session_date AS session_date,
+                       (SELECT SUM(p.net_pnl) FROM v_daily_pnl p
+                         WHERE p.profile = d.profile AND p.session_date <= d.session_date) AS realized_net_cumulative,
+                       a.cash                                      AS broker_cash,
+                       a.holdings_value                            AS broker_holdings,
+                       a.total                                     AS broker_total,
+                       COALESCE(a.total,
+                                (SELECT b.total FROM v_account_value b
+                                  WHERE b.profile = d.profile AND b.session_date <= d.session_date
+                                  ORDER BY b.session_date DESC LIMIT 1),
+                                (SELECT SUM(p.net_pnl) FROM v_daily_pnl p
+                                  WHERE p.profile = d.profile AND p.session_date <= d.session_date)) AS account_value,
+                       CASE WHEN a.total IS NOT NULL THEN a.source
+                            WHEN EXISTS (SELECT 1 FROM v_account_value b
+                                          WHERE b.profile = d.profile AND b.session_date <= d.session_date) THEN 'carried'
+                            ELSE 'derived' END                      AS basis
+                FROM days d
+                LEFT JOIN v_account_value a ON a.profile = d.profile AND a.session_date = d.session_date""");
+
+        // Each profile's holdings as of the last day they were read for it.
+        ddl.add("""
+                CREATE VIEW v_current_holdings AS
+                SELECT h.profile, h.session_date, h.symbol, h.quantity, h.average_price, h.last_price,
+                       h.market_value, h.unrealised,
+                       CASE WHEN h.last_price IS NULL OR h.average_price <= 0 THEN NULL
+                            ELSE (h.last_price - h.average_price) * 100.0 / h.average_price
+                       END AS unrealised_pct
+                FROM account_holding h
+                WHERE h.session_date = (SELECT MAX(x.session_date) FROM account_holding x WHERE x.profile = h.profile)""");
+        return ddl;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.stockanalyzer.store.jdbc;
 import com.stockanalyzer.model.PeriodType;
 import com.stockanalyzer.model.PnlSummary;
 import com.stockanalyzer.model.Product;
+import com.stockanalyzer.store.AccountProfileRepository;
 import com.stockanalyzer.store.Database;
 import com.stockanalyzer.store.PnlPeriodRepository;
 
@@ -18,30 +19,40 @@ import java.util.Optional;
 public final class SqlitePnlPeriodRepository implements PnlPeriodRepository {
 
     private final Database database;
+    private final String profile;
 
+    /** For the default profile; see {@link AccountProfileRepository#DEFAULT_PROFILE}. */
     public SqlitePnlPeriodRepository(Database database) {
+        this(database, AccountProfileRepository.DEFAULT_PROFILE);
+    }
+
+    /** Sees and writes only the rows of {@code profile}. */
+    public SqlitePnlPeriodRepository(Database database, String profile) {
         this.database = database;
+        this.profile = profile;
     }
 
     @Override
     public void upsert(PnlSummary s) {
         database.inTransaction(connection -> {
             try (PreparedStatement delete = connection.prepareStatement("""
-                    DELETE FROM pnl_period WHERE period_type = ? AND period_start = ?
+                    DELETE FROM pnl_period WHERE profile = ? AND period_type = ? AND period_start = ?
                       AND instrument_id IS (SELECT id FROM instrument WHERE symbol = ?)
                       AND product IS ?""")) {
-                delete.setString(1, s.periodType().name());
-                delete.setString(2, s.periodStart().toString());
-                delete.setString(3, s.symbol());
-                delete.setString(4, s.product() == null ? null : s.product().name());
+                delete.setString(1, profile);
+                delete.setString(2, s.periodType().name());
+                delete.setString(3, s.periodStart().toString());
+                delete.setString(4, s.symbol());
+                delete.setString(5, s.product() == null ? null : s.product().name());
                 delete.executeUpdate();
             }
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO pnl_period
                       (period_type, period_start, period_end, instrument_id, product, trades, closed_lots,
                        wins, losses, win_rate, gross_pnl, charges, net_pnl, turnover, charges_pct_turnover,
-                       avg_win, avg_loss, profit_factor, best_lot_pnl, worst_lot_pnl, unrealized_end, computed_at)
-                    VALUES (?,?,?,(SELECT id FROM instrument WHERE symbol = ?),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""")) {
+                       avg_win, avg_loss, profit_factor, best_lot_pnl, worst_lot_pnl, unrealized_end, computed_at,
+                       profile)
+                    VALUES (?,?,?,(SELECT id FROM instrument WHERE symbol = ?),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""")) {
                 insert.setString(1, s.periodType().name());
                 insert.setString(2, s.periodStart().toString());
                 insert.setString(3, s.periodEnd().toString());
@@ -64,6 +75,7 @@ public final class SqlitePnlPeriodRepository implements PnlPeriodRepository {
                 insert.setDouble(20, s.worstLotPnl());
                 insert.setDouble(21, s.unrealizedEnd());
                 insert.setLong(22, JdbcSupport.now());
+                insert.setString(23, profile);
                 insert.executeUpdate();
             }
         });
@@ -75,11 +87,12 @@ public final class SqlitePnlPeriodRepository implements PnlPeriodRepository {
             try (PreparedStatement select = connection.prepareStatement("""
                     SELECT p.*, i.symbol AS symbol FROM pnl_period p
                     LEFT JOIN instrument i ON i.id = p.instrument_id
-                    WHERE p.period_type = ? AND p.period_start = ?
+                    WHERE p.profile = ? AND p.period_type = ? AND p.period_start = ?
                       AND p.instrument_id IS (SELECT id FROM instrument WHERE symbol = ?)""")) {
-                select.setString(1, periodType.name());
-                select.setString(2, periodStart.toString());
-                select.setString(3, symbolOrNull);
+                select.setString(1, profile);
+                select.setString(2, periodType.name());
+                select.setString(3, periodStart.toString());
+                select.setString(4, symbolOrNull);
                 try (ResultSet rs = select.executeQuery()) {
                     if (!rs.next()) {
                         return Optional.<PnlSummary>empty();

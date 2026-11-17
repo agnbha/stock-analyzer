@@ -72,6 +72,8 @@ class MarketMonitorSellTargetTest {
     private ExecutorService executor;
     private AlertRepository alerts;
     private TradeRepository trades;
+    /** Each account's fills, when a test has more than one account; otherwise the one journal above. */
+    private AccountFills accountFills;
     private final List<Alert> delivered = new CopyOnWriteArrayList<>();
     private final AtomicLong now = new AtomicLong();
     /** The high of the candle starting at an epoch; every other candle trades flat at 100. */
@@ -246,11 +248,46 @@ class MarketMonitorSellTargetTest {
         monitor.tick(DAY);
     }
 
+    @Test
+    @DisplayName("two accounts that bought the same stock each get their own targets, from their own average")
+    void eachAccountItsOwnTargets() {
+        TradeRepository second = new SqliteTradeRepository(database, "second");
+        buy(SYMBOL, 100, 100.00, at(9, 20, 10));
+        buy(second, SYMBOL, 50, 100.50, at(9, 21, 10));
+        accountFills = date -> List.of(new AccountFills.Account("main", true, trades.findRange(date, date)),
+                new AccountFills.Account("second", false, second.findRange(date, date)));
+        MarketMonitor monitor = monitor(List.of(SYMBOL));
+        monitor.prepare(DAY);
+        monitor.tick(DAY);
+
+        // The first account's targets are 100.60 and 101.00; the second's, from 100.50, are 101.15 and 101.55.
+        highs.put(at(9, 33), 101.00);
+        now.set(at(9, 34));
+        monitor.tick(DAY);
+        assertEquals(List.of("Sell target +0.6%", "Sell target +1%"), titles(),
+                "the first account's two, read as they always have; the second account's not reached");
+
+        highs.put(at(9, 35), 101.20);
+        now.set(at(9, 36));
+        monitor.tick(DAY);
+        assertEquals(List.of("Sell target +0.6%", "Sell target +1%", "Sell target +0.6% (second)"), titles());
+        assertEquals("RELIANCE is up 0.6% on second's average buy of 100.50 (50 shares). Sell now: set the limit "
+                + "at 101.15.", delivered.getLast().message(), "its own average and shares, not the two added up");
+    }
+
+    private List<String> titles() {
+        return delivered.stream().map(Alert::title).toList();
+    }
+
     private List<String> rules() {
         return delivered.stream().map(Alert::rule).toList();
     }
 
     private void buy(String symbol, int quantity, double price, long executedAt) {
+        buy(trades, symbol, quantity, price, executedAt);
+    }
+
+    private static void buy(TradeRepository trades, String symbol, int quantity, double price, long executedAt) {
         trades.importAll(List.of(new Trade(0, symbol, "t-" + symbol + "-" + executedAt, "o-" + executedAt, DAY,
                 executedAt, Side.BUY, quantity, price, Product.MIS, 0, null, Trade.ChargesSource.MODELLED,
                 Trade.TradeSource.BROKER, null)), "NSE", "CASH");
@@ -320,7 +357,9 @@ class MarketMonitorSellTargetTest {
             }
         };
         return new MarketMonitor(candles, noWindows, eventDetector, new FeatureExtractor(CLOCK), model, engine,
-                new SellTargetAlerts(List.of(0.6, 1.0), 0.05, 1, 10), trades,
+                // Read at each tick, so a test that swaps the journal afterwards is seen.
+                new SellTargetAlerts(List.of(0.6, 1.0), 0.05, 1, 10),
+                date -> accountFills != null ? accountFills.on(date) : AccountFills.of(trades).on(date),
                 new SqliteHeartbeatRepository(database), new SqliteInstrumentRepository(database),
                 new SqliteLiveCandleRepository(database), new SqliteLiveOpportunityRepository(database),
                 new SqliteMarketEventRepository(database), new SqliteTradingDayRepository(database), weekdays, null,

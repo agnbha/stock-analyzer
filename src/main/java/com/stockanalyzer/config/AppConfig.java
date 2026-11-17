@@ -14,9 +14,16 @@ import java.util.Properties;
 public final class AppConfig {
 
     private final Properties properties;
+    private final java.util.function.UnaryOperator<String> environment;
 
-    private AppConfig(Properties properties) {
+    private AppConfig(Properties properties, java.util.function.UnaryOperator<String> environment) {
         this.properties = properties;
+        this.environment = environment;
+    }
+
+    /** For tests: these properties and this environment, not the process's, so a shell's credentials cannot leak in. */
+    static AppConfig of(Properties properties, java.util.Map<String, String> environment) {
+        return new AppConfig(properties, environment::get);
     }
 
     public static AppConfig load() {
@@ -28,12 +35,12 @@ public final class AppConfig {
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to load application.properties", e);
         }
-        return new AppConfig(props);
+        return new AppConfig(props, System::getenv);
     }
 
     private String get(String key, String defaultValue) {
         String envKey = key.toUpperCase().replace('.', '_');
-        String envValue = System.getenv(envKey);
+        String envValue = environment.apply(envKey);
         if (envValue != null && !envValue.isBlank()) {
             return envValue;
         }
@@ -177,6 +184,26 @@ public final class AppConfig {
 
     public int databaseBusyTimeoutMillis() {
         return Integer.parseInt(get("db.busy.timeout.ms", "5000"));
+    }
+
+    /**
+     * The name of the account whose Groww credentials are in this environment, the first profile. Dashboards list
+     * it first and open on it.
+     */
+    public String growwProfileName() {
+        String name = get("groww.profile.name", GrowwProfile.DEFAULT_NAME);
+        return name == null || name.isBlank() ? GrowwProfile.DEFAULT_NAME : name.strip();
+    }
+
+    /**
+     * Env files of further Groww accounts, comma-separated ({@code ~/} allowed). Each holds that account's
+     * {@code GROWW_PROFILE_NAME} and its credentials, under the same names as the first account's; the files are read,
+     * not sourced, so they need not be loaded into the environment.
+     */
+    public List<String> growwProfileFiles() {
+        String files = get("groww.profile.files", "");
+        return files == null ? List.of() : java.util.Arrays.stream(files.split(","))
+                .map(String::strip).filter(entry -> !entry.isEmpty()).toList();
     }
 
     /** Where the access token is cached so separate processes can share it. */

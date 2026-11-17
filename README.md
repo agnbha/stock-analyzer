@@ -56,6 +56,10 @@ keep NTP running, or tokens will be rejected with what looks like a bad-credenti
 A TOTP setup from before `groww.totp.token` existed, with the token in `groww.api.key`,
 still works while the new setting is blank.
 
+More than one Groww account works too: each login is a profile with its own fills, P&L, balance and holdings, while
+the stock data is shared. List the other accounts' env files in `GROWW_PROFILE_FILES`; see
+[ops/README.md](ops/README.md#more-than-one-groww-account).
+
 ## Requirements
 
 - Java 25+

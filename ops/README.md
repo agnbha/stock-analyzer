@@ -87,6 +87,44 @@ launchctl list | grep stockanalyzer
 
 The plists carry absolute paths, so regenerate or edit them if the repo moves.
 
+### More than one Groww account
+
+Each Groww login is a *profile*. Its fills, matched lots, open positions, P&L statements, balance and holdings are
+kept apart from every other account's; the stock data (candles, sessions, windows, company details) is fetched once,
+with the first account's login, and shared. The first account is the one in `~/.stock-analyzer.env`. Name it there,
+and list the env files of the others:
+
+```bash
+# in ~/.stock-analyzer.env
+GROWW_PROFILE_NAME=main                          # the first account's name; "main" if left out
+GROWW_PROFILE_FILES=~/.stock-analyzer-second.env # further accounts, comma-separated
+
+# ~/.stock-analyzer-second.env, one per further account (chmod 600)
+GROWW_PROFILE_NAME=second
+GROWW_AUTH_MODE=totp
+GROWW_TOTP_TOKEN=...
+GROWW_TOTP_SECRET=...
+```
+
+The other files are read by the application, not sourced by the scripts, so keep `ops/bin/common.sh` loading
+`~/.stock-analyzer.env`. Each login caches its own token beside `data/.groww-token.json`
+(`data/.groww-token-second.json`).
+
+- The market-day daemon imports every account's fills each minute, follows a symbol any account trades every 10 s,
+  and works out sell targets per account; another account's alerts name it ("Sell target +1% (second)").
+- The evening, weekly and monthly jobs read the broker and write statements for every account. A command takes
+  `--profile NAME` to act on one; `trades add`, `trades note`, `trades import --csv` and `trades balance --cash`
+  act on the first unless told otherwise. The monthly statement of another account is written beside the first's,
+  with its name added (`statements/2026-10-second.csv`).
+- `TradeJournalMain profiles` lists the accounts and what each holds. The journal from before profiles belonged to
+  no account; the first start gives it to the first account. A renamed account keeps its rows only if they are moved:
+  `TradeJournalMain profiles rename --from old --to new`, then change `GROWW_PROFILE_NAME`.
+- The account pages (Account Overview, Candles and Calls, Decision Reasons) have an **Account** box. They open on the
+  first account; tick more than one to add them up.
+
+Do not change which file is first once there is a journal: the first account is the one the old rows went to, and
+its login fetches the stock data.
+
 ## Running a job by hand
 
 Every script takes the same arguments as the underlying command and is safe to

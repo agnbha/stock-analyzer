@@ -4,6 +4,7 @@ import com.stockanalyzer.alert.AlertEngine;
 import com.stockanalyzer.alert.AlertPolicy;
 import com.stockanalyzer.alert.ConsoleAlertSink;
 import com.stockanalyzer.config.AppConfig;
+import com.stockanalyzer.live.AccountFills;
 import com.stockanalyzer.live.LiveFillImporter;
 import com.stockanalyzer.live.MarketMonitor;
 import com.stockanalyzer.live.PriorSessionBackfill;
@@ -21,6 +22,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Parts 3 and 4: the market-hours process. Polls for new candles, keeps the
@@ -79,7 +82,11 @@ public final class MarketDayDaemon {
                     context.signalModel(),
                     alertEngine,
                     context.sellTargetAlerts(),
-                    context.tradeRepository(),
+                    // Every account's fills: a symbol any of them trades is followed closely, each its own targets.
+                    date -> context.profiles().stream()
+                            .map(profile -> new AccountFills.Account(profile.name(), profile.primary(),
+                                    profile.tradeRepository().findRange(date, date)))
+                            .toList(),
                     context.heartbeatRepository(),
                     context.instrumentRepository(),
                     context.liveCandleRepository(),
@@ -105,11 +112,17 @@ public final class MarketDayDaemon {
                     .ensure(sessionDate, config.stockSymbols(), config.exchange(), config.segment(),
                             config.intradayIntervalMinutes());
             Runtime.getRuntime().addShutdownHook(new Thread(monitor::stop));
-            try (LiveFillImporter fills = new LiveFillImporter(
-                    () -> context.brokerFillSync().sync(context.brokerExecutionClient(), sessionDate, sessionDate),
-                    config.tradesLiveImportIntervalMinutes())) {
-                fills.start();
+            List<LiveFillImporter> importers = new ArrayList<>();
+            for (ProfileContext profile : context.profiles()) {
+                importers.add(new LiveFillImporter(
+                        () -> profile.brokerFillSync().sync(profile.brokerExecutionClient(), sessionDate, sessionDate),
+                        config.tradesLiveImportIntervalMinutes(), profile.primary() ? null : profile.name()));
+            }
+            try {
+                importers.forEach(LiveFillImporter::start);
                 monitor.run(sessionDate);
+            } finally {
+                importers.forEach(LiveFillImporter::close);
             }
         }
     }

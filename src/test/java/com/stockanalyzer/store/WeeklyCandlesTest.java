@@ -255,7 +255,8 @@ class WeeklyCandlesTest {
         JsonNode target = panel.path("targets").get(0);
         String query = target.path("queryText").asText();
         assertEquals(query, target.path("rawQueryText").asText(), "the plugin runs queryText; the editor shows the raw");
-        query = query.replace("$symbol", symbol)
+        query = query.replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
+                .replace("$symbol", symbol)
                 .replace("$__from", String.valueOf(from.atStartOfDay(ZoneId.of("Asia/Kolkata"))
                         .toInstant().toEpochMilli()));
         assertTrue(!query.contains("$"), "an unfilled variable would make this prove nothing: " + query);
@@ -312,8 +313,8 @@ class WeeklyCandlesTest {
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO trade (instrument_id, broker_trade_id, order_id, session_date, executed_ts, side,
-                                       quantity, price, product, charges_source, source, imported_at)
-                    VALUES (?,?,?,?,?,?,10,?,'MIS','MODELLED','BROKER',0)""")) {
+                                       quantity, price, product, charges_source, source, imported_at, profile)
+                    VALUES (?,?,?,?,?,?,10,?,'MIS','MODELLED','BROKER',0,?)""")) {
                 insert.setLong(1, instrument);
                 insert.setString(2, "t" + id);
                 insert.setString(3, "o" + id);
@@ -321,6 +322,7 @@ class WeeklyCandlesTest {
                 insert.setLong(5, epoch(date) + 600);
                 insert.setString(6, side);
                 insert.setDouble(7, price);
+                insert.setString(8, AccountProfileRepository.DEFAULT_PROFILE);
                 insert.executeUpdate();
             }
         });

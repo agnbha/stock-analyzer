@@ -718,7 +718,8 @@ class PriceTilesTest {
         String sql = target.path("queryText").asText();
         assertEquals(sql, target.path("rawQueryText").asText(), "the plugin runs queryText; the editor shows the raw");
         assertTrue(sql.contains(TODAY), "today is read by the market's clock");
-        sql = sql.replace(TODAY, "'" + today + "'").replace("$symbol", symbol).replace("${session:sqlstring}", sessions);
+        sql = sql.replace(TODAY, "'" + today + "'").replace("$symbol", symbol).replace("${session:sqlstring}", sessions)
+                .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'");
         assertFalse(sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         String query = sql;
         return database.read(connection -> {
@@ -764,8 +765,9 @@ class PriceTilesTest {
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO trade (instrument_id, broker_trade_id, order_id, session_date, executed_ts, side,
-                                       quantity, price, product, charges_total, charges_source, source, imported_at)
-                    VALUES (?,?,?,?,?,?,?,?,'MIS',?,'MODELLED','BROKER',0)""")) {
+                                       quantity, price, product, charges_total, charges_source, source, imported_at,
+                                       profile)
+                    VALUES (?,?,?,?,?,?,?,?,'MIS',?,'MODELLED','BROKER',0,?)""")) {
                 insert.setLong(1, instrument);
                 insert.setString(2, "t" + id);
                 insert.setString(3, "o" + id);
@@ -775,6 +777,8 @@ class PriceTilesTest {
                 insert.setInt(7, quantity);
                 insert.setDouble(8, price);
                 insert.setDouble(9, charges);
+                // The account the journal's repositories read when given none, as the application writes it.
+                insert.setString(10, AccountProfileRepository.DEFAULT_PROFILE);
                 insert.executeUpdate();
             }
         });

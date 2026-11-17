@@ -1,5 +1,6 @@
 package com.stockanalyzer.store.jdbc;
 
+import com.stockanalyzer.store.AccountProfileRepository;
 import com.stockanalyzer.store.Database;
 import com.stockanalyzer.store.TradeReasonRepository;
 
@@ -12,9 +13,17 @@ import java.util.List;
 public final class SqliteTradeReasonRepository implements TradeReasonRepository {
 
     private final Database database;
+    private final String profile;
 
+    /** For the default profile; see {@link AccountProfileRepository#DEFAULT_PROFILE}. */
     public SqliteTradeReasonRepository(Database database) {
+        this(database, AccountProfileRepository.DEFAULT_PROFILE);
+    }
+
+    /** Lists only the trades of {@code profile}; reasons are written and removed by trade id, whoever owns it. */
+    public SqliteTradeReasonRepository(Database database, String profile) {
         this.database = database;
+        this.profile = profile;
     }
 
     @Override
@@ -47,10 +56,11 @@ public final class SqliteTradeReasonRepository implements TradeReasonRepository 
             try (PreparedStatement select = connection.prepareStatement("""
                     SELECT r.trade_id, r.reason_code, r.reason_source, r.detail
                     FROM trade_reason r JOIN trade t ON t.id = r.trade_id
-                    WHERE t.session_date BETWEEN ? AND ?
+                    WHERE t.profile = ? AND t.session_date BETWEEN ? AND ?
                     ORDER BY t.executed_ts""")) {
-                select.setString(1, from.toString());
-                select.setString(2, to.toString());
+                select.setString(1, profile);
+                select.setString(2, from.toString());
+                select.setString(3, to.toString());
                 try (ResultSet rs = select.executeQuery()) {
                     while (rs.next()) {
                         reasons.add(new TradeReason(rs.getLong("trade_id"), rs.getString("reason_code"),

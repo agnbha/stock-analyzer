@@ -48,8 +48,8 @@
         "iconColor": "#8AB8FF",
         "name": "Noted buys",
         "target": {
-          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
-          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
           "queryType": "table",
           "refId": "Anno",
           "timeColumns": [
@@ -67,8 +67,8 @@
         "iconColor": "#FF9830",
         "name": "Noted sells",
         "target": {
-          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
-          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\n  AND t.profile IN (${profile:sqlstring})\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
           "queryType": "table",
           "refId": "Anno",
           "timeColumns": [
@@ -99,7 +99,29 @@
     ]
   },
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "profile",
+        "label": "Account",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT name FROM account_profile ORDER BY position, name",
+        "definition": "SELECT name FROM account_profile ORDER BY position, name",
+        "refresh": 1,
+        "sort": 0,
+        "includeAll": false,
+        "multi": true,
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Whose buys, sells and account figures to show: one Groww account per profile. The stock data is the same whichever is picked. The page opens on the first account; tick more than one to add them together."
+      }
+    ]
   },
   "panels": [
     {
@@ -124,8 +146,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT total FROM v_account_value ORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT total FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.total) AS total FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
+          "queryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.total) AS total FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
           "timeColumns": []
         }
       ],
@@ -182,8 +204,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT available FROM v_account_value ORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT available FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.available) AS available FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
+          "queryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.available) AS available FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
           "timeColumns": []
         }
       ],
@@ -240,8 +262,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT holdings_value FROM v_account_value ORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT holdings_value FROM v_account_value ORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.holdings_value) AS holdings_value FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
+          "queryText": "-- Each account picked at its own latest reading, added up.\nSELECT SUM(v.holdings_value) AS holdings_value FROM v_account_value v\nWHERE v.profile IN (${profile:sqlstring})\n  AND v.session_date = (SELECT MAX(x.session_date) FROM v_account_value x WHERE x.profile = v.profile)",
           "timeColumns": []
         }
       ],
@@ -298,8 +320,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet",
-          "queryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet",
+          "rawQueryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet WHERE profile IN (${profile:sqlstring})",
+          "queryText": "SELECT COALESCE(SUM(bet_amount), 0) AS value FROM v_bet WHERE profile IN (${profile:sqlstring})",
           "timeColumns": []
         }
       ],
@@ -356,8 +378,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl",
-          "queryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl",
+          "rawQueryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl WHERE profile IN (${profile:sqlstring})",
+          "queryText": "SELECT COALESCE(SUM(net_pnl), 0) AS value FROM v_daily_pnl WHERE profile IN (${profile:sqlstring})",
           "timeColumns": []
         }
       ],
@@ -426,8 +448,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl",
-          "queryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl",
+          "rawQueryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl WHERE profile IN (${profile:sqlstring})",
+          "queryText": "SELECT COALESCE(SUM(charges), 0) AS value FROM v_daily_pnl WHERE profile IN (${profile:sqlstring})",
           "timeColumns": []
         }
       ],
@@ -484,8 +506,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       account_value           AS \"Account value\",\n       broker_cash             AS \"Cash\",\n       broker_holdings         AS \"Holdings\",\n       realized_net_cumulative AS \"Cumulative net P&L\"\nFROM v_account_equity\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       account_value           AS \"Account value\",\n       broker_cash             AS \"Cash\",\n       broker_holdings         AS \"Holdings\",\n       realized_net_cumulative AS \"Cumulative net P&L\"\nFROM v_account_equity\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(account_value)           AS \"Account value\",\n       SUM(broker_cash)             AS \"Cash\",\n       SUM(broker_holdings)         AS \"Holdings\",\n       SUM(realized_net_cumulative) AS \"Cumulative net P&L\"\nFROM v_account_equity\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(account_value)           AS \"Account value\",\n       SUM(broker_cash)             AS \"Cash\",\n       SUM(broker_holdings)         AS \"Holdings\",\n       SUM(realized_net_cumulative) AS \"Cumulative net P&L\"\nFROM v_account_equity\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -540,8 +562,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       gross_pnl AS \"Gross P&L\",\n       net_pnl   AS \"Net P&L\"\nFROM v_daily_pnl\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       gross_pnl AS \"Gross P&L\",\n       net_pnl   AS \"Net P&L\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(gross_pnl) AS \"Gross P&L\",\n       SUM(net_pnl)   AS \"Net P&L\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(gross_pnl) AS \"Gross P&L\",\n       SUM(net_pnl)   AS \"Net P&L\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -593,8 +615,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       bet_amount AS \"Bet amount\",\n       trades     AS \"Trades\"\nFROM v_daily_pnl\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       bet_amount AS \"Bet amount\",\n       trades     AS \"Trades\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(bet_amount) AS \"Bet amount\",\n       SUM(trades)     AS \"Trades\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(bet_amount) AS \"Bet amount\",\n       SUM(trades)     AS \"Trades\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -645,8 +667,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       brokerage AS \"Brokerage\",\n       taxes     AS \"Taxes (STT, stamp, GST)\",\n       fees      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nORDER BY session_date",
-          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       brokerage AS \"Brokerage\",\n       taxes     AS \"Taxes (STT, stamp, GST)\",\n       fees      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nORDER BY session_date",
+          "rawQueryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(brokerage) AS \"Brokerage\",\n       SUM(taxes)     AS \"Taxes (STT, stamp, GST)\",\n       SUM(fees)      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
+          "queryText": "SELECT CAST(strftime('%s', session_date) AS INTEGER) AS time,\n       SUM(brokerage) AS \"Brokerage\",\n       SUM(taxes)     AS \"Taxes (STT, stamp, GST)\",\n       SUM(fees)      AS \"Exchange and SEBI fees\"\nFROM v_daily_pnl\nWHERE profile IN (${profile:sqlstring})\nGROUP BY session_date\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -704,8 +726,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\"\nFROM v_bet\nORDER BY bet_amount DESC\nLIMIT 500",
-          "queryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\"\nFROM v_bet\nORDER BY bet_amount DESC\nLIMIT 500",
+          "rawQueryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\",\n       profile      AS \"Account\"\nFROM v_bet\nWHERE profile IN (${profile:sqlstring})\nORDER BY bet_amount DESC\nLIMIT 500",
+          "queryText": "SELECT session_date AS \"Date\",\n       symbol       AS \"Symbol\",\n       side         AS \"Side\",\n       product      AS \"Product\",\n       quantity     AS \"Qty\",\n       price        AS \"Price\",\n       bet_amount   AS \"Bet amount\",\n       charges      AS \"Charges\",\n       profile      AS \"Account\"\nFROM v_bet\nWHERE profile IN (${profile:sqlstring})\nORDER BY bet_amount DESC\nLIMIT 500",
           "timeColumns": []
         }
       ],
@@ -956,8 +978,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
-          "queryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\"\nFROM v_current_holdings\nORDER BY market_value DESC",
+          "rawQueryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\",\n       profile                 AS \"Account\"\nFROM v_current_holdings\nWHERE profile IN (${profile:sqlstring})\nORDER BY market_value DESC",
+          "queryText": "SELECT symbol                AS \"Symbol\",\n       quantity                AS \"Qty\",\n       average_price           AS \"Avg cost\",\n       last_price              AS \"Last\",\n       market_value            AS \"Value\",\n       unrealised              AS \"Unrealised\",\n       unrealised_pct          AS \"Unrealised %\",\n       profile                 AS \"Account\"\nFROM v_current_holdings\nWHERE profile IN (${profile:sqlstring})\nORDER BY market_value DESC",
           "timeColumns": []
         }
       ]

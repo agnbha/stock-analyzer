@@ -28,7 +28,6 @@ import com.stockanalyzer.store.InstrumentRepository;
 import com.stockanalyzer.store.LiveCandleRepository;
 import com.stockanalyzer.store.LiveOpportunityRepository;
 import com.stockanalyzer.store.MarketEventRepository;
-import com.stockanalyzer.store.TradeRepository;
 import com.stockanalyzer.store.TradingDayRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
@@ -78,7 +77,7 @@ public final class MarketMonitor {
     private final IntradaySignalModel signalModel;
     private final AlertEngine alertEngine;
     private final SellTargetAlerts sellTargets;
-    private final TradeRepository tradeRepository;
+    private final AccountFills accountFills;
     private final HeartbeatRepository heartbeatRepository;
     private final InstrumentRepository instrumentRepository;
     private final LiveCandleRepository liveCandleRepository;
@@ -117,7 +116,7 @@ public final class MarketMonitor {
                          IntradaySignalModel signalModel,
                          AlertEngine alertEngine,
                          SellTargetAlerts sellTargets,
-                         TradeRepository tradeRepository,
+                         AccountFills accountFills,
                          HeartbeatRepository heartbeatRepository,
                          InstrumentRepository instrumentRepository,
                          LiveCandleRepository liveCandleRepository,
@@ -131,7 +130,7 @@ public final class MarketMonitor {
                          ExecutorService executor,
                          MonitorSettings settings) {
         this(candleDataClient, detector, eventDetector, featureExtractor, signalModel, alertEngine,
-                sellTargets, tradeRepository, heartbeatRepository, instrumentRepository, liveCandleRepository,
+                sellTargets, accountFills, heartbeatRepository, instrumentRepository, liveCandleRepository,
                 liveOpportunityRepository, marketEventRepository, tradingDayRepository, calendar, reconciler,
                 view, clock, executor, settings, () -> System.currentTimeMillis() / 1000);
     }
@@ -144,7 +143,7 @@ public final class MarketMonitor {
                   IntradaySignalModel signalModel,
                   AlertEngine alertEngine,
                   SellTargetAlerts sellTargets,
-                  TradeRepository tradeRepository,
+                  AccountFills accountFills,
                   HeartbeatRepository heartbeatRepository,
                   InstrumentRepository instrumentRepository,
                   LiveCandleRepository liveCandleRepository,
@@ -166,7 +165,7 @@ public final class MarketMonitor {
         this.signalModel = signalModel;
         this.alertEngine = alertEngine;
         this.sellTargets = sellTargets;
-        this.tradeRepository = tradeRepository;
+        this.accountFills = accountFills;
         this.heartbeatRepository = heartbeatRepository;
         this.instrumentRepository = instrumentRepository;
         this.liveCandleRepository = liveCandleRepository;
@@ -235,7 +234,7 @@ public final class MarketMonitor {
     /** Whether today's journal holds a different number of fills than the last tick saw. A failed read is no news. */
     private boolean newFillSince(LocalDate sessionDate) {
         try {
-            return tradeRepository.findRange(sessionDate, sessionDate).size() != fillsSeen;
+            return accountFills.on(sessionDate).stream().mapToInt(a -> a.fills().size()).sum() != fillsSeen;
         } catch (RuntimeException e) {
             return false;
         }
@@ -265,16 +264,14 @@ public final class MarketMonitor {
         long now = nowEpoch();
         List<String> degradedSymbols = new ArrayList<>();
 
-        List<Trade> fills = todaysFills(sessionDate);
+        // Any account's fill makes a symbol one to follow closely; sell targets are worked out per account.
+        List<AccountFills.Account> accounts = todaysFills(sessionDate);
+        List<Trade> fills = accounts.stream().flatMap(account -> account.fills().stream()).toList();
         fillsSeen = fills.size();
-        Set<String> bought = new LinkedHashSet<>();
         Set<String> traded = new LinkedHashSet<>();
         for (Trade fill : fills) {
             String symbol = fill.symbol();
             traded.add(symbol);
-            if (fill.side() == Side.BUY) {
-                bought.add(symbol);
-            }
             boolean tracked = settings.symbols().contains(symbol);
             if (!tracked && untrackedTraded.add(symbol)) {
                 states.put(symbol, new LiveSessionState(symbol, settings.intervalMinutes()));
@@ -323,7 +320,7 @@ public final class MarketMonitor {
             }
         }
 
-        fireSellTargets(sessionDate, fills, bought, now);
+        fireSellTargets(sessionDate, accounts, now);
 
         long staleness = symbolStates.stream()
                 .mapToLong(state -> now - state.lastUpdatedEpoch())
@@ -516,30 +513,42 @@ public final class MarketMonitor {
         return mean <= 0 ? 1.0 : candles.getLast().volume() / mean;
     }
 
-    /** Everything filled today, for any symbol; empty rather than fatal when the journal cannot be read. */
-    private List<Trade> todaysFills(LocalDate sessionDate) {
+    /** Everything filled today in each account, any symbol; empty rather than fatal when the journal cannot be read. */
+    private List<AccountFills.Account> todaysFills(LocalDate sessionDate) {
         try {
-            return tradeRepository.findRange(sessionDate, sessionDate);
+            return accountFills.on(sessionDate);
         } catch (RuntimeException e) {
             log.warn("Could not read today's fills, so no sell targets this tick: {}", e.getMessage());
             return List.of();
         }
     }
 
-    /** For each symbol bought today, the sell-target alerts that have come due. */
-    private void fireSellTargets(LocalDate sessionDate, List<Trade> fills, Set<String> bought, long now) {
-        for (String symbol : bought) {
-            LiveSessionState state = states.get(symbol);
-            if (state == null) {
-                continue;
-            }
-            try {
-                for (Alert alert : sellTargets.due(sessionDate, symbol, fills, state.allCandles(), now)) {
-                    deliver(alert);
+    /**
+     * For each symbol an account bought today, the sell-target alerts that have come due on that account's position.
+     * The first account's alerts do not name it; another account's say whose position it is.
+     */
+    private void fireSellTargets(LocalDate sessionDate, List<AccountFills.Account> accounts, long now) {
+        for (AccountFills.Account account : accounts) {
+            Set<String> bought = new LinkedHashSet<>();
+            for (Trade fill : account.fills()) {
+                if (fill.side() == Side.BUY) {
+                    bought.add(fill.symbol());
                 }
-            } catch (RuntimeException e) {
-                // One symbol's trouble, or a sink that cannot post, must never stop the day's monitoring.
-                log.warn("Could not check the sell targets for {}: {}", symbol, e.toString());
+            }
+            for (String symbol : bought) {
+                LiveSessionState state = states.get(symbol);
+                if (state == null) {
+                    continue;
+                }
+                try {
+                    for (Alert alert : sellTargets.due(sessionDate, symbol, account.fills(), state.allCandles(), now,
+                            account.primary() ? null : account.name())) {
+                        deliver(alert);
+                    }
+                } catch (RuntimeException e) {
+                    // One symbol's trouble, or a sink that cannot post, must never stop the day's monitoring.
+                    log.warn("Could not check the sell targets for {}: {}", symbol, e.toString());
+                }
             }
         }
     }

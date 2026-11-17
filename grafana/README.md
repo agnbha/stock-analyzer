@@ -122,6 +122,12 @@ show six months of weeks. A day held both ways is counted once, as the session, 
 
 ## The three tabs
 
+**Account** (top of Account Overview, Candles and Calls and Decision Reasons) — whose buys, sells, P&L, balance and
+holdings to show, when there is more than one Groww account (see
+[ops/README.md](../ops/README.md#more-than-one-groww-account)). A page opens on the first account; tick more than one
+to add them together: the tiles sum each account at its own latest reading, the per-day charts add the accounts day
+by day, and the tables gain an Account column. Prices, candles and windows are the same whichever is picked.
+
 **Account Overview** — money in the account, total staked, gains and losses, and
 what it all cost. Four stat tiles across the top, then the account value over
 time, per-day gains/losses and bet amounts side by side, taxes and charges

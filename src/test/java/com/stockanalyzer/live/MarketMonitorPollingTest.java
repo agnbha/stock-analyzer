@@ -414,7 +414,8 @@ class MarketMonitorPollingTest {
             }
         };
         return new MarketMonitor(candles, noWindows, noEvents, new FeatureExtractor(CLOCK), noModel, engine,
-                new SellTargetAlerts(List.of(0.6, 1.0), 0.05, 1, 10), trades,
+                // Read at each tick, so a test that swaps the journal afterwards is seen.
+                new SellTargetAlerts(List.of(0.6, 1.0), 0.05, 1, 10), date -> AccountFills.of(trades).on(date),
                 new SqliteHeartbeatRepository(database), new SqliteInstrumentRepository(database),
                 new SqliteLiveCandleRepository(database), new SqliteLiveOpportunityRepository(database),
                 new SqliteMarketEventRepository(database), new SqliteTradingDayRepository(database), weekdays, null,

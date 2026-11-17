@@ -116,6 +116,12 @@ import com.stockanalyzer.trade.ReasonAttributor;
 import com.stockanalyzer.trade.TradeJournalService;
 import com.stockanalyzer.trade.TradeNoteService;
 import com.stockanalyzer.watchlist.WatchlistService;
+import com.stockanalyzer.config.GrowwProfile;
+import com.stockanalyzer.config.GrowwProfiles;
+import com.stockanalyzer.store.AccountProfileRepository;
+import com.stockanalyzer.store.jdbc.SqliteAccountProfileRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.stockanalyzer.util.MarketClock;
 
 import java.net.http.HttpClient;
@@ -126,6 +132,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -140,6 +147,8 @@ import java.util.function.Supplier;
  * they ask for.
  */
 public final class AppContext implements AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(AppContext.class);
 
     private final AppConfig config;
     private final MarketClock clock;
@@ -187,6 +196,9 @@ public final class AppContext implements AutoCloseable {
     private final FeatureExtractor featureExtractor;
     private final IntradaySignalModel signalModel;
     private final TradeJournalService tradeJournalService;
+    // One per Groww account, the first first. The repositories above that belong to an account are the first one's.
+    private final List<ProfileContext> profiles;
+    private final AccountProfileRepository accountProfileRepository;
 
     public AppContext(AppConfig config) {
         this.config = config;
@@ -194,6 +206,8 @@ public final class AppContext implements AutoCloseable {
                 LocalTime.parse(config.monitorSessionOpen()), LocalTime.parse(config.monitorSessionClose()));
         this.database = Database.open(config.databaseUrl(), config.databaseBusyTimeoutMillis());
         new SchemaMigrator(database).migrate();
+        List<GrowwProfile> configured = GrowwProfiles.load(config);
+        String first = configured.getFirst().name();
         this.executor = Executors.newFixedThreadPool(config.fetchConcurrency());
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -211,16 +225,16 @@ public final class AppContext implements AutoCloseable {
         this.predictionRepository = new SqlitePredictionRepository(database);
         this.alertRepository = new SqliteAlertRepository(database);
         this.heartbeatRepository = new SqliteHeartbeatRepository(database);
-        this.tradeRepository = new SqliteTradeRepository(database);
-        this.realizedLotRepository = new SqliteRealizedLotRepository(database);
-        this.pnlPeriodRepository = new SqlitePnlPeriodRepository(database);
+        this.tradeRepository = new SqliteTradeRepository(database, first);
+        this.realizedLotRepository = new SqliteRealizedLotRepository(database, first);
+        this.pnlPeriodRepository = new SqlitePnlPeriodRepository(database, first);
         this.attributionRepository = new SqliteAttributionRepository(database);
-        this.tradeReasonRepository = new SqliteTradeReasonRepository(database);
-        this.tradeNoteRepository = new SqliteTradeNoteRepository(database);
+        this.tradeReasonRepository = new SqliteTradeReasonRepository(database, first);
+        this.tradeNoteRepository = new SqliteTradeNoteRepository(database, first);
         this.chartNoteRepository = new SqliteChartNoteRepository(database);
         this.watchlistPickRepository = new SqliteWatchlistPickRepository(database);
         this.companyProfileRepository = new SqliteCompanyProfileRepository(database);
-        this.accountBalanceRepository = new SqliteAccountBalanceRepository(database);
+        this.accountBalanceRepository = new SqliteAccountBalanceRepository(database, first);
 
         this.rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerSecond(),
                 config.rateLimitPerMinute(), config.rateLimitPerDay());
@@ -278,10 +292,86 @@ public final class AppContext implements AutoCloseable {
                 config.chargeRate("stamp.duty.buy.pct", 0.003),
                 config.chargeRate("gst.pct", 18.0));
         ChargeModel chargeModel = new GrowwChargeModel(rates);
-        this.tradeJournalService = new TradeJournalService(tradeRepository, realizedLotRepository,
-                pnlPeriodRepository, instrumentRepository, tradingDayRepository, new FifoLotMatcher(),
-                chargeModel, new PeriodAggregator(), new PeriodBounds(config.financialYearStartMonth()),
-                config.preferBrokerCharges(), config.exchange(), config.segment());
+        this.tradeJournalService = journal(tradeRepository, realizedLotRepository, pnlPeriodRepository, chargeModel);
+
+        List<ProfileContext> built = new ArrayList<>();
+        for (GrowwProfile profile : configured) {
+            built.add(profile.primary() ? firstProfile(profile) : otherProfile(profile, chargeModel));
+        }
+        this.profiles = List.copyOf(built);
+        this.accountProfileRepository = new SqliteAccountProfileRepository(database);
+        accountProfileRepository.register(configured.stream().map(GrowwProfile::name).toList());
+        Map<String, Integer> adopted = accountProfileRepository.adoptUnassigned(first);
+        if (!adopted.isEmpty()) {
+            log.info("Rows that belonged to no account yet now belong to the first, {}: {}", first, adopted);
+        }
+    }
+
+    private TradeJournalService journal(TradeRepository trades, RealizedLotRepository lots, PnlPeriodRepository periods,
+                                        ChargeModel chargeModel) {
+        return new TradeJournalService(trades, lots, periods, instrumentRepository, tradingDayRepository,
+                new FifoLotMatcher(), chargeModel, new PeriodAggregator(),
+                new PeriodBounds(config.financialYearStartMonth()), config.preferBrokerCharges(), config.exchange(),
+                config.segment());
+    }
+
+    /** The first account: the login already built for the stock data, and the repositories above. */
+    private ProfileContext firstProfile(GrowwProfile profile) {
+        return new ProfileContext(profile, authenticator,
+                () -> new GrowwExecutionClient(httpClient, authenticator.get(), config.growwBaseUrl(), clock,
+                        defaultProduct(), config.segment(), rateLimiter),
+                accountDataClient, tradeRepository, realizedLotRepository, accountBalanceRepository,
+                tradeReasonRepository, tradeNoteRepository, tradeJournalService,
+                reasonAttributorFor(tradeNoteRepository),
+                new TradeNoteService(tradeRepository, tradeNoteRepository, clock, sentimentVocabulary()));
+    }
+
+    /**
+     * A further account: its own login and token cache, and repositories that see only its rows. It shares the rate
+     * limiter, so all the accounts together stay within the budget the stock data is planned against.
+     */
+    private ProfileContext otherProfile(GrowwProfile profile, ChargeModel chargeModel) {
+        String name = profile.name();
+        Supplier<GrowwAuthenticator> login = memoize(() -> GrowwAuthenticators.create(profile.authMode(), httpClient,
+                config.growwBaseUrl(), profile.apiKey(), profile.apiSecret(), profile.totpToken(),
+                profile.totpSecret(), new FileTokenCache(Path.of(profile.tokenCachePath())), rateLimiter));
+        TradeRepository trades = new SqliteTradeRepository(database, name);
+        RealizedLotRepository lots = new SqliteRealizedLotRepository(database, name);
+        TradeNoteRepository notes = new SqliteTradeNoteRepository(database, name);
+        return new ProfileContext(profile, login,
+                () -> new GrowwExecutionClient(httpClient, login.get(), config.growwBaseUrl(), clock,
+                        defaultProduct(), config.segment(), rateLimiter),
+                memoize(() -> new GrowwAccountClient(httpClient, login.get(), config.growwBaseUrl(), config.exchange(),
+                        config.segment(), rateLimiter)),
+                trades, lots, new SqliteAccountBalanceRepository(database, name),
+                new SqliteTradeReasonRepository(database, name), notes,
+                journal(trades, lots, new SqlitePnlPeriodRepository(database, name), chargeModel),
+                reasonAttributorFor(notes),
+                new TradeNoteService(trades, notes, clock, sentimentVocabulary()));
+    }
+
+    private ReasonAttributor reasonAttributorFor(TradeNoteRepository notes) {
+        return new ReasonAttributor(marketEventRepository, alertRepository, notes, instrumentRepository,
+                config.exchange(), config.segment(), config.reasonLookbackMinutes());
+    }
+
+    /** Every Groww account, the first first. */
+    public List<ProfileContext> profiles() {
+        return profiles;
+    }
+
+    /** The first account: the one whose login fetches the stock data. */
+    public ProfileContext primaryProfile() {
+        return profiles.getFirst();
+    }
+
+    /** The account of that name, ignoring case. */
+    public java.util.Optional<ProfileContext> profile(String name) {
+        return profiles.stream().filter(p -> p.name().equalsIgnoreCase(name.strip())).findFirst();
+    }
+
+    public AccountProfileRepository accountProfileRepository() {
+        return accountProfileRepository;
     }
 
     public AlertEngine alertEngine() {
@@ -325,14 +415,14 @@ public final class AppContext implements AutoCloseable {
         return new PredictionEvaluator(predictionRepository, candleRepository, config.intradayIntervalMinutes());
     }
 
+    /** The first account's; see {@link ProfileContext#reasonAttributor()} for another's. */
     public ReasonAttributor reasonAttributor() {
-        return new ReasonAttributor(marketEventRepository, alertRepository, tradeNoteRepository, instrumentRepository,
-                config.exchange(), config.segment(), config.reasonLookbackMinutes());
+        return primaryProfile().reasonAttributor();
     }
 
     /** Records what you thought when you took a trade; see {@code trades note}. */
     public TradeNoteService tradeNoteService() {
-        return new TradeNoteService(tradeRepository, tradeNoteRepository, clock, sentimentVocabulary());
+        return primaryProfile().tradeNoteService();
     }
 
     /** The generic sentiments, and the labels that stand for them. */
@@ -430,12 +520,12 @@ public final class AppContext implements AutoCloseable {
 
     /** The broker's order book, sharing this process's token and rate limit. */
     public ExecutionDataClient brokerExecutionClient() {
-        return new GrowwExecutionClient(httpClient, authenticator.get(), config.growwBaseUrl(), clock,
-                defaultProduct(), config.segment(), rateLimiter);
+        return primaryProfile().brokerExecutionClient();
     }
 
+    /** The first account's; each {@link ProfileContext} has its own. */
     public BrokerFillSync brokerFillSync() {
-        return new BrokerFillSync(tradeJournalService, tradeRepository, tradeReasonRepository, reasonAttributor());
+        return primaryProfile().brokerFillSync();
     }
 
     public TradeJournalService tradeJournalService() {

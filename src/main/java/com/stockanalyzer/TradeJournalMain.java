@@ -20,6 +20,7 @@ import com.stockanalyzer.trade.TradeIds;
 import com.stockanalyzer.trade.TradeNoteService;
 import com.stockanalyzer.store.TradeReasonRepository;
 import com.stockanalyzer.util.Args;
+import com.stockanalyzer.store.AccountProfileRepository;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -28,6 +29,7 @@ import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
@@ -56,7 +58,15 @@ import java.util.stream.Collectors;
  *   pnl --rebuild                             re-match every stored trade
  *   statement --from D --to D --out FILE      one row per realized lot
  *   capture --month YYYY-MM                   what you took vs what was available
+ *   profiles                                  the Groww accounts, and what each holds
+ *   profiles rename --from A --to B           move an account's rows to a new name
  * </pre>
+ *
+ * <p>With more than one Groww account ({@code groww.profile.files}), every command takes {@code --profile NAME}.
+ * Without it, what reads the broker or reports - {@code trades import --broker}, {@code trades balance},
+ * {@code trades reasons}, {@code trades notes}, {@code pnl}, {@code statement} and {@code capture} - runs for every
+ * account in turn, one failing account not stopping the rest; what records something by hand - {@code trades add},
+ * {@code trades note}, {@code trades import --csv}, {@code trades balance --cash} - acts on the first account.
  */
 public final class TradeJournalMain {
 
@@ -71,9 +81,10 @@ public final class TradeJournalMain {
                 case "pnl" -> pnl(context, parsed);
                 case "statement" -> statement(context, parsed);
                 case "capture" -> capture(context, parsed);
+                case "profiles" -> profiles(context, parsed);
                 default -> {
                     System.err.println("Unknown command: " + command);
-                    System.err.println("Try: trades | chartnotes | pnl | statement | capture");
+                    System.err.println("Try: trades | chartnotes | pnl | statement | capture | profiles");
                     System.exit(2);
                 }
             }
@@ -84,23 +95,23 @@ public final class TradeJournalMain {
         String subcommand = args.subcommand("import");
         switch (subcommand) {
             case "add" -> {
-                addManualTrade(context, args);
+                eachProfile(context, args, false, profile -> addManualTrade(context, profile, args));
                 return;
             }
             case "reasons" -> {
-                reasons(context, args);
+                eachProfile(context, args, true, profile -> reasons(context, profile, args));
                 return;
             }
             case "note" -> {
-                note(context, args);
+                eachProfile(context, args, false, profile -> note(context, profile, args));
                 return;
             }
             case "notes" -> {
-                notes(context, args);
+                eachProfile(context, args, true, profile -> notes(context, profile, args));
                 return;
             }
             case "balance" -> {
-                balance(context, args);
+                eachProfile(context, args, !args.has("cash"), profile -> balance(context, profile, args));
                 return;
             }
             default -> { }
@@ -110,21 +121,104 @@ public final class TradeJournalMain {
         LocalDate from = args.date("from", to.minusMonths(1));
         AppConfig config = context.config();
 
-        ExecutionDataClient client;
-        if (args.has("csv")) {
-            client = new CsvTradeImporter(Path.of(args.require("csv")), config.tradesCsvDateFormat(),
-                    context.defaultProduct(), context.clock());
-        } else {
-            client = context.brokerExecutionClient();
-        }
+        // A CSV is one account's export, so it goes to one account; the broker is read for each.
+        eachProfile(context, args, !args.has("csv"), profile -> {
+            ExecutionDataClient client;
+            if (args.has("csv")) {
+                client = new CsvTradeImporter(Path.of(args.require("csv")), config.tradesCsvDateFormat(),
+                        context.defaultProduct(), context.clock());
+            } else {
+                client = profile.brokerExecutionClient();
+            }
 
-        BrokerFillSync.Result result = context.brokerFillSync().sync(client, from, to);
-        System.out.printf("Imported %d new trades; matched %d closed lots, %d positions open, "
-                        + "%d reasons attributed%n",
-                result.newTrades(), result.closedLots(), result.openPositions(), result.reasonsAttributed());
+            BrokerFillSync.Result result = profile.brokerFillSync().sync(client, from, to);
+            System.out.printf("Imported %d new trades; matched %d closed lots, %d positions open, "
+                            + "%d reasons attributed%n",
+                    result.newTrades(), result.closedLots(), result.openPositions(), result.reasonsAttributed());
+        });
     }
 
-    private static void addManualTrade(AppContext context, Args args) {
+    /**
+     * Runs {@code action} for the account {@code --profile} names, or else for every account ({@code everyByDefault})
+     * or the first. Each account's output is headed by its name when there is more than one. With several, one that
+     * fails is reported and the rest still run; the process then exits 1 so a scheduled job shows the failure.
+     */
+    private static void eachProfile(AppContext context, Args args, boolean everyByDefault,
+                                    Consumer<ProfileContext> action) {
+        List<ProfileContext> chosen;
+        var named = args.value("profile");
+        if (named.isPresent()) {
+            var found = context.profile(named.get());
+            if (found.isEmpty()) {
+                System.err.printf("No profile named '%s'. The profiles are: %s%n", named.get(),
+                        String.join(", ", context.profiles().stream().map(ProfileContext::name).toList()));
+                System.exit(2);
+                return;
+            }
+            chosen = List.of(found.get());
+        } else {
+            chosen = everyByDefault ? context.profiles() : List.of(context.primaryProfile());
+        }
+        boolean heading = context.profiles().size() > 1;
+        List<String> failed = new java.util.ArrayList<>();
+        for (ProfileContext profile : chosen) {
+            if (heading) {
+                System.out.printf("%n== %s ==%n", profile.name());
+            }
+            if (chosen.size() == 1) {
+                action.accept(profile);
+                continue;
+            }
+            try {
+                action.accept(profile);
+            } catch (RuntimeException e) {
+                failed.add(profile.name());
+                System.err.printf("%s: %s%n", profile.name(), e.getMessage());
+            }
+        }
+        if (!failed.isEmpty()) {
+            System.err.println("Failed for: " + String.join(", ", failed));
+            System.exit(1);
+        }
+    }
+
+    /**
+     * {@code profiles}: each account, where its login comes from and what its journal holds. {@code profiles rename
+     * --from A --to B} moves every row of account A to the name B, for when an env file's {@code GROWW_PROFILE_NAME}
+     * changes; it refuses a name that already has rows, so two journals are never merged.
+     */
+    private static void profiles(AppContext context, Args args) {
+        AccountProfileRepository repository = context.accountProfileRepository();
+        if ("rename".equals(args.subcommand("list"))) {
+            String from = args.require("from");
+            String to = args.require("to");
+            try {
+                var moved = repository.rename(from, to);
+                System.out.printf("Moved %s's rows to %s: %s%n", from, to, moved.isEmpty() ? "none" : moved);
+                System.out.println("Set GROWW_PROFILE_NAME to the new name in that account's env file too, or the next "
+                        + "start registers the old name again.");
+            } catch (IllegalArgumentException e) {
+                System.err.println(e.getMessage());
+                System.exit(2);
+            }
+            return;
+        }
+        System.out.printf("%n%-3s %-20s %-8s %8s %6s %-11s %-11s %s%n", "#", "PROFILE", "LOGIN", "TRADES", "OPEN",
+                "LAST FILL", "LAST BAL.", "CREDENTIALS FROM");
+        for (var summary : repository.summaries()) {
+            var configured = context.profile(summary.name()).map(ProfileContext::profile);
+            System.out.printf("%-3s %-20s %-8s %8d %6d %-11s %-11s %s%n",
+                    summary.position() == null ? "-" : String.valueOf(summary.position() + 1),
+                    summary.name().isEmpty() ? "(none yet)" : summary.name(),
+                    configured.map(p -> p.authMode()).orElse("-"), summary.trades(), summary.openPositions(),
+                    summary.lastTradeDate() == null ? "-" : summary.lastTradeDate(),
+                    summary.lastBalanceDate() == null ? "-" : summary.lastBalanceDate(),
+                    configured.map(p -> p.source()).orElse("not configured now"));
+        }
+        System.out.println();
+    }
+
+    private static void addManualTrade(AppContext context, ProfileContext profile, Args args) {
         String symbol = args.require("symbol").toUpperCase();
         Side side = Side.valueOf(args.require("side").toUpperCase());
         int quantity = Integer.parseInt(args.require("qty"));
@@ -139,10 +233,10 @@ public final class TradeJournalMain {
                 0, null, Trade.ChargesSource.MODELLED, Trade.TradeSource.MANUAL,
                 args.value("reason").or(() -> args.value("notes")).orElse(null));
 
-        int inserted = context.tradeJournalService()
+        int inserted = profile.tradeJournalService()
                 .importTrades((from, to) -> List.of(trade), trade.sessionDate(), trade.sessionDate());
-        context.tradeJournalService().rebuild();
-        attributeReasons(context, trade.sessionDate(), trade.sessionDate());
+        profile.tradeJournalService().rebuild();
+        attributeReasons(profile, trade.sessionDate(), trade.sessionDate());
         System.out.println(inserted == 1 ? "Added." : "Already recorded; nothing changed.");
     }
 
@@ -151,13 +245,13 @@ public final class TradeJournalMain {
      * journal, so they survive re-imports, show next to the fill on the Candles and Calls dashboard, and
      * count as a reason on Decision Reasons ("did BULLISH calls pay?").
      */
-    private static void note(AppContext context, Args args) {
+    private static void note(AppContext context, ProfileContext profile, Args args) {
         LocalDate date = args.date("date", LocalDate.now(context.clock().zone()));
         TradeNoteService.Selection selection = new TradeNoteService.Selection(
                 args.require("symbol").toUpperCase(Locale.ROOT),
                 Side.valueOf(args.require("side").toUpperCase(Locale.ROOT)), date,
                 args.value("at").map(LocalTime::parse).orElse(null), args.value("order").orElse(null));
-        TradeNoteService service = context.tradeNoteService();
+        TradeNoteService service = profile.tradeNoteService();
         boolean clearing = args.flag("clear");
 
         TradeNoteService.Result result;
@@ -171,7 +265,7 @@ public final class TradeJournalMain {
             System.exit(2);
             return;
         }
-        attributeReasons(context, date, date);
+        attributeReasons(profile, date, date);
 
         System.out.printf("%s %d %s fills for %s on %s (%d %s):%n", clearing ? "Cleared the note from" : "Noted",
                 result.fills().size(), selection.side(), selection.symbol(), date, result.calls().size(),
@@ -248,10 +342,10 @@ public final class TradeJournalMain {
         }
     }
 
-    private static void notes(AppContext context, Args args) {
+    private static void notes(AppContext context, ProfileContext profile, Args args) {
         LocalDate to = args.date("to", args.date("date", LocalDate.now(context.clock().zone())));
         LocalDate from = args.date("from", args.has("date") ? to : to.minusDays(14));
-        List<TradeNoteService.Entry> entries = context.tradeNoteService()
+        List<TradeNoteService.Entry> entries = profile.tradeNoteService()
                 .list(from, to, args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
         if (entries.isEmpty()) {
             System.out.printf("No noted calls from %s to %s.%n", from, to);
@@ -270,8 +364,12 @@ public final class TradeJournalMain {
     }
 
     private static void pnl(AppContext context, Args args) {
+        eachProfile(context, args, true, profile -> pnl(context, profile, args));
+    }
+
+    private static void pnl(AppContext context, ProfileContext profile, Args args) {
         if (args.flag("rebuild")) {
-            var result = context.tradeJournalService().rebuild();
+            var result = profile.tradeJournalService().rebuild();
             System.out.printf("Rebuilt: %d closed lots, %d positions open%n",
                     result.lots().size(), result.openPositions().size());
             return;
@@ -281,11 +379,11 @@ public final class TradeJournalMain {
         LocalDate anchor = anchorFor(context, args, periodType);
         String symbol = args.value("symbol").orElse(null);
 
-        PnlSummary summary = context.tradeJournalService().pnl(periodType, anchor, symbol);
-        List<PnlSummary> breakdown = context.tradeJournalService().breakdown(periodType, anchor, symbol);
+        PnlSummary summary = profile.tradeJournalService().pnl(periodType, anchor, symbol);
+        List<PnlSummary> breakdown = profile.tradeJournalService().breakdown(periodType, anchor, symbol);
         new ConsolePnlReporter().report(
                 new PeriodBounds(context.config().financialYearStartMonth()).label(periodType, anchor),
-                summary, breakdown, context.tradeJournalService().openPositions());
+                summary, breakdown, profile.tradeJournalService().openPositions());
     }
 
     private static LocalDate anchorFor(AppContext context, Args args, PeriodType periodType) {
@@ -303,15 +401,33 @@ public final class TradeJournalMain {
         };
     }
 
+    /** One file per account: the first account's at {@code --out}, another's beside it with its name added. */
     private static void statement(AppContext context, Args args) {
         LocalDate from = LocalDate.parse(args.require("from"));
         LocalDate to = args.date("to", LocalDate.now(context.clock().zone()));
         Path out = Path.of(args.value("out").orElse("statement.csv"));
-        List<RealizedLot> lots = context.realizedLotRepository().findClosedBetween(from, to);
-        new CsvStatementExporter(context.clock()).export(lots, out);
+        eachProfile(context, args, true, profile -> {
+            Path file = profile.primary() || args.has("profile") ? out : besides(out, profile.name());
+            List<RealizedLot> lots = profile.realizedLotRepository().findClosedBetween(from, to);
+            new CsvStatementExporter(context.clock()).export(lots, file);
+            System.out.println("Wrote " + file);
+        });
+    }
+
+    /** statements/2026-10.csv for account "second" is statements/2026-10-second.csv. */
+    static Path besides(Path file, String profile) {
+        String slug = profile.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String renamed = dot > 0 ? name.substring(0, dot) + "-" + slug + name.substring(dot) : name + "-" + slug;
+        return file.resolveSibling(renamed);
     }
 
     private static void capture(AppContext context, Args args) {
+        eachProfile(context, args, true, profile -> capture(context, profile, args));
+    }
+
+    private static void capture(AppContext context, ProfileContext profile, Args args) {
         PeriodBounds bounds = new PeriodBounds(context.config().financialYearStartMonth());
         LocalDate anchor = args.value("month")
                 .map(month -> LocalDate.parse(month + "-01"))
@@ -319,7 +435,7 @@ public final class TradeJournalMain {
         LocalDate from = bounds.startOf(PeriodType.MONTH, anchor);
         LocalDate to = bounds.endOf(PeriodType.MONTH, anchor);
 
-        List<Trade> trades = context.tradeRepository().findRange(from, to);
+        List<Trade> trades = profile.tradeRepository().findRange(from, to);
         List<TradeAttribution> attributions = context.captureAnalyzer().analyse(trades, from, to);
         context.attributionRepository().upsertAll(attributions);
         new CaptureReporter().report(bounds.label(PeriodType.MONTH, anchor), attributions);
@@ -327,18 +443,18 @@ public final class TradeJournalMain {
 
 
     /** Recomputes why each trade in the range was taken. Safe to re-run. */
-    private static int attributeReasons(AppContext context, LocalDate from, LocalDate to) {
-        List<Trade> trades = context.tradeRepository().findRange(from, to);
+    private static int attributeReasons(ProfileContext profile, LocalDate from, LocalDate to) {
+        List<Trade> trades = profile.tradeRepository().findRange(from, to);
         if (trades.isEmpty()) {
             return 0;
         }
-        context.tradeReasonRepository().deleteForTrades(trades.stream().map(Trade::id).toList());
-        List<TradeReasonRepository.TradeReason> reasons = context.reasonAttributor().attribute(trades);
-        context.tradeReasonRepository().upsertAll(reasons);
+        profile.tradeReasonRepository().deleteForTrades(trades.stream().map(Trade::id).toList());
+        List<TradeReasonRepository.TradeReason> reasons = profile.reasonAttributor().attribute(trades);
+        profile.tradeReasonRepository().upsertAll(reasons);
         return reasons.size();
     }
 
-    private static void reasons(AppContext context, Args args) {
+    private static void reasons(AppContext context, ProfileContext profile, Args args) {
         PeriodBounds bounds = new PeriodBounds(context.config().financialYearStartMonth());
         LocalDate anchor = args.value("month")
                 .map(month -> LocalDate.parse(month + "-01"))
@@ -346,13 +462,13 @@ public final class TradeJournalMain {
         LocalDate from = args.date("from", bounds.startOf(PeriodType.MONTH, anchor));
         LocalDate to = args.date("to", bounds.endOf(PeriodType.MONTH, anchor));
 
-        int attributed = attributeReasons(context, from, to);
-        Map<String, Long> frequency = context.tradeReasonRepository().findBetween(from, to).stream()
+        int attributed = attributeReasons(profile, from, to);
+        Map<String, Long> frequency = profile.tradeReasonRepository().findBetween(from, to).stream()
                 .collect(Collectors.groupingBy(TradeReasonRepository.TradeReason::reasonCode,
                         TreeMap::new, Collectors.counting()));
 
         System.out.printf("%nWhy trades were taken, %s to %s (%d reasons across %d trades)%n%n",
-                from, to, attributed, context.tradeRepository().findRange(from, to).size());
+                from, to, attributed, profile.tradeRepository().findRange(from, to).size());
         if (frequency.isEmpty()) {
             System.out.println("No trades in this period.");
             return;
@@ -371,20 +487,20 @@ public final class TradeJournalMain {
      * deposit, dividend or fill this process never saw. {@code --cash} is the
      * fallback for when the API cannot be reached, and is marked as such.
      */
-    private static void balance(AppContext context, Args args) {
+    private static void balance(AppContext context, ProfileContext profile, Args args) {
         LocalDate date = args.date("date", LocalDate.now(context.clock().zone()));
 
         if (args.value("cash").isPresent()) {
             double cash = Double.parseDouble(args.require("cash"));
             Double invested = args.value("invested").map(Double::parseDouble).orElse(null);
-            context.accountBalanceRepository().record(date, cash, invested, "manual");
+            profile.accountBalanceRepository().record(date, cash, invested, "manual");
             System.out.printf("Recorded balance for %s by hand: cash %s%s%n", date, rupees(cash),
                     invested == null ? "" : ", invested " + rupees(invested));
             return;
         }
 
-        AccountSnapshot snapshot = context.accountDataClient().fetch();
-        context.accountBalanceRepository().record(date, snapshot);
+        AccountSnapshot snapshot = profile.accountDataClient().fetch();
+        profile.accountBalanceRepository().record(date, snapshot);
         printBalance(date, snapshot);
     }
 
