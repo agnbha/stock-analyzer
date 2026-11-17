@@ -179,9 +179,14 @@ the page still draws.
 **Yesterday's trading hours** is a button beside *Company Details*, not a picker entry: a picker entry is a fixed
 expression such as "yesterday 9:15 to 15:30", which cannot skip a Sunday or a holiday. The button looks up the last
 session with minutes stored before today (so weekends and holidays are skipped), and opens the page on that session,
-9:15 to 15:30 IST, with the symbol, detector and candle count you had. On a Monday it is Friday's. Three hidden
-variables (`prev_day`, `prev_from`, `prev_to`) hold the lookup and refresh when the time range changes; a page left
-open past midnight catches up on the next range pick or reload.
+9:15 to 15:30 IST, with the symbol, detector and candle count you had. On a Monday it is Friday's. It leaves the
+**Session** box on *All*: the range holds only that session, so that is what the chart shows, and widening the range
+afterwards shows every session in it. Two hidden variables (`prev_from`, `prev_to`) hold the lookup and refresh when
+the time range changes; a page left open past midnight catches up on the next range pick or reload.
+
+The minute chart draws exactly the sessions ticked in the **Session** box, and the box lists only the sessions inside
+the time range at the top. A session ticked by hand stays ticked when the range changes, as long as it is still in
+the range, so after picking one, set the box back to *All* to see the whole range again.
 
 The minute-candle chart on this page draws at most **200** candles unless you change the **Max candles** box at the
 top (type a number, press Enter). When the sessions you pick hold more minutes than that, minutes are combined into

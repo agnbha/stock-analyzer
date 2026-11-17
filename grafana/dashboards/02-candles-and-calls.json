@@ -256,13 +256,13 @@
       "title": "Yesterday's trading hours",
       "type": "link",
       "icon": "clock-nine",
-      "url": "/d/stockanalyzer-candles/candles-and-calls?${symbol:queryparam}&${detector:queryparam}&${candles:queryparam}&var-session=${prev_day}&from=${prev_from}&to=${prev_to}",
+      "url": "/d/stockanalyzer-candles/candles-and-calls?${symbol:queryparam}&${detector:queryparam}&${candles:queryparam}&var-session=%24__all&from=${prev_from}&to=${prev_to}",
       "includeVars": false,
       "keepTime": false,
       "targetBlank": false,
       "asDropdown": false,
       "tags": [],
-      "tooltip": "The previous trading session, 9:15 to 15:30. Weekends and holidays are skipped: it is the last session with minutes stored before today."
+      "tooltip": "The previous trading session, 9:15 to 15:30. Weekends and holidays are skipped: it is the last session with minutes stored before today. Session is left on All, so widening the range afterwards shows every session in it."
     },
     {
       "title": "Company Details",
@@ -318,7 +318,7 @@
           "text": "",
           "value": ""
         },
-        "description": "Sessions that have any minute data, settled or still forming. Reads staging as well as the consolidated tape, so the day in progress is selectable instead of appearing only after the evening batch has run."
+        "description": "Sessions that have any minute data, settled or still forming. Reads staging as well as the consolidated tape, so the day in progress is selectable instead of appearing only after the evening batch has run. The chart draws the sessions ticked here. One ticked by hand stays ticked when the time range changes, so pick All to see every session in a range."
       },
       {
         "name": "detector",
@@ -360,23 +360,6 @@
           }
         ],
         "hide": 0
-      },
-      {
-        "name": "prev_day",
-        "type": "query",
-        "datasource": {
-          "type": "frser-sqlite-datasource",
-          "uid": "stock-analyzer-sqlite"
-        },
-        "query": "SELECT MAX(session_date) FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
-        "definition": "SELECT MAX(session_date) FROM (SELECT session_date FROM trading_day UNION SELECT session_date FROM live_candle) WHERE session_date < date('now', '+5 hours', '+30 minutes')",
-        "refresh": 2,
-        "hide": 2,
-        "includeAll": false,
-        "multi": false,
-        "sort": 0,
-        "description": "The previous trading session's date.",
-        "current": {}
       },
       {
         "name": "prev_from",
