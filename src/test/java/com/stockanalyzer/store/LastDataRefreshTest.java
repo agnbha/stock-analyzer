@@ -147,15 +147,32 @@ class LastDataRefreshTest {
         assertEquals(4_000_000L, refreshedAt("03-decision-reasons.json"));
     }
 
+    private void scan(long runAt) {
+        execute("""
+                INSERT INTO canslim_run (run_at, screened, evaluated, market_symbol, market_state)
+                VALUES (?, 0, 0, 'NIFTYBEES', 'CONFIRMED_UPTREND')""", runAt);
+    }
+
     @Test
-    @DisplayName("Stock Trend and Watchlist report when a session was last written to the history")
-    void dailyPages() throws IOException {
+    @DisplayName("Watchlist reports when a session was last written to the history")
+    void watchlist() throws IOException {
         liveCandle(9_000);
         trade(8_000);
+        scan(7_000);
         tradingDay(1_500);
 
-        assertEquals(1_500_000L, refreshedAt("04-stock-trend.json"));
         assertEquals(1_500_000L, refreshedAt("05-watchlist.json"));
+    }
+
+    @Test
+    @DisplayName("Stock Trend reports the last CAN SLIM scan, which fetches the daily bars its stock is drawn from")
+    void stockTrend() throws IOException {
+        liveCandle(9_000);
+        tradingDay(8_000);
+        scan(1_000);
+        scan(2_000);
+
+        assertEquals(2_000_000L, refreshedAt("04-stock-trend.json"));
     }
 
     @Test
