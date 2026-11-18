@@ -43,8 +43,8 @@ class StockLinksTest {
 
     private static final List<Row> ROWS = List.of(
             new Row("02-candles-and-calls.json", 20, List.of("CAN SLIM", "Stock Trend", "Company Details")),
-            new Row("04-stock-trend.json", 10, List.of("Candles and Calls", "CAN SLIM")),
-            new Row("06-canslim.json", 20, List.of("Candles and Calls", "Stock Trend")));
+            new Row("04-stock-trend.json", 10, List.of("Candles and Calls", "CAN SLIM", "Company Details")),
+            new Row("06-canslim.json", 20, List.of("Candles and Calls", "Stock Trend", "Company Details")));
 
     @Test
     @DisplayName("each stock page has one row of buttons, straight under its chart, across the page")
@@ -114,6 +114,26 @@ class StockLinksTest {
         List<String> top = new ArrayList<>();
         dashboard("02-candles-and-calls.json").path("links").forEach(link -> top.add(link.path("title").asText()));
         assertEquals(List.of("Yesterday's trading hours"), top);
+    }
+
+    @Test
+    @DisplayName("Company Details links to the other stock pages at its top, each taking the symbol and not the time")
+    void companyDetailsLinksBack() throws IOException {
+        JsonNode dashboard = dashboard("07-company-details.json");
+        assertEquals(Set.of("symbol"), variableNames(dashboard),
+                "carrying the page's variables carries the symbol alone");
+        Map<String, String> pages = Map.of("Candles and Calls", "stockanalyzer-candles",
+                "Stock Trend", "stockanalyzer-trend", "CAN SLIM", "stockanalyzer-canslim");
+        List<String> titles = new ArrayList<>();
+        for (JsonNode link : dashboard.path("links")) {
+            String title = link.path("title").asText();
+            titles.add(title);
+            assertTrue(link.path("url").asText().startsWith("/d/" + pages.get(title) + "/"), title);
+            assertEquals("link", link.path("type").asText(), title);
+            assertTrue(link.path("includeVars").asBoolean(), title + " takes the symbol along");
+            assertFalse(link.path("keepTime").asBoolean(), title + " opens on its own range");
+        }
+        assertEquals(List.of("Candles and Calls", "Stock Trend", "CAN SLIM"), titles);
     }
 
     @Test

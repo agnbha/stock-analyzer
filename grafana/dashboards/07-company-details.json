@@ -32,6 +32,30 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": "The same symbol's charts and calls"
+    },
+    {
+      "title": "Stock Trend",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-trend/stock-trend",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The same symbol's daily candles and moving averages, RSI, supports and resistances"
+    },
+    {
+      "title": "CAN SLIM",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-canslim/can-slim",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The same symbol's CAN SLIM reading: its daily chart with the 50- and 200-day averages, the pivot and every scan's reading"
     }
   ],
   "templating": {
