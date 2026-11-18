@@ -16,6 +16,30 @@
     "from": "now-3M",
     "to": "now"
   },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Last 3 months",
+        "from": "now-3M",
+        "to": "now"
+      },
+      {
+        "display": "Last 6 months",
+        "from": "now-6M",
+        "to": "now"
+      },
+      {
+        "display": "Last 1 year",
+        "from": "now-1y",
+        "to": "now"
+      },
+      {
+        "display": "Last 2 years",
+        "from": "now-2y",
+        "to": "now"
+      }
+    ]
+  },
   "annotations": {
     "list": [
       {
@@ -164,8 +188,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT trend_score AS \"Trend\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND trend_score IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT trend_score AS \"Trend\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND trend_score IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "SELECT trend AS \"Trend\"\nFROM (\n  SELECT session_date,\n         CASE WHEN COUNT(close) OVER w20 < 20 THEN NULL\n              WHEN close > AVG(close) OVER w20 AND AVG(close) OVER w5 > AVG(close) OVER w20 THEN 2\n              WHEN close < AVG(close) OVER w20 AND AVG(close) OVER w5 < AVG(close) OVER w20 THEN 0\n              ELSE 1 END AS trend\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW w5  AS (ORDER BY session_date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),\n         w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))\nWHERE trend IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT trend AS \"Trend\"\nFROM (\n  SELECT session_date,\n         CASE WHEN COUNT(close) OVER w20 < 20 THEN NULL\n              WHEN close > AVG(close) OVER w20 AND AVG(close) OVER w5 > AVG(close) OVER w20 THEN 2\n              WHEN close < AVG(close) OVER w20 AND AVG(close) OVER w5 < AVG(close) OVER w20 THEN 0\n              ELSE 1 END AS trend\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW w5  AS (ORDER BY session_date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),\n         w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))\nWHERE trend IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
           "timeColumns": []
         }
       ],
@@ -246,8 +270,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
-          "queryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM v_symbol_trend\nWHERE symbol = '$symbol' AND rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "rawQueryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM (\n  SELECT session_date, ts_epoch,\n         CASE WHEN COUNT(gain) OVER w14 < 14 THEN NULL\n              WHEN AVG(loss) OVER w14 = 0 THEN 100.0\n              ELSE 100.0 - 100.0 / (1 + (AVG(gain) OVER w14) / (AVG(loss) OVER w14))\n         END AS rsi14\n  FROM (\n    SELECT session_date, ts_epoch,\n           MAX(close - LAG(close) OVER p, 0) AS gain,\n           MAX(LAG(close) OVER p - close, 0) AS loss\n    FROM daily_bar\n    WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n    WINDOW p AS (ORDER BY session_date))\n  WINDOW w14 AS (ORDER BY session_date ROWS BETWEEN 13 PRECEDING AND CURRENT ROW))\nWHERE rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
+          "queryText": "SELECT ROUND(rsi14, 1) AS \"RSI(14)\"\nFROM (\n  SELECT session_date, ts_epoch,\n         CASE WHEN COUNT(gain) OVER w14 < 14 THEN NULL\n              WHEN AVG(loss) OVER w14 = 0 THEN 100.0\n              ELSE 100.0 - 100.0 / (1 + (AVG(gain) OVER w14) / (AVG(loss) OVER w14))\n         END AS rsi14\n  FROM (\n    SELECT session_date, ts_epoch,\n           MAX(close - LAG(close) OVER p, 0) AS gain,\n           MAX(LAG(close) OVER p - close, 0) AS loss\n    FROM daily_bar\n    WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n    WINDOW p AS (ORDER BY session_date))\n  WINDOW w14 AS (ORDER BY session_date ROWS BETWEEN 13 PRECEDING AND CURRENT ROW))\nWHERE rsi14 IS NOT NULL\nORDER BY session_date DESC LIMIT 1",
           "timeColumns": []
         }
       ],
@@ -293,7 +317,7 @@
         },
         "overrides": []
       },
-      "description": "Momentum on a 0–100 scale, over the last 14 sessions.\n\n- **RSI** — how hard price has been pushed one way. Above 70 is conventionally overbought (ran up fast, may pause); below 30 oversold (dropped fast, may bounce).\n\nSimple-average (Cutler) RSI, not Wilder's smoothing — a SQL view cannot express the recursion."
+      "description": "Momentum on a 0–100 scale, over the last 14 sessions.\n\n- **RSI** — how hard price has been pushed one way. Above 70 is conventionally overbought (ran up fast, may pause); below 30 oversold (dropped fast, may bounce).\n\nSimple-average (Cutler) RSI, not Wilder's smoothing: the same arithmetic as the Watchlist's."
     },
     {
       "id": 3,
@@ -317,8 +341,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT ROUND(beta, 2) AS \"Beta\" FROM v_symbol_beta WHERE symbol = '$symbol'",
-          "queryText": "SELECT ROUND(beta, 2) AS \"Beta\" FROM v_symbol_beta WHERE symbol = '$symbol'",
+          "rawQueryText": "WITH market AS (\n  SELECT session_date, LAG(session_date) OVER p AS previous,\n         (close - LAG(close) OVER p) / LAG(close) OVER p AS change\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument\n                         WHERE symbol = (SELECT market_symbol FROM canslim_run ORDER BY id DESC LIMIT 1))\n  WINDOW p AS (ORDER BY session_date)),\nstock AS (\n  SELECT session_date, LAG(session_date) OVER p AS previous,\n         (close - LAG(close) OVER p) / LAG(close) OVER p AS change\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW p AS (ORDER BY session_date)),\npaired AS (\n  SELECT s.change AS s, m.change AS m\n  FROM stock s JOIN market m ON m.session_date = s.session_date AND m.previous = s.previous\n  WHERE s.change IS NOT NULL AND m.change IS NOT NULL\n  ORDER BY s.session_date DESC LIMIT 252)\nSELECT CASE WHEN COUNT(*) < 60 THEN NULL\n            ELSE ROUND((COUNT(*) * SUM(s * m) - SUM(s) * SUM(m))\n                       / NULLIF(COUNT(*) * SUM(m * m) - SUM(m) * SUM(m), 0), 2) END AS \"Beta\"\nFROM paired",
+          "queryText": "WITH market AS (\n  SELECT session_date, LAG(session_date) OVER p AS previous,\n         (close - LAG(close) OVER p) / LAG(close) OVER p AS change\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument\n                         WHERE symbol = (SELECT market_symbol FROM canslim_run ORDER BY id DESC LIMIT 1))\n  WINDOW p AS (ORDER BY session_date)),\nstock AS (\n  SELECT session_date, LAG(session_date) OVER p AS previous,\n         (close - LAG(close) OVER p) / LAG(close) OVER p AS change\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW p AS (ORDER BY session_date)),\npaired AS (\n  SELECT s.change AS s, m.change AS m\n  FROM stock s JOIN market m ON m.session_date = s.session_date AND m.previous = s.previous\n  WHERE s.change IS NOT NULL AND m.change IS NOT NULL\n  ORDER BY s.session_date DESC LIMIT 252)\nSELECT CASE WHEN COUNT(*) < 60 THEN NULL\n            ELSE ROUND((COUNT(*) * SUM(s * m) - SUM(s) * SUM(m))\n                       / NULLIF(COUNT(*) * SUM(m * m) - SUM(m) * SUM(m), 0), 2) END AS \"Beta\"\nFROM paired",
           "timeColumns": []
         }
       ],
@@ -362,7 +386,7 @@
         },
         "overrides": []
       },
-      "description": "How much this symbol moves relative to the rest of the tracked universe.\n\n- **Beta** — 1.0 moves with the basket, above 1.0 amplifies it, below 1.0 damps it.\n\nMeasured against an equal-weighted basket of the tracked symbols, because no index series is stored. Comparable between these symbols, but not with a published NIFTY beta."
+      "description": "How much this stock moves with the market.\n\n- **Beta** — 1.0 moves with the market, above 1.0 amplifies it, below 1.0 damps it.\n\nMeasured against the market CAN SLIM reads (NIFTYBEES, a NIFTY 50 fund), over the last year of daily changes, 252 sessions at most, on days both traded. So it is comparable with a published NIFTY beta. Blank until there are 60 such days."
     },
     {
       "id": 4,
@@ -440,7 +464,7 @@
       "id": 10,
       "type": "candlestick",
       "title": "$symbol - daily candles and moving averages",
-      "description": "Daily candles with their moving averages.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.\n\n**Volume** (bars, right axis) — shares traded that day.\n\n**Notes** (cyan dashed lines) — your own notes on the chart. Click the chart, press **Add annotation**, write the note (your sentiment, the plan), tag it with this symbol in capitals (for example `RELIANCE`) and a sentiment (`BULLISH`, `BEARISH` or `NEUTRAL`; `BUY` or `SELL` too if you like) and Save. It appears at once, here and on this symbol's other charts, and on the account views if it is tagged `BUY` or `SELL`. Hover its marker to read it. A note without the symbol tag is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
+      "description": "Daily candles with their moving averages, from the daily bars kept for the whole market (the chart on CAN SLIM reads the same ones), so every stock has them, tracked or not, as far back as the daily bars go. The close is the exchange's official close, as on Groww's daily chart.\n\n- **SMA 5 / 20 / 50** — simple moving averages of the last 5, 20 and 50 daily closes. A smooth line showing recent trend direction; the shorter the window, the faster it turns.\n\nEach average appears only once its window is full, so the 50-day line starts 50 sessions in.\n\n**Volume** (bars, right axis) — shares traded that day.\n\n**Notes** (cyan dashed lines) — your own notes on the chart. Click the chart, press **Add annotation**, write the note (your sentiment, the plan), tag it with this symbol in capitals (for example `RELIANCE`) and a sentiment (`BULLISH`, `BEARISH` or `NEUTRAL`; `BUY` or `SELL` too if you like) and Save. It appears at once, here and on this symbol's other charts, and on the account views if it is tagged `BUY` or `SELL`. Hover its marker to read it. A note without the symbol tag is saved but not drawn.\n\n**Noted calls** (light-blue buys, orange sells; dashed lines) — calls you documented with `trades note`. Hover a marker for the sentiment and your note.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -459,8 +483,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.volume,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\"\nFROM v_symbol_trend t\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
-          "queryText": "SELECT t.ts_epoch AS time,\n       t.open, t.high, t.low, t.close,\n       t.volume,\n       t.sma5           AS \"SMA 5\",\n       t.sma20          AS \"SMA 20\",\n       t.sma50          AS \"SMA 50\"\nFROM v_symbol_trend t\nWHERE t.symbol = '$symbol'\nORDER BY t.ts_epoch",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       open, high, low, close,\n       volume,\n       CASE WHEN COUNT(close) OVER w5  < 5  THEN NULL ELSE AVG(close) OVER w5  END AS \"SMA 5\",\n       CASE WHEN COUNT(close) OVER w20 < 20 THEN NULL ELSE AVG(close) OVER w20 END AS \"SMA 20\",\n       CASE WHEN COUNT(close) OVER w50 < 50 THEN NULL ELSE AVG(close) OVER w50 END AS \"SMA 50\"\nFROM daily_bar\nWHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\nWINDOW w5  AS (ORDER BY session_date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),\n       w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),\n       w50 AS (ORDER BY session_date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)\nORDER BY session_date",
+          "queryText": "SELECT ts_epoch AS time,\n       open, high, low, close,\n       volume,\n       CASE WHEN COUNT(close) OVER w5  < 5  THEN NULL ELSE AVG(close) OVER w5  END AS \"SMA 5\",\n       CASE WHEN COUNT(close) OVER w20 < 20 THEN NULL ELSE AVG(close) OVER w20 END AS \"SMA 20\",\n       CASE WHEN COUNT(close) OVER w50 < 50 THEN NULL ELSE AVG(close) OVER w50 END AS \"SMA 50\"\nFROM daily_bar\nWHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\nWINDOW w5  AS (ORDER BY session_date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW),\n       w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW),\n       w50 AS (ORDER BY session_date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW)\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -624,8 +648,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM v_symbol_trend WHERE symbol = '$symbol' AND rsi14 IS NOT NULL ORDER BY ts_epoch",
-          "queryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM v_symbol_trend WHERE symbol = '$symbol' AND rsi14 IS NOT NULL ORDER BY ts_epoch",
+          "rawQueryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM (\n  SELECT session_date, ts_epoch,\n         CASE WHEN COUNT(gain) OVER w14 < 14 THEN NULL\n              WHEN AVG(loss) OVER w14 = 0 THEN 100.0\n              ELSE 100.0 - 100.0 / (1 + (AVG(gain) OVER w14) / (AVG(loss) OVER w14))\n         END AS rsi14\n  FROM (\n    SELECT session_date, ts_epoch,\n           MAX(close - LAG(close) OVER p, 0) AS gain,\n           MAX(LAG(close) OVER p - close, 0) AS loss\n    FROM daily_bar\n    WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n    WINDOW p AS (ORDER BY session_date))\n  WINDOW w14 AS (ORDER BY session_date ROWS BETWEEN 13 PRECEDING AND CURRENT ROW))\nWHERE rsi14 IS NOT NULL\nORDER BY session_date",
+          "queryText": "SELECT ts_epoch AS time, rsi14 AS \"RSI(14)\"\nFROM (\n  SELECT session_date, ts_epoch,\n         CASE WHEN COUNT(gain) OVER w14 < 14 THEN NULL\n              WHEN AVG(loss) OVER w14 = 0 THEN 100.0\n              ELSE 100.0 - 100.0 / (1 + (AVG(gain) OVER w14) / (AVG(loss) OVER w14))\n         END AS rsi14\n  FROM (\n    SELECT session_date, ts_epoch,\n           MAX(close - LAG(close) OVER p, 0) AS gain,\n           MAX(LAG(close) OVER p - close, 0) AS loss\n    FROM daily_bar\n    WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n    WINDOW p AS (ORDER BY session_date))\n  WINDOW w14 AS (ORDER BY session_date ROWS BETWEEN 13 PRECEDING AND CURRENT ROW))\nWHERE rsi14 IS NOT NULL\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -790,7 +814,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "$symbol - supports and resistances",
-      "description": "Levels price has had to get through, plotted against the close.\n\n- **Pivot, R1/R2, S1/S2** — classic floor-trader pivots, computed from the previous session's high, low and close. R levels sit above as resistance, S levels below as support.\n- **20-day high / low** — the rolling extremes price has actually traded through.",
+      "description": "Levels price has had to get through, plotted against the close.\n\n- **Pivot, R1/R2, S1/S2** — classic floor-trader pivots, computed from the previous session's high, low and close. R levels sit above as resistance, S levels below as support.\n- **20-day high / low** — the rolling extremes price has actually traded through, once there are twenty sessions.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -809,8 +833,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT ts_epoch AS time,\n       close   AS \"Close\",\n       r2      AS \"R2\", r1 AS \"R1\", pivot AS \"Pivot\", s1 AS \"S1\", s2 AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM v_support_resistance WHERE symbol = '$symbol' ORDER BY ts_epoch",
-          "queryText": "SELECT ts_epoch AS time,\n       close   AS \"Close\",\n       r2      AS \"R2\", r1 AS \"R1\", pivot AS \"Pivot\", s1 AS \"S1\", s2 AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM v_support_resistance WHERE symbol = '$symbol' ORDER BY ts_epoch",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       close                          AS \"Close\",\n       pivot + (prev_high - prev_low) AS \"R2\",\n       2 * pivot - prev_low           AS \"R1\",\n       pivot                          AS \"Pivot\",\n       2 * pivot - prev_high          AS \"S1\",\n       pivot - (prev_high - prev_low) AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM (\n  SELECT session_date, ts_epoch, close,\n         (LAG(high) OVER p + LAG(low) OVER p + LAG(close) OVER p) / 3.0 AS pivot,\n         LAG(high) OVER p AS prev_high,\n         LAG(low)  OVER p AS prev_low,\n         CASE WHEN COUNT(*) OVER w20 < 20 THEN NULL ELSE MAX(high) OVER w20 END AS high_20,\n         CASE WHEN COUNT(*) OVER w20 < 20 THEN NULL ELSE MIN(low)  OVER w20 END AS low_20\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW p   AS (ORDER BY session_date),\n         w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))\nORDER BY session_date",
+          "queryText": "SELECT ts_epoch AS time,\n       close                          AS \"Close\",\n       pivot + (prev_high - prev_low) AS \"R2\",\n       2 * pivot - prev_low           AS \"R1\",\n       pivot                          AS \"Pivot\",\n       2 * pivot - prev_high          AS \"S1\",\n       pivot - (prev_high - prev_low) AS \"S2\",\n       high_20 AS \"20-day high\", low_20 AS \"20-day low\"\nFROM (\n  SELECT session_date, ts_epoch, close,\n         (LAG(high) OVER p + LAG(low) OVER p + LAG(close) OVER p) / 3.0 AS pivot,\n         LAG(high) OVER p AS prev_high,\n         LAG(low)  OVER p AS prev_low,\n         CASE WHEN COUNT(*) OVER w20 < 20 THEN NULL ELSE MAX(high) OVER w20 END AS high_20,\n         CASE WHEN COUNT(*) OVER w20 < 20 THEN NULL ELSE MIN(low)  OVER w20 END AS low_20\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW p   AS (ORDER BY session_date),\n         w20 AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW))\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -1068,7 +1092,7 @@
       "id": 14,
       "type": "timeseries",
       "title": "$symbol - where price sits in its own range",
-      "description": "Where the close sits between the low and high of a range: 0 is the bottom, 100 the top.\n\n- **% of 10-day range** — where a stock sits this fortnight. Rolls with every session.\n- **% of 52-week range** — where it sits over the past year. The closest thing to a valuation read here: dear or cheap against its own history, not against its earnings.\n\nThe 52-week band is a stored snapshot refreshed by hand (`DailyAnalysisMain week52`), so a later close can read below 0 or above 100. That is a stale band, not bad data.",
+      "description": "Where the close sits between the low and high of a range: 0 is the bottom, 100 the top.\n\n- **% of 10-day range** — where a stock sits this fortnight.\n- **% of 52-week range** — where it sits over the past year: the last 252 sessions, the year CAN SLIM measures the distance from the high over. The closest thing to a valuation read here: dear or cheap against its own history, not against its earnings.\n\nBoth roll with every session, and each starts once its window is full: a stock with less than a year of daily bars has no 52-week line yet.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -1087,8 +1111,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT ts_epoch AS time,\n       pct_of_52w_range AS \"% of 52-week range\",\n       pct_of_10d_range AS \"% of 10-day range\"\nFROM v_range_history\nWHERE symbol = '$symbol'\nORDER BY ts_epoch",
-          "queryText": "SELECT ts_epoch AS time,\n       pct_of_52w_range AS \"% of 52-week range\",\n       pct_of_10d_range AS \"% of 10-day range\"\nFROM v_range_history\nWHERE symbol = '$symbol'\nORDER BY ts_epoch",
+          "rawQueryText": "SELECT ts_epoch AS time,\n       CASE WHEN sessions_252 < 252 OR high_252 <= low_252 THEN NULL\n            ELSE (close - low_252) / (high_252 - low_252) * 100.0 END AS \"% of 52-week range\",\n       CASE WHEN sessions_10 < 10 OR high_10 <= low_10 THEN NULL\n            ELSE (close - low_10) / (high_10 - low_10) * 100.0 END    AS \"% of 10-day range\"\nFROM (\n  SELECT session_date, ts_epoch, close,\n         COUNT(*)  OVER w10  AS sessions_10,\n         MAX(high) OVER w10  AS high_10,\n         MIN(low)  OVER w10  AS low_10,\n         COUNT(*)  OVER w252 AS sessions_252,\n         MAX(high) OVER w252 AS high_252,\n         MIN(low)  OVER w252 AS low_252\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW w10  AS (ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),\n         w252 AS (ORDER BY session_date ROWS BETWEEN 251 PRECEDING AND CURRENT ROW))\nORDER BY session_date",
+          "queryText": "SELECT ts_epoch AS time,\n       CASE WHEN sessions_252 < 252 OR high_252 <= low_252 THEN NULL\n            ELSE (close - low_252) / (high_252 - low_252) * 100.0 END AS \"% of 52-week range\",\n       CASE WHEN sessions_10 < 10 OR high_10 <= low_10 THEN NULL\n            ELSE (close - low_10) / (high_10 - low_10) * 100.0 END    AS \"% of 10-day range\"\nFROM (\n  SELECT session_date, ts_epoch, close,\n         COUNT(*)  OVER w10  AS sessions_10,\n         MAX(high) OVER w10  AS high_10,\n         MIN(low)  OVER w10  AS low_10,\n         COUNT(*)  OVER w252 AS sessions_252,\n         MAX(high) OVER w252 AS high_252,\n         MIN(low)  OVER w252 AS low_252\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW w10  AS (ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW),\n         w252 AS (ORDER BY session_date ROWS BETWEEN 251 PRECEDING AND CURRENT ROW))\nORDER BY session_date",
           "timeColumns": [
             "time"
           ]
@@ -1182,7 +1206,7 @@
       "id": 90,
       "type": "stat",
       "title": "",
-      "description": "When a session's data was last written to the history these charts are drawn from. That happens after the close - the daemon reconciles the day and evening.sh ingests it - so during the market day this shows that earlier write, not the live session.",
+      "description": "When the daily bars this stock's tiles and charts are drawn from were last fetched. The CAN SLIM scan does that each market evening, after the close, so during the market day the newest candle is the previous session's. Market breadth comes from the tracked stocks' sessions, written after the close.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -1226,8 +1250,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
-          "queryText": "SELECT MAX(ingested_at) * 1000 AS \"Last data refresh\" FROM trading_day",
+          "rawQueryText": "SELECT run_at * 1000 AS \"Last data refresh\" FROM canslim_run ORDER BY id DESC LIMIT 1",
+          "queryText": "SELECT run_at * 1000 AS \"Last data refresh\" FROM canslim_run ORDER BY id DESC LIMIT 1",
           "timeColumns": []
         }
       ],

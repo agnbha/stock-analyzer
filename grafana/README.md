@@ -285,6 +285,18 @@ reasons versus sell reasons, and a table of whether each reason actually paid.
 `UNEXPLAINED` is a real category, not a gap: a fill with no note, event or alert
 behind it is worth counting.
 
+**Stock Trend** — one stock's daily candles with their 5-, 20- and 50-day averages, its trend, RSI and beta, supports
+and resistances, and where its price sits in its own range, beside how much of the market rose. Everything about the
+stock comes from the daily bars kept for the whole market (the chart on CAN SLIM reads the same ones), so every stock
+has it, tracked or not, as far back as those bars go. Their close, high and low are the exchange's official ones, as on
+Groww's daily chart. The CAN SLIM scan fetches the bars each market evening, so during the market day the newest candle
+is the previous session's. Each reading starts once its window is full: the 50-day average after 50 sessions, the
+52-week range after 252 (the year CAN SLIM measures the distance from the high over). Beta is measured against the
+market CAN SLIM reads (NIFTYBEES, a NIFTY 50 fund) over the last year of sessions, so it compares with a published NIFTY
+beta. The trend, RSI and pivots are the same arithmetic as the Watchlist's. Market breadth is still the tracked stocks',
+the universe the Watchlist ranks. The time picker offers three months and longer only (3 and 6 months, 1 and 2 years),
+because a few weeks of daily candles say little about a trend.
+
 **CAN SLIM** — the market's direction and distribution-day count across the
 top, then two lists: breakouts and setups about to break out (stocks that passed
 the screener.in query), and rallies that have ended (stop losses, heavy-volume
@@ -342,7 +354,8 @@ row and sits beside or above the first panel. What it counts differs by page:
 |---|---|
 | Account Overview | last fill imported, last balance recorded, last reasons worked out |
 | Decision Reasons | when the reasons were last worked out (each fill import) |
-| Stock Trend, Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
+| Stock Trend | the last CAN SLIM scan, which fetches the daily bars the stock's tiles and charts are drawn from each market evening; during the market day the newest candle is the previous session's |
+| Watchlist | when a session was last written to the history, which happens after the close; during the market day it shows that earlier write, not the live session |
 | Company Details | last company page read from screener.in (any company; this one's is its *Read on* date), last live candle, last session ingested, since the ratios are restated at the latest price |
 
 On Candles and Calls, **As of** much older than a few minutes during market hours
