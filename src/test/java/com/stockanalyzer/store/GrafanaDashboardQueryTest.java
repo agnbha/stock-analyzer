@@ -269,7 +269,8 @@ class GrafanaDashboardQueryTest {
         }
         assertTrue(checked >= 4, "expected the links between dashboards, found " + checked);
 
-        // Candles and Calls and Company Details are the same symbol from two sides: each links to the other.
+        // Candles and Calls and Company Details are the same symbol from two sides: each links to the other, from the
+        // top of the page or from a row of buttons on it.
         for (String[] pair : new String[][]{{"02-candles-and-calls.json", "stockanalyzer-company"},
                 {"07-company-details.json", "stockanalyzer-candles"}}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(pair[0])));
@@ -277,6 +278,10 @@ class GrafanaDashboardQueryTest {
             for (JsonNode dashboardLink : root.path("links")) {
                 carriesSymbol |= dashboardLink.path("url").asText().contains("/d/" + pair[1])
                         && dashboardLink.path("includeVars").asBoolean(false);
+            }
+            Pattern button = Pattern.compile("href=\"/d/" + pair[1] + "/[^\"]*\\$\\{symbol:queryparam}[^\"]*\"");
+            for (JsonNode panel : root.path("panels")) {
+                carriesSymbol |= button.matcher(panel.path("options").path("content").asText()).find();
             }
             assertTrue(carriesSymbol, pair[0] + " needs a link to " + pair[1] + " that takes the symbol picked along");
         }
