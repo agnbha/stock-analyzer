@@ -254,8 +254,8 @@ screener.in does not carry, and the industry P/E, which screener.in loads separa
 
 **Company Details** — the same screener.in reading on a page of its own, one symbol at a time, with more of it. Pick
 a symbol (the list is every company whose page has been read), or follow *Company Details* under the main chart on
-Candles and Calls, Stock Trend or CAN SLIM, which takes the symbol along; *Candles and Calls* at the top of this page
-goes back.
+Candles and Calls, Stock Trend or CAN SLIM, which takes the symbol along. *Candles and Calls*, *Stock Trend* and *CAN
+SLIM* at the top of this page open the same symbol on those pages.
 
 - *What the company does*: its classification, the description, the last quarter it reported results for, the last
   shareholding pattern filed, and the day the page was read. The panel's corner links open the company on

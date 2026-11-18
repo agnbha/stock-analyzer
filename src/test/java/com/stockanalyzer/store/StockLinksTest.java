@@ -117,6 +117,26 @@ class StockLinksTest {
     }
 
     @Test
+    @DisplayName("Company Details links to the other stock pages at its top, each taking the symbol and not the time")
+    void companyDetailsLinksBack() throws IOException {
+        JsonNode dashboard = dashboard("07-company-details.json");
+        assertEquals(Set.of("symbol"), variableNames(dashboard),
+                "carrying the page's variables carries the symbol alone");
+        Map<String, String> pages = Map.of("Candles and Calls", "stockanalyzer-candles",
+                "Stock Trend", "stockanalyzer-trend", "CAN SLIM", "stockanalyzer-canslim");
+        List<String> titles = new ArrayList<>();
+        for (JsonNode link : dashboard.path("links")) {
+            String title = link.path("title").asText();
+            titles.add(title);
+            assertTrue(link.path("url").asText().startsWith("/d/" + pages.get(title) + "/"), title);
+            assertEquals("link", link.path("type").asText(), title);
+            assertTrue(link.path("includeVars").asBoolean(), title + " takes the symbol along");
+            assertFalse(link.path("keepTime").asBoolean(), title + " opens on its own range");
+        }
+        assertEquals(List.of("Candles and Calls", "Stock Trend", "CAN SLIM"), titles);
+    }
+
+    @Test
     @DisplayName("the buttons use only styles Grafana keeps")
     void onlyStylesGrafanaKeeps() throws IOException {
         for (Row row : ROWS) {
