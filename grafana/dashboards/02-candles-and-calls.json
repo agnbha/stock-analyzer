@@ -263,18 +263,6 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": "The previous trading session, 9:15 to 15:30. Weekends and holidays are skipped: it is the last session with minutes stored before today. Session is left on All, so widening the range afterwards shows every session in it."
-    },
-    {
-      "title": "Company Details",
-      "type": "link",
-      "icon": "doc",
-      "url": "/d/stockanalyzer-company/company-details",
-      "includeVars": true,
-      "keepTime": false,
-      "targetBlank": false,
-      "asDropdown": false,
-      "tags": [],
-      "tooltip": "Everything read from screener.in for this symbol: results, shareholding, peers"
     }
   ],
   "templating": {
@@ -1047,6 +1035,27 @@
       }
     },
     {
+      "id": 23,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<a href=\"/d/stockanalyzer-canslim/can-slim?${symbol:queryparam}\" title=\"$symbol on CAN SLIM: its daily chart with the 50- and 200-day averages, the pivot and every scan's reading\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">CAN SLIM</a>\n<a href=\"/d/stockanalyzer-trend/stock-trend?${symbol:queryparam}&${detector:queryparam}\" title=\"$symbol on Stock Trend: daily candles and moving averages, RSI, supports and resistances\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">Stock Trend</a>\n<a href=\"/d/stockanalyzer-company/company-details?${symbol:queryparam}\" title=\"$symbol on Company Details: everything read from screener.in, results, shareholding, peers\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">Company Details</a>\n</div>",
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        }
+      }
+    },
+    {
       "id": 21,
       "type": "table",
       "title": "$symbol - windows found in the selected sessions",
@@ -1057,7 +1066,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 15,
+        "y": 17,
         "w": 11,
         "h": 7
       },
@@ -1164,7 +1173,7 @@
       },
       "gridPos": {
         "x": 11,
-        "y": 15,
+        "y": 17,
         "w": 13,
         "h": 7
       },
@@ -1273,7 +1282,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 24,
         "w": 24,
         "h": 9
       },
@@ -1408,7 +1417,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 33,
         "w": 24,
         "h": 8
       },
@@ -1451,7 +1460,7 @@
       "description": "From the company's page on screener.in, read by `CanSlimMain profiles` (evening.sh does a few each night). **Market cap, P/E, P/B and dividend yield** are restated at the latest price this database holds (today's last candle, else the last session's close) from the figures that do not move with it: earnings per share over the trailing twelve months, book value, the share count and the dividend per share. **Debt / equity** is borrowings over equity capital plus reserves in the latest balance sheet. **ROE, ROCE, book value and face value** are as the page shows them. The 52-week range is this database's own where it has one, else the page's. Empty until the company's page has been read.",
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 41,
         "w": 24,
         "h": 5
       },
@@ -1725,7 +1734,7 @@
       "description": "The company's latest eight reported quarters, from screener.in. Revenue is its \"Sales\" line (a bank's \"Revenue\"); net profit is after tax.",
       "gridPos": {
         "x": 0,
-        "y": 44,
+        "y": 46,
         "w": 12,
         "h": 9
       },
@@ -1817,7 +1826,7 @@
       "description": "The shareholding pattern at the end of each of the last eight quarters, from screener.in: promoters, foreign institutions (FII), domestic institutions (DII) and the public. Government and other holders, a percent or so, are left out, so the bars fall a little short of 100.",
       "gridPos": {
         "x": 12,
-        "y": 44,
+        "y": 46,
         "w": 12,
         "h": 9
       },
@@ -1942,7 +1951,7 @@
       "description": "Compounded growth in revenue and profit as screener.in prints it: over the trailing twelve months, and per year over three years.",
       "gridPos": {
         "x": 0,
-        "y": 53,
+        "y": 55,
         "w": 24,
         "h": 4
       },
@@ -2018,7 +2027,7 @@
       "description": "What the company does, and the sector it is filed under, from its page on screener.in.",
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 59,
         "w": 24,
         "h": 6
       },
