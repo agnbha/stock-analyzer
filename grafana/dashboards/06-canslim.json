@@ -17,6 +17,20 @@
     "from": "now-1y",
     "to": "now"
   },
+  "links": [
+    {
+      "title": "US Yields and Crude Oil",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-markets/us-yields-and-crude-oil",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "US Treasury yields and crude oil: daily history and today's prices"
+    }
+  ],
   "annotations": {
     "list": [
       {

@@ -92,7 +92,24 @@ public final class SchemaMigrator {
         all.put(24, v24());
         all.put(25, v25());
         all.put(26, v26());
+        all.put(27, v27());
         return all;
+    }
+
+    /**
+     * v27: daily market series from outside the broker, for the page linked from CAN SLIM: the US Treasury's 10- and
+     * 2-year yields and Brent and WTI crude, read by {@code CanSlimMain markets}. One row a series a day, under names of
+     * our own (US10Y, US2Y, BRENT, WTI); a reading read again replaces the one held.
+     */
+    private List<String> v27() {
+        return List.of("""
+                CREATE TABLE market_series (
+                  series TEXT NOT NULL,
+                  observed_on TEXT NOT NULL,
+                  value REAL NOT NULL,
+                  fetched_at INTEGER NOT NULL,
+                  PRIMARY KEY (series, observed_on)
+                ) WITHOUT ROWID""");
     }
 
     /**

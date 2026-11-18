@@ -443,6 +443,26 @@ public final class AppConfig {
         return Long.parseLong(get("canslim.screener.request.interval.ms", "12000"));
     }
 
+    /** Where the US Treasury's daily yield curve files are read from. */
+    public String marketsTreasuryBaseUrl() {
+        return get("markets.treasury.base.url", "https://home.treasury.gov");
+    }
+
+    /** Where FRED's API, for the crude oil prices, is read from. */
+    public String marketsFredApiUrl() {
+        return get("markets.fred.api.url", "https://api.stlouisfed.org");
+    }
+
+    /** The free FRED API key, for the crude oil prices. Prefer the FRED_API_KEY env var; null when none is set. */
+    public String fredApiKeyOrNull() {
+        return get("fred.api.key", null);
+    }
+
+    /** How far back a series is read the first time, in days. */
+    public int marketsHistoryDays() {
+        return Integer.parseInt(get("markets.history.days", "760"));
+    }
+
     /** How old a company's profile may be before its screener.in page is read again. */
     public int companyProfileRefreshDays() {
         return Integer.parseInt(get("company.profile.refresh.days", "1"));
