@@ -283,6 +283,14 @@ reasons versus sell reasons, and a table of whether each reason actually paid.
 `UNEXPLAINED` is a real category, not a gap: a fill with no note, event or alert
 behind it is worth counting.
 
+**Stock Trend** — one stock's daily candles with their 5-, 20- and 50-day averages, its RSI, supports and resistances,
+and where its price sits in its own range, beside how much of the market rose. The daily candles come from the daily
+bars kept for the whole market (the chart on CAN SLIM reads the same ones), so every stock has them, tracked or not, as
+far back as those bars go. Their close is the exchange's official close, as on Groww's daily chart. The tiles and the
+charts under the candles are still worked out from the sessions built from minutes, which only the tracked stocks
+have. The time picker offers three months and longer only (3 and 6 months, 1 and 2 years), because a few weeks of
+daily candles say little about a trend.
+
 **CAN SLIM** — the market's direction and distribution-day count across the
 top, then two lists: breakouts and setups about to break out (stocks that passed
 the screener.in query), and rallies that have ended (stop losses, heavy-volume
