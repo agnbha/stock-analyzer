@@ -230,10 +230,18 @@ about the business: the fundamentals (market cap, P/E, P/B, debt/equity, ROE, RO
 face value, and the 52-week range), revenue and net profit for the last eight quarters, growth over the trailing year
 and three years, who holds the shares over the same quarters (promoters, FII, DII, public), and what the company does.
 
-They come from the company's public page, read by `CanSlimMain profiles`. `evening.sh` reads a dozen of the stalest
-each night, 12 seconds apart because screener.in refuses a faster pace, so the symbols in `symbols.txt` turn over in
-about a week (`company.profile.refresh.days`, `company.profile.max.pages.per.run`); `profiles --symbol RELIANCE` reads
-one now, and `profiles --max-pages 0` everything due. Until a company has been read its panels are empty.
+They come from the company's public page, read by `CanSlimMain profiles`. `evening.sh` reads every symbol in
+`symbols.txt` each evening, 12 seconds apart because screener.in refuses a faster pace (62 pages, about 12.5 minutes),
+so their filings are at most a day old (`company.profile.refresh.days`, `company.profile.max.pages.per.run`; a page
+read within six hours of the period counts as due, so one read at this time last night is read again tonight).
+`profiles --symbol RELIANCE` reads one now, and `profiles --max-pages 0` everything due. Until a company has been read
+its panels are empty.
+
+*Announcements and concalls.* Under the growth tiles, Company Details lists the company's five latest filings as its
+page shows them, newest first, each with its time and the line screener.in writes on what it says (a merger, an order
+won, a change of CFO; routine filings have none). Click a subject to open the filing on the exchange's site. Beside
+them are its latest earnings calls with links to their presentations and recordings. Read signed out, as the pages are,
+screener.in shows a call's transcript and its own summary without a link, so neither is there yet.
 
 Every other symbol the database holds (the whole market's daily bars, and any stock you traded outside `symbols.txt`)
 gets the same details on a slower round: after the tracked symbols, `evening.sh` reads up to 50 of them a night, stocks

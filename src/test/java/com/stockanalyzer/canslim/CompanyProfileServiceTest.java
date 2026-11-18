@@ -92,6 +92,19 @@ class CompanyProfileServiceTest {
     }
 
     @Test
+    @DisplayName("read every evening, a page read last night is read again tonight even if this run reaches it sooner")
+    void aDailyRoundRereadsLastNightsPages() {
+        profiles.save(id("EARLIER"), welspun, NOW - 86_400L + 20 * 60);   // 23 h 40 min ago
+        profiles.save(id("TODAY"), welspun, NOW - 12 * 3_600L);           // this morning, by hand
+
+        CompanyProfileService.Result result = service(symbol -> Optional.of(welspun))
+                .refresh(List.of("EARLIER", "TODAY"), 0, 86_400L, false);
+
+        assertEquals(List.of("EARLIER"), asked, "within six hours of a day counts as a day; half a day does not");
+        assertEquals(1, result.fetched());
+    }
+
+    @Test
     @DisplayName("a company whose copy is fresh is left alone unless it is forced")
     void freshCopiesAreNotReadAgain() {
         profiles.save(id("AAA"), welspun, NOW - 86_400L);
@@ -161,7 +174,7 @@ class CompanyProfileServiceTest {
 
         CompanyProfile shorter = new CompanyProfile("About.", "Sector", 100.0, 10.0, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null,
-                welspun.quarters().subList(0, 2), List.of());
+                welspun.quarters().subList(0, 2), List.of(), List.of(), List.of());
         profiles.save(id, shorter, NOW);
 
         assertEquals("2", scalar("SELECT COUNT(*) FROM company_quarter"));

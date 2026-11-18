@@ -91,7 +91,40 @@ public final class SchemaMigrator {
         all.put(23, v23());
         all.put(24, v24());
         all.put(25, v25());
+        all.put(26, v26());
         return all;
+    }
+
+    /**
+     * v26: what a company has filed lately and its earnings calls, from the same screener.in page as its profile,
+     * for the Company Details page. Both are replaced whenever the page is read, as the profile is: the filings are
+     * the ones the page lists then (the latest five), with screener.in's one line on each, and the calls are the
+     * latest eight with whatever links the page gives for them.
+     */
+    private List<String> v26() {
+        List<String> ddl = new ArrayList<>();
+        ddl.add("""
+                CREATE TABLE company_announcement (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  position INTEGER NOT NULL,
+                  announced_at INTEGER,
+                  title TEXT NOT NULL,
+                  summary TEXT,
+                  url TEXT,
+                  PRIMARY KEY (instrument_id, position)
+                ) WITHOUT ROWID""");
+        ddl.add("""
+                CREATE TABLE company_concall (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  position INTEGER NOT NULL,
+                  period TEXT NOT NULL,
+                  transcript_url TEXT,
+                  presentation_url TEXT,
+                  recording_url TEXT,
+                  summary_url TEXT,
+                  PRIMARY KEY (instrument_id, position)
+                ) WITHOUT ROWID""");
+        return ddl;
     }
 
     /**

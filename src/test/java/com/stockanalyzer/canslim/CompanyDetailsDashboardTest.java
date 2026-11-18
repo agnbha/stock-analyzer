@@ -23,9 +23,13 @@ import java.sql.ResultSetMetaData;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -240,7 +244,106 @@ class CompanyDetailsDashboardTest {
         assertTrue(panel(13, "NIFTYBEES").isEmpty(), "and the comparison has nothing to list");
     }
 
+    @Test
+    @DisplayName("the latest filings, newest first, with the time they were filed in IST, screener.in's line and a link")
+    void announcements() throws IOException {
+        profiles.save(id("EXAMPLE"), withDocuments(), NOW);
+
+        List<Map<String, Object>> filings = panel(14, "EXAMPLE");
+        assertEquals(5, filings.size());
+        Map<String, Object> first = filings.getFirst();
+        assertEquals("13 Nov 2026, 15:16", first.get("Filed"));
+        assertEquals("Announcement under Regulation 30 (LODR)-Change in Management", first.get("Announcement"));
+        assertEquals("Chief Financial Officer resigns; the board names the Company's treasurer as interim CFO.",
+                first.get("What it says"));
+        assertEquals("https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=aaaa1111.pdf", first.get("url"));
+        assertNull(filings.get(1).get("What it says"), "a routine filing");
+        assertEquals("4 Nov 2026, 12:21", filings.get(1).get("Filed"), "no leading zero on the day");
+        assertEquals("27 Oct 2026, 18:24", filings.getLast().get("Filed"));
+    }
+
+    @Test
+    @DisplayName("the latest calls, newest first, naming only the links the page gave")
+    void concalls() throws IOException {
+        profiles.save(id("EXAMPLE"), withDocuments(), NOW);
+
+        List<Map<String, Object>> calls = panel(15, "EXAMPLE");
+        assertEquals(8, calls.size());
+        Map<String, Object> latest = calls.getFirst();
+        assertEquals("Oct 2026", latest.get("Call"));
+        assertEquals("Presentation", latest.get("Presentation"));
+        assertEquals("Recording", latest.get("Recording"));
+        assertNull(latest.get("Transcript"), "signed out, the page does not link it");
+        assertEquals("https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=ppt-oct-2026.pdf",
+                latest.get("presentation_url"));
+        assertNull(calls.get(2).get("Presentation"), "May 2026 had none");
+        assertEquals("Jan 2025", calls.getLast().get("Call"));
+    }
+
+    @Test
+    @DisplayName("a page read again replaces the filings and calls; a page with nothing on it leaves none behind")
+    void documentsAreReplacedOnEachRead() throws IOException {
+        long example = id("EXAMPLE");
+        profiles.save(example, withDocuments(), NOW - 86_400L);
+        profiles.save(example, welspun, NOW);
+        assertTrue(panel(14, "EXAMPLE").isEmpty(), "the page read today listed none");
+        assertTrue(panel(15, "EXAMPLE").isEmpty());
+
+        profiles.save(example, withDocuments(), NOW);
+        profiles.saveEmpty(example, NOW);
+        assertTrue(panel(14, "EXAMPLE").isEmpty());
+        assertTrue(panel(15, "EXAMPLE").isEmpty());
+    }
+
+    @Test
+    @DisplayName("each linked column opens the URL its query returns, and the URL columns themselves are hidden")
+    void linksPointAtHiddenColumns() throws IOException {
+        profiles.save(id("EXAMPLE"), withDocuments(), NOW);
+        Pattern field = Pattern.compile("^\\$\\{__data\\.fields\\.(\\w+)}$");
+        int links = 0;
+        for (int id : new int[]{14, 15}) {
+            JsonNode panel = StreamSupport.stream(dashboard().path("panels").spliterator(), false)
+                    .filter(p -> p.path("id").asInt() == id).findFirst().orElseThrow();
+            Set<String> columns = panel(id, "EXAMPLE").getFirst().keySet();
+            Set<String> hidden = new HashSet<>();
+            Map<String, String> linked = new LinkedHashMap<>();
+            for (JsonNode override : panel.path("fieldConfig").path("overrides")) {
+                String name = override.path("matcher").path("options").asText();
+                for (JsonNode property : override.path("properties")) {
+                    if (property.path("id").asText().equals("custom.hidden") && property.path("value").asBoolean()) {
+                        hidden.add(name);
+                    }
+                    if (property.path("id").asText().equals("links")) {
+                        Matcher url = field.matcher(property.path("value").get(0).path("url").asText());
+                        assertTrue(url.matches(), name + ": " + property);
+                        assertTrue(property.path("value").get(0).path("targetBlank").asBoolean(), name);
+                        linked.put(name, url.group(1));
+                    }
+                }
+            }
+            for (Map.Entry<String, String> link : linked.entrySet()) {
+                assertTrue(columns.contains(link.getKey()), id + ": no column " + link.getKey());
+                assertTrue(columns.contains(link.getValue()), id + ": no column " + link.getValue());
+                assertTrue(hidden.contains(link.getValue()), id + ": " + link.getValue() + " shows as a column");
+                links++;
+            }
+            for (String column : columns) {
+                assertTrue(!column.endsWith("url") || hidden.contains(column), id + ": " + column + " is not hidden");
+            }
+        }
+        assertEquals(4, links, "the filing, and a call's presentation, transcript and recording");
+    }
+
     // ---- helpers -------------------------------------------------------------------------------------------------
+
+    /** WELSPUNLIV's page with the invented Documents section in place of its own. */
+    private CompanyProfile withDocuments() throws IOException {
+        try (InputStream page = getClass().getResourceAsStream("/screener/company-welspunliv.html");
+             InputStream documents = getClass().getResourceAsStream("/screener/company-documents.html")) {
+            return ScreenerCompanyParser.profile(new String(page.readAllBytes(), StandardCharsets.UTF_8)
+                    + new String(documents.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
 
     private long id(String symbol) {
         return instruments.findOrCreate(symbol, "NSE", "CASH");
@@ -253,7 +356,8 @@ class CompanyDetailsDashboardTest {
     private static CompanyProfile company(String classification, double marketCapCr, List<CompanyProfile.Quarter> quarters) {
         YearMonth latest = quarters.isEmpty() ? null : quarters.getLast().period();
         return new CompanyProfile("A company.", classification, marketCapCr, 100.0, 120.0, 80.0, 20.0, 50.0, 1.0,
-                15.0, 12.0, 1.0, 5.0, 0.5, 10.0, 10.0, 10.0, 10.0, latest, null, quarters, List.of());
+                15.0, 12.0, 1.0, 5.0, 0.5, 10.0, 10.0, 10.0, 10.0, latest, null, quarters, List.of(), List.of(),
+                List.of());
     }
 
     private static double number(Map<String, Object> row, String column) {

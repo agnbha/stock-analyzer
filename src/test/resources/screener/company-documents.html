@@ -1,0 +1,203 @@
+<!-- The documents section of a screener.in company page, signed out, in the page's own markup. The company, its
+     filings and its calls are invented. -->
+<html>
+<body>
+    <section id="documents" class="card card-large">
+      <div class="flex flex-space-between margin-bottom-16">
+        <h2 class="margin-0">Documents</h2>
+      </div>
+
+      <div class="flex-row flex-gap-small">
+
+          <div class="documents flex-column" style="flex: 2 1 250px;">
+            <h3 class="margin-bottom-8">Announcements</h3>
+
+            <div class="show-more-box" style="flex-basis: 300px">
+              <div id="company-announcements-tab">
+                <div class="flex">
+  <div class="options small" style="margin-bottom: 0">
+    <button
+      type="button"
+      class="active"
+      onclick="Utils.ajaxLoad(event, '/announcements/recent/9999/')"
+      data-swap="#company-announcements-tab"
+    >
+      Recent
+    </button>
+    <a class="button" href="https://www.bseindia.com/stock-share-price/example/EXAMPLE/999999/corp-announcements/" target="_blank" rel="noopener noreferrer">
+      All
+      <i class="icon-link-ext smaller"></i>
+    </a>
+  </div>
+</div>
+
+  <ul class="list-links">
+
+      <li class="overflow-wrap-anywhere">
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=aaaa1111.pdf"
+           target="_blank"
+           rel="noopener noreferrer">
+          Announcement under Regulation 30 (LODR)-Change in Management
+
+            <div class="ink-600 smaller"><time datetime="2026-11-13T15:16:15+05:30">13 Nov</time> - Chief Financial Officer resigns; the board names the Company&#x27;s treasurer as interim CFO.</div>
+
+        </a>
+      </li>
+
+      <li class="overflow-wrap-anywhere">
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=bbbb2222.pdf"
+           target="_blank"
+           rel="noopener noreferrer">
+          Announcement under Regulation 30 (LODR)-Analyst / Investor Meet - Intimation
+
+            <span class="ink-600 smaller"><time datetime="2026-11-04T12:21:04+05:30">4 Nov</time></span>
+
+        </a>
+      </li>
+
+      <li class="overflow-wrap-anywhere">
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=cccc3333.pdf&amp;type=new"
+           target="_blank"
+           rel="noopener noreferrer">
+          Announcement under Regulation 30 (LODR)-Scheme of Arrangement
+
+            <div class="ink-600 smaller"><time datetime="2026-11-02T18:44:16+05:30">2 Nov</time> - Board approves merging its wholly owned subsidiary into the company &amp; a demerger of the packaging arm.</div>
+
+        </a>
+      </li>
+
+      <li class="overflow-wrap-anywhere">
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=dddd4444.pdf"
+           target="_blank"
+           rel="noopener noreferrer">
+          Bagging/Receiving Of Orders/Contracts
+
+            <div class="ink-600 smaller"><time datetime="2026-10-28T09:05:00+05:30">28 Oct</time> - Wins a three-year supply order from a state utility.</div>
+
+        </a>
+      </li>
+
+      <li class="overflow-wrap-anywhere">
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=eeee5555.pdf"
+           target="_blank"
+           rel="noopener noreferrer">
+          Unaudited Financial Results For The Quarter Ended 30Th September, 2026
+
+            <div class="ink-600 smaller"><time datetime="2026-10-27T18:24:48+05:30">27 Oct</time> - Quarterly results approved; revenue up on new customers in exports.</div>
+
+        </a>
+      </li>
+
+  </ul>
+
+              </div>
+            </div>
+          </div>
+
+        <div class="documents annual-reports flex-column"
+             style="flex: 1 1 180px;
+                    max-width: 200px">
+          <h3>Annual reports</h3>
+          <div class="show-more-box">
+  <ul class="list-links">
+      <li>
+        <a href="https://www.bseindia.com/annual-report-2026.pdf" target="_blank" rel="noopener noreferrer">
+          Financial Year 2026
+          <div class="ink-600 smaller">from bse</div>
+        </a>
+      </li>
+  </ul>
+          </div>
+        </div>
+
+          <div class="documents concalls flex-column"
+               style="flex: 2 1 260px;
+                      max-width: fit-content">
+            <div class="flex flex-space-between flex-align-center margin-bottom-8">
+              <h3 class="margin-0">Concalls</h3>
+              <button class="a font-size-12 font-weight-500 sub"
+                      onclick="Modal.openInModal(event)"
+                      data-url="/concalls/add-9999/"
+                      data-title="EXAMPLE - Add Link">
+                <i class="icon-flag"></i>
+                <span class="underline-link">Add Missing</span>
+              </button>
+            </div>
+            <div class="show-more-box"><ul class="list-links">
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap"
+           style="width: 74px">Oct 2026</div>
+
+        <div class="button-chip">Transcript</div>
+
+        <div class="button-chip">AI Summary</div>
+
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=ppt-oct-2026.pdf"
+           class="button-chip"
+           target="_blank"
+           rel="noopener noreferrer">PPT</a>
+
+        <a href="https://example.com/recordings/oct-2026"
+           class="button-chip"
+           target="_blank"
+           rel="noopener noreferrer">REC</a>
+
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap"
+           style="width: 74px">Jul 2026</div>
+
+        <div class="button-chip">Transcript</div>
+
+        <a href="https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=ppt-jul-2026.pdf"
+           class="button-chip"
+           target="_blank"
+           rel="noopener noreferrer">PPT</a>
+
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap"
+           style="width: 74px">May 2026</div>
+
+        <div class="button-chip">Transcript</div>
+
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">Jan 2026</div>
+        <a href="https://www.bseindia.com/ppt-jan-2026.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">Oct 2025</div>
+        <a href="https://www.bseindia.com/ppt-oct-2025.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">Jul 2025</div>
+        <a href="https://www.bseindia.com/ppt-jul-2025.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">May 2025</div>
+        <a href="https://www.bseindia.com/ppt-may-2025.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">Jan 2025</div>
+        <a href="https://www.bseindia.com/ppt-jan-2025.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+
+    <li class="flex flex-gap-8 flex-wrap-420">
+      <div class="ink-600 font-size-15 font-weight-500 nowrap" style="width: 74px">Oct 2024</div>
+        <a href="https://www.bseindia.com/ppt-oct-2024.pdf" class="button-chip" target="_blank">PPT</a>
+    </li>
+  </ul></div>
+          </div>
+      </div>
+    </section>
+</body>
+</html>

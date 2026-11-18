@@ -1,5 +1,6 @@
 package com.stockanalyzer.canslim;
 
+import java.time.Instant;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -23,6 +24,8 @@ import java.util.List;
  * @param salesGrowthTtm compounded growth figures as the page prints them, in percent
  * @param quarters       the latest reported quarters, oldest first
  * @param holdings       the latest quarters of the shareholding pattern, oldest first
+ * @param announcements  the filings the page lists under Announcements, newest first
+ * @param concalls       the latest earnings calls the page lists, newest first
  */
 public record CompanyProfile(String about,
                              String classification,
@@ -45,7 +48,9 @@ public record CompanyProfile(String about,
                              YearMonth resultsQuarter,
                              YearMonth holdingQuarter,
                              List<Quarter> quarters,
-                             List<Holding> holdings) {
+                             List<Holding> holdings,
+                             List<Announcement> announcements,
+                             List<Concall> concalls) {
 
     /** One reported quarter, in crore rupees except per-share earnings. */
     public record Quarter(YearMonth period, Double sales, Double netProfit, Double eps) {
@@ -56,9 +61,36 @@ public record CompanyProfile(String about,
                           Double publicShare, Double others, Double shareholders) {
     }
 
+    /**
+     * A filing as the page lists it under Announcements.
+     *
+     * @param at      when it was filed, from the page's timestamp; null if the page gave none
+     * @param title   the filing's subject, as the exchange records it
+     * @param summary screener.in's one line on what it says, which most filings carry and routine ones do not
+     * @param url     the filing itself, on the exchange's site
+     */
+    public record Announcement(Instant at, String title, String summary, String url) {
+    }
+
+    /**
+     * An earnings call as the page lists it under Concalls, with the links screener.in gives for it. Signed out,
+     * the transcript and screener.in's summary are labels without a link, so only the presentation has one.
+     *
+     * @param period          the month of the call
+     * @param transcriptUrl   the call's transcript, when the page links it
+     * @param presentationUrl the investor presentation for the call
+     * @param recordingUrl    the call's recording
+     * @param summaryUrl      where screener.in's summary of the call is read from, when the page links it
+     */
+    public record Concall(YearMonth period, String transcriptUrl, String presentationUrl, String recordingUrl,
+                          String summaryUrl) {
+    }
+
     public CompanyProfile {
         quarters = List.copyOf(quarters);
         holdings = List.copyOf(holdings);
+        announcements = List.copyOf(announcements);
+        concalls = List.copyOf(concalls);
     }
 
     /**

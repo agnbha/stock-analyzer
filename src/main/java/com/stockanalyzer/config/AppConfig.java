@@ -445,12 +445,12 @@ public final class AppConfig {
 
     /** How old a company's profile may be before its screener.in page is read again. */
     public int companyProfileRefreshDays() {
-        return Integer.parseInt(get("company.profile.refresh.days", "7"));
+        return Integer.parseInt(get("company.profile.refresh.days", "1"));
     }
 
     /** The most company pages one nightly run reads for profiles; zero reads every one that is due. */
     public int companyProfileMaxPagesPerRun() {
-        return Integer.parseInt(get("company.profile.max.pages.per.run", "12"));
+        return Integer.parseInt(get("company.profile.max.pages.per.run", "0"));
     }
 
     /** How old the profile of a symbol outside symbols.txt may be before its page is read again: three months. */

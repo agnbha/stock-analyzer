@@ -143,7 +143,7 @@
       "id": 1,
       "type": "table",
       "title": "$symbol - what the company does",
-      "description": "From the company's public page on screener.in, read by `CanSlimMain profiles` (evening.sh reads a dozen of the stalest each night, so each company is read again about once a week). **Latest results** is the last quarter the company has reported, **Shareholding as of** the last shareholding pattern filed, **Read on** the day its screener.in page was read. The links in the corner open the company on screener.in and on Candles and Calls.",
+      "description": "From the company's public page on screener.in, read by `CanSlimMain profiles` (evening.sh reads every tracked company each evening; other stocks on a slower round, every three months). **Latest results** is the last quarter the company has reported, **Shareholding as of** the last shareholding pattern filed, **Read on** the day its screener.in page was read. The links in the corner open the company on screener.in and on Candles and Calls.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -648,13 +648,271 @@
       }
     },
     {
+      "id": 103,
+      "type": "row",
+      "title": "Announcements and concalls",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "$symbol - the latest announcements",
+      "description": "The filings the company's screener.in page lists under Announcements when it was last read (**Read on**, at the top): the five latest, newest first, at the time they reached the exchange. **What it says** is screener.in's one line on the filing; a routine one (an investor meet, a trading window) has none. Click a subject to open the filing itself on the exchange's site.\n\nThe tracked stocks' pages are read every evening, so their filings are at most a day old. Other stocks' pages are read on a slow round, so look at **Read on** before reading these as the latest.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position",
+          "queryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Filed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Announcement"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 330
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Announcement"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the filing",
+                    "url": "${__data.fields.url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "$symbol - concalls",
+      "description": "The company's latest earnings calls as its screener.in page lists them, newest first, with a link to what the page gives for each: the investor presentation, and the recording when there is one. Read signed out, screener.in shows the transcript and its own summary of a call without a link, so neither is here yet.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 19,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Call"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Presentation"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the presentation",
+                    "url": "${__data.fields.presentation_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Transcript"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the transcript",
+                    "url": "${__data.fields.transcript_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recording"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the recording",
+                    "url": "${__data.fields.recording_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "presentation_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "transcript_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "recording_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": 100,
       "type": "row",
       "title": "Quarterly results",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 28,
         "w": 24,
         "h": 1
       },
@@ -671,7 +929,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 29,
         "w": 12,
         "h": 9
       },
@@ -764,7 +1022,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 19,
+        "y": 29,
         "w": 6,
         "h": 9
       },
@@ -842,7 +1100,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 19,
+        "y": 29,
         "w": 6,
         "h": 9
       },
@@ -920,7 +1178,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 38,
         "w": 24,
         "h": 10
       },
@@ -1265,7 +1523,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 38,
+        "y": 48,
         "w": 24,
         "h": 1
       },
@@ -1282,7 +1540,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 49,
         "w": 12,
         "h": 9
       },
@@ -1422,7 +1680,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 39,
+        "y": 49,
         "w": 12,
         "h": 9
       },
@@ -1500,7 +1758,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 58,
         "w": 12,
         "h": 4
       },
@@ -1593,7 +1851,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 58,
         "w": 12,
         "h": 4
       },
@@ -1686,7 +1944,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 52,
+        "y": 62,
         "w": 24,
         "h": 10
       },
@@ -1757,7 +2015,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 62,
+        "y": 72,
         "w": 24,
         "h": 1
       },
@@ -1774,7 +2032,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 63,
+        "y": 73,
         "w": 24,
         "h": 16
       },
