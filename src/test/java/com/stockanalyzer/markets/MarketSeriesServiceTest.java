@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** What the evening read asks FRED for, and what it keeps. The readings are invented. */
+/** What the evening read asks its sources for, and what it keeps. The readings are invented. */
 class MarketSeriesServiceTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 18);
@@ -54,7 +54,7 @@ class MarketSeriesServiceTest {
         return new MarketSeriesService((series, from) -> {
             asked.add(series + " from " + from);
             if (!available.containsKey(series)) {
-                throw new MarketDataException("FRED answered HTTP 404 for " + series, null);
+                throw new MarketDataException("the source answered HTTP 404 for " + series, null);
             }
             return available.get(series).stream().filter(o -> !o.date().isBefore(from)).toList();
         }, repository, CLOCK);

@@ -540,12 +540,11 @@ public final class AppContext implements AutoCloseable {
         return new WatchlistService(watchlistPickRepository);
     }
 
-    /** Reads the US Treasury yields (from the Treasury) and crude oil prices (from FRED) into the database. */
+    /** Reads the US Treasury yields (from the Treasury) and Brent and WTI (the EIA's, via an open dataset). */
     public com.stockanalyzer.markets.MarketSeriesService marketSeriesService() {
         com.stockanalyzer.markets.MarketSources sources = new com.stockanalyzer.markets.MarketSources(
                 new com.stockanalyzer.markets.TreasuryYieldClient(httpClient, config.marketsTreasuryBaseUrl()),
-                new com.stockanalyzer.markets.FredClient(httpClient, config.marketsFredApiUrl(),
-                        config.fredApiKeyOrNull()));
+                new com.stockanalyzer.markets.OilPricesClient(httpClient, config.marketsOilPricesUrl()));
         return new com.stockanalyzer.markets.MarketSeriesService(sources,
                 new com.stockanalyzer.store.jdbc.SqliteMarketSeriesRepository(database), java.time.Clock.systemUTC());
     }

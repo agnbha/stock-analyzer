@@ -325,10 +325,10 @@ that move it most: US yields, which FII money answers to, and crude, which India
 today's prices on CNBC (the US 10- and 2-year yields, Brent and WTI). Under them, each series' latest daily reading
 and date, and its move over a month, three months and a year (basis points for a yield, percent for crude); then the
 yields with the 10-year less 2-year gap, and the two crudes, over the range picked. `CanSlimMain markets` reads them
-each evening: the yields from the US Treasury's own daily yield curve file, the evening after the US trading day; Brent
-and WTI from the EIA's spot prices through FRED, about a week behind, which needs a free FRED API key (sign in at
-fred.stlouisfed.org, My Account, API Keys, and put `FRED_API_KEY=...` in `~/.stock-analyzer.env`). Without the key the
-crude stays empty, and the run says so each evening; the yields and the buttons work regardless.
+each evening from files published openly for programs, with no key: the yields from the US Treasury's own daily yield
+curve file, the evening after the US trading day, and Brent and WTI from the EIA's daily spot prices in the open
+oil-prices dataset (github.com/datasets/oil-prices, public domain), which refreshes them weekly, so they run about a
+week behind; the buttons have today's.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.

@@ -118,7 +118,7 @@ public final class SchemaMigrator {
 
     /**
      * v27: daily market series from outside the broker, for the page linked from CAN SLIM: the US Treasury's 10- and
-     * 2-year yields and Brent and WTI crude, read by {@code CanSlimMain markets}. One row a series a day, under names of
+     * 2-year yields and the price of crude, read by {@code CanSlimMain markets}. One row a series a day, under names of
      * our own (US10Y, US2Y, BRENT, WTI); a reading read again replaces the one held.
      */
     private List<String> v27() {

@@ -1,7 +1,7 @@
 {
   "uid": "stockanalyzer-markets",
   "title": "US Yields and Crude Oil",
-  "description": "The US Treasury yields and crude oil prices behind the market's direction: what FII money and India's import bill answer to. Daily readings from the US Treasury and FRED, read each evening, and buttons to today's prices.",
+  "description": "The US Treasury yields and crude oil prices behind the market's direction: what FII money and India's import bill answer to. Daily readings from the US Treasury and the EIA, read each evening, and buttons to today's prices.",
   "tags": [
     "stock-analyzer",
     "screening",
@@ -216,7 +216,7 @@
       "id": 2,
       "type": "table",
       "title": "Latest readings, and how far they have moved",
-      "description": "Each series' newest daily reading on FRED and its date, then the move since the reading a month, three months and a year before it.\n\n- **Yields** move in basis points (bp): 25 bp is a quarter of a percentage point. Higher US yields pull foreign money out of emerging markets, India's included, and lift the dollar against the rupee.\n- **Crude** moves in percent. India imports most of its oil, so dearer crude widens the trade deficit, weakens the rupee and squeezes the margins of oil marketers, paints, tyres and airlines.\n\nThe yields are the US Treasury's daily par yield curve rates, from the Treasury the evening after the US trading day. Brent and WTI are the EIA's spot prices, through FRED, about a week behind; they need a FRED API key (FRED_API_KEY) and stay empty without one.",
+      "description": "Each series' newest daily reading and its date, then the move since the reading a month, three months and a year before it.\n\n- **Yields** move in basis points (bp): 25 bp is a quarter of a percentage point. Higher US yields pull foreign money out of emerging markets, India's included, and lift the dollar against the rupee.\n- **Crude** moves in percent. India imports most of its oil, so dearer crude widens the trade deficit, weakens the rupee and squeezes the margins of oil marketers, paints, tyres and airlines.\n\nThe yields are the US Treasury's daily par yield curve rates, from the Treasury the evening after the US trading day. Brent and WTI are the EIA's daily spot prices, from the open oil-prices dataset (github.com/datasets/oil-prices), which refreshes them weekly, so they run about a week behind; the buttons above have today's.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

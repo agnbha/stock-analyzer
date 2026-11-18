@@ -448,14 +448,9 @@ public final class AppConfig {
         return get("markets.treasury.base.url", "https://home.treasury.gov");
     }
 
-    /** Where FRED's API, for the crude oil prices, is read from. */
-    public String marketsFredApiUrl() {
-        return get("markets.fred.api.url", "https://api.stlouisfed.org");
-    }
-
-    /** The free FRED API key, for the crude oil prices. Prefer the FRED_API_KEY env var; null when none is set. */
-    public String fredApiKeyOrNull() {
-        return get("fred.api.key", null);
+    /** The open "oil-prices" dataset's data folder, with the EIA's daily Brent and WTI prices. */
+    public String marketsOilPricesUrl() {
+        return get("markets.oil.prices.url", "https://raw.githubusercontent.com/datasets/oil-prices/main/data");
     }
 
     /** How far back a series is read the first time, in days. */

@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.function.BiFunction;
 
 /**
- * The four series the page linked from CAN SLIM draws, each read from where it is published without charge, under
- * names of their own: the Treasury publishes the yields itself and fresher than anyone; the oil prices come from the
- * EIA through FRED.
+ * The series the page linked from CAN SLIM draws, each read from where it is published openly for programs, with no
+ * key, under names of their own: the US Treasury publishes its yields itself; the EIA's Brent and WTI prices come
+ * through the open "oil-prices" dataset.
  */
 public final class MarketSources implements BiFunction<String, LocalDate, List<Observation>> {
 
@@ -18,11 +18,11 @@ public final class MarketSources implements BiFunction<String, LocalDate, List<O
     public static final List<String> ALL = List.of(US_10Y, US_2Y, BRENT, WTI);
 
     private final TreasuryYieldClient treasury;
-    private final FredClient fred;
+    private final OilPricesClient oil;
 
-    public MarketSources(TreasuryYieldClient treasury, FredClient fred) {
+    public MarketSources(TreasuryYieldClient treasury, OilPricesClient oil) {
         this.treasury = treasury;
-        this.fred = fred;
+        this.oil = oil;
     }
 
     @Override
@@ -30,8 +30,8 @@ public final class MarketSources implements BiFunction<String, LocalDate, List<O
         return switch (series) {
             case US_10Y -> treasury.fetch("10 Yr", from);
             case US_2Y -> treasury.fetch("2 Yr", from);
-            case BRENT -> fred.fetch("DCOILBRENTEU", from);
-            case WTI -> fred.fetch("DCOILWTICO", from);
+            case BRENT -> oil.fetch("brent", from);
+            case WTI -> oil.fetch("wti", from);
             default -> throw new MarketDataException("no source for a series called " + series, null);
         };
     }
