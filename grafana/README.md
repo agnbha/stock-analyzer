@@ -208,7 +208,8 @@ whatever time range is picked at the top.
 
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and
-Calls**, **CAN SLIM**), and CAN SLIM under its chart of the symbol (**Candles and Calls**, **Stock Trend**). A button
+Calls**, **CAN SLIM**, **Company Details**), and CAN SLIM under its chart of the symbol (**Candles and Calls**,
+**Stock Trend**, **Company Details**). A button
 takes the symbol along, and the detector between Candles and Calls and Stock Trend, which both have that box. It does
 not take the time range: each page opens on its own, because today's minutes would be a single candle on a page of
 daily ones. CAN SLIM lists only the stocks in its last scan, and Company Details only the companies whose page has been
@@ -252,8 +253,9 @@ Three things on a typical stock page are not here: market depth and the circuit 
 screener.in does not carry, and the industry P/E, which screener.in loads separately from the company page.
 
 **Company Details** — the same screener.in reading on a page of its own, one symbol at a time, with more of it. Pick
-a symbol (the list is every company whose page has been read), or follow *Company Details* under the minute chart on
-Candles and Calls, which takes the symbol along; *Candles and Calls* at the top of this page goes back.
+a symbol (the list is every company whose page has been read), or follow *Company Details* under the main chart on
+Candles and Calls, Stock Trend or CAN SLIM, which takes the symbol along; *Candles and Calls* at the top of this page
+goes back.
 
 - *What the company does*: its classification, the description, the last quarter it reported results for, the last
   shareholding pattern filed, and the day the page was read. The panel's corner links open the company on

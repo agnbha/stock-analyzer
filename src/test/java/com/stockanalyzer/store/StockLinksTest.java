@@ -43,8 +43,8 @@ class StockLinksTest {
 
     private static final List<Row> ROWS = List.of(
             new Row("02-candles-and-calls.json", 20, List.of("CAN SLIM", "Stock Trend", "Company Details")),
-            new Row("04-stock-trend.json", 10, List.of("Candles and Calls", "CAN SLIM")),
-            new Row("06-canslim.json", 20, List.of("Candles and Calls", "Stock Trend")));
+            new Row("04-stock-trend.json", 10, List.of("Candles and Calls", "CAN SLIM", "Company Details")),
+            new Row("06-canslim.json", 20, List.of("Candles and Calls", "Stock Trend", "Company Details")));
 
     @Test
     @DisplayName("each stock page has one row of buttons, straight under its chart, across the page")
