@@ -93,7 +93,27 @@ public final class SchemaMigrator {
         all.put(25, v25());
         all.put(26, v26());
         all.put(27, v27());
+        all.put(28, v28());
         return all;
+    }
+
+    /**
+     * v28: screener.in's AI summaries of earnings calls, read on request ({@code CanSlimMain summary}) for the Company
+     * Details page: a line a row, in order, with its depth (0 a heading, 1 a point, 2 and more a point under a point).
+     * A summary read again replaces the one held for that call.
+     */
+    private List<String> v28() {
+        return List.of("""
+                CREATE TABLE company_concall_summary (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  period TEXT NOT NULL,
+                  line_no INTEGER NOT NULL,
+                  depth INTEGER NOT NULL,
+                  text TEXT NOT NULL,
+                  source_url TEXT,
+                  fetched_at INTEGER NOT NULL,
+                  PRIMARY KEY (instrument_id, period, line_no)
+                ) WITHOUT ROWID""");
     }
 
     /**

@@ -26,6 +26,9 @@ import java.util.Locale;
  *                              company details: the stalest first, at most company.profile.max.pages.per.run
  *   profiles --symbol S        one company, now, whatever its copy's age
  *   profiles --max-pages N     a different budget for this run; 0 reads every company that is due
+ *   summary --symbol S         read screener.in's AI summary of S's latest earnings call into Company Details, with
+ *                              the signed-in session (SCREENER_SESSION_ID); --call 2026-10 for another listed call,
+ *                              --again to read one already held. A free account may open 10 in 30 days.
  *   markets                    read the US 10- and 2-year yields (the Treasury) and Brent and WTI (FRED, with
  *                              FRED_API_KEY), for the page linked from CAN SLIM's header
  * </pre>
@@ -48,10 +51,15 @@ public final class CanSlimMain {
             markets();
             return;
         }
+        if (command.equals("summary")) {
+            summary(parsed);
+            return;
+        }
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
-                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets");
+                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets"
+                    + " | summary --symbol S [--call YYYY-MM] [--again]");
             System.exit(2);
         }
 
@@ -74,6 +82,38 @@ public final class CanSlimMain {
             if (report.screenerFailed()) {
                 System.exit(report.needsLogin() ? 3 : 1);
             }
+        }
+    }
+
+    /**
+     * Reads one company's concall summary on request. Exit status 3 means the session was refused and needs renewing,
+     * 1 that the summary could not be read for another reason (no summary for that call, screener.in unreachable).
+     */
+    private static void summary(Args parsed) {
+        AppConfig config = AppConfig.load();
+        String symbol = parsed.require("symbol").toUpperCase(Locale.ROOT);
+        java.time.YearMonth call = parsed.value("call").map(java.time.YearMonth::parse).orElse(null);
+        try (AppContext context = new AppContext(config)) {
+            com.stockanalyzer.canslim.ConcallSummaryService.Result result =
+                    context.concallSummaryService().read(symbol, call, parsed.flag("again"));
+            String month = result.call().getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
+                    + " " + result.call().getYear();
+            if (result.heldSince() != null) {
+                System.out.printf("%s: the %s call's summary is already on Company Details (read %s); none of the "
+                                + "allowance used. --again reads it afresh.%n", symbol, month,
+                        java.time.Instant.ofEpochSecond(result.heldSince()).atZone(java.time.ZoneId.of("Asia/Kolkata"))
+                                .toLocalDate());
+                return;
+            }
+            System.out.printf("%s: the %s call's summary, %d lines, is now on Company Details.%n",
+                    symbol, month, result.lines());
+            if (result.viewed() != null && result.allowance() != null) {
+                System.out.printf("screener.in: %d of %d summaries opened in the last 30 days.%n",
+                        result.viewed(), result.allowance());
+            }
+        } catch (com.stockanalyzer.canslim.ScreenerException e) {
+            System.err.println(symbol + ": " + e.getMessage());
+            System.exit(e.needsLogin() ? 3 : 1);
         }
     }
 

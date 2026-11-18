@@ -238,11 +238,18 @@ read within six hours of the period counts as due, so one read at this time last
 `profiles --symbol RELIANCE` reads one now, and `profiles --max-pages 0` everything due. Until a company has been read
 its panels are empty.
 
-*Announcements and concalls.* Under the growth tiles, Company Details lists the company's five latest filings as its
+*Announcements and concalls.* After the shareholding, Company Details lists the company's five latest filings as its
 page shows them, newest first, each with its time and the line screener.in writes on what it says (a merger, an order
 won, a change of CFO; routine filings have none). Click a subject to open the filing on the exchange's site. Beside
-them are its latest earnings calls with links to their presentations and recordings. Read signed out, as the pages are,
-screener.in shows a call's transcript and its own summary without a link, so neither is there yet.
+them are its latest earnings calls, with links to their transcripts and presentations when screener.in has them, and
+recordings.
+
+Under them is screener.in's AI summary of the latest call, its headings and the points under each, as written. Those
+are read on request only: the screener.in account may open ten summaries in thirty days, and the same allowance serves
+your own reading on the site. `CanSlimMain summary --symbol INFY` reads the latest call's (`--call 2026-07` another
+listed call; one already held is not read again unless `--again`) and says how many of the ten are used. It needs the
+signed-in session: sign in at screener.in in a browser, copy the `sessionid` cookie, and put
+`SCREENER_SESSION_ID=...` in `~/.stock-analyzer.env`; when it expires the command says so (exit status 3).
 
 Every other symbol the database holds (the whole market's daily bars, and any stock you traded outside `symbols.txt`)
 gets the same details on a slower round: after the tracked symbols, `evening.sh` reads up to 50 of them a night, stocks

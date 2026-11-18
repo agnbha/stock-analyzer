@@ -550,6 +550,20 @@ public final class AppContext implements AutoCloseable {
                 new com.stockanalyzer.store.jdbc.SqliteMarketSeriesRepository(database), java.time.Clock.systemUTC());
     }
 
+    /**
+     * Reads screener.in's AI summary of a company's earnings call on request: the public page for the call, then the
+     * summary with the signed-in session (SCREENER_SESSION_ID).
+     */
+    public com.stockanalyzer.canslim.ConcallSummaryService concallSummaryService() {
+        ScreenerCompanyClient client = new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis());
+        String session = config.screenerSessionIdOrNull();
+        return new com.stockanalyzer.canslim.ConcallSummaryService(client::fetchProfile,
+                path -> client.concallSummary(path, session), companyProfileRepository,
+                new com.stockanalyzer.store.jdbc.SqliteConcallSummaryRepository(database), instrumentRepository,
+                java.time.Clock.systemUTC(), config.exchange(), config.segment());
+    }
+
     /** Reads company profiles from screener.in's public pages, one at a time at the configured pace. */
     public CompanyProfileService companyProfileService() {
         return new CompanyProfileService(
