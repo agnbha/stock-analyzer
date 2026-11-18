@@ -1,5 +1,7 @@
 package com.stockanalyzer.canslim;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -52,6 +54,24 @@ public final class ScreenerCompanyParser {
     private static final Pattern CITATION = Pattern.compile("<sup>.*?</sup>", Pattern.DOTALL);
     private static final Pattern MARKET_LINK = Pattern.compile(
             "<a[^>]*href=\"/market/[^\"]*\"[^>]*>(.*?)</a>", Pattern.DOTALL);
+    /** One filing under Announcements: its link, then its subject and the line under it. */
+    private static final Pattern FILING = Pattern.compile(
+            "<li[^>]*>\\s*<a\\s+href=\"([^\"]*)\"[^>]*>(.*?)</a>\\s*</li>", Pattern.DOTALL);
+    /** The line under a filing's subject: its date, and screener.in's summary after a dash when there is one. */
+    private static final Pattern FILING_LINE = Pattern.compile(
+            "<(?:div|span) class=\"ink-600 smaller\">(.*)</(?:div|span)>", Pattern.DOTALL);
+    private static final Pattern FILED_AT = Pattern.compile("<time datetime=\"([^\"]+)\"[^>]*>.*?</time>(.*)",
+            Pattern.DOTALL);
+    private static final Pattern LIST_ITEM = Pattern.compile("<li[^>]*>(.*?)</li>", Pattern.DOTALL);
+    private static final Pattern CALL_MONTH = Pattern.compile(
+            "<div class=\"ink-600[^\"]*\"[^>]*>\\s*([A-Z][a-z]{2} \\d{4})\\s*</div>");
+    /** A link or label under a concall: {@code <a href=... class="button-chip">PPT</a>}, or a bare label signed out. */
+    private static final Pattern CHIP = Pattern.compile(
+            "<(a|div|button)\\b([^>]*\\bclass=\"[^\"]*button-chip[^\"]*\"[^>]*)>\\s*([^<]*?)\\s*</\\1>",
+            Pattern.DOTALL);
+    private static final Pattern HREF = Pattern.compile("\\b(?:href|data-url)=\"([^\"]+)\"");
+    /** The page lists five filings; a longer list is cut here. */
+    private static final int ANNOUNCEMENTS = 10;
     /** How many of the latest quarters a profile keeps, of revenue, profit and shareholding alike. */
     private static final int PROFILE_QUARTERS = 8;
     private static final int ABOUT_LIMIT = 1200;
@@ -87,7 +107,93 @@ public final class ScreenerCompanyParser {
                 compounded(html, "Compounded Profit Growth", "TTM:"),
                 compounded(html, "Compounded Profit Growth", "3 Years:"),
                 lastQuarter(quarters), lastQuarter(holding),
-                quarterRows(quarters), holdingRows(holding));
+                quarterRows(quarters), holdingRows(holding), announcements(html), concalls(html));
+    }
+
+    /**
+     * The filings under Announcements, newest first, as the page lists them ("Recent"): each one's subject, its
+     * time, the line screener.in writes on what it says (routine filings have none) and the filing's link.
+     */
+    static List<CompanyProfile.Announcement> announcements(String html) {
+        int start = html.indexOf("id=\"company-announcements-tab\"");
+        if (start < 0) {
+            return List.of();
+        }
+        int stop = html.indexOf("</ul>", start);
+        String list = html.substring(start, stop < 0 ? html.length() : stop);
+        List<CompanyProfile.Announcement> filings = new ArrayList<>();
+        Matcher filing = FILING.matcher(list);
+        while (filing.find() && filings.size() < ANNOUNCEMENTS) {
+            String body = filing.group(2);
+            Matcher line = FILING_LINE.matcher(body);
+            String title = prose(line.find() ? body.substring(0, line.start()) : body);
+            if (title.isEmpty()) {
+                continue;
+            }
+            Instant at = null;
+            String summary = null;
+            if (line.find(0)) {
+                Matcher filed = FILED_AT.matcher(line.group(1));
+                if (filed.find()) {
+                    at = instant(filed.group(1));
+                    summary = prose(filed.group(2)).replaceFirst("^[-\u2013\u2014:\\s]+", "");
+                }
+            }
+            filings.add(new CompanyProfile.Announcement(at, title,
+                    summary == null || summary.isEmpty() ? null : summary, decode(filing.group(1))));
+        }
+        return filings;
+    }
+
+    /**
+     * The latest earnings calls under Concalls, newest first, with whichever of their transcript, presentation,
+     * recording and summary the page links. Signed out, the transcript and the summary are labels without a link.
+     */
+    static List<CompanyProfile.Concall> concalls(String html) {
+        int start = html.indexOf("documents concalls");
+        if (start < 0) {
+            return List.of();
+        }
+        int stop = html.indexOf("</ul>", start);
+        String list = html.substring(start, stop < 0 ? html.length() : stop);
+        List<CompanyProfile.Concall> calls = new ArrayList<>();
+        Matcher item = LIST_ITEM.matcher(list);
+        while (item.find() && calls.size() < PROFILE_QUARTERS) {
+            Matcher month = CALL_MONTH.matcher(item.group(1));
+            if (!month.find()) {
+                continue;
+            }
+            YearMonth period;
+            try {
+                period = YearMonth.parse(month.group(1), QUARTER);
+            } catch (DateTimeParseException notAMonth) {
+                continue;
+            }
+            Map<String, String> links = new LinkedHashMap<>();
+            Matcher chip = CHIP.matcher(item.group(1));
+            while (chip.find()) {
+                Matcher href = HREF.matcher(chip.group(2));
+                if (href.find()) {
+                    links.putIfAbsent(decode(text(chip.group(3))).toLowerCase(Locale.ROOT), decode(href.group(1)));
+                }
+            }
+            calls.add(new CompanyProfile.Concall(period, links.get("transcript"), links.get("ppt"),
+                    links.get("rec"), links.get("ai summary")));
+        }
+        return calls;
+    }
+
+    /** Text without its markup, entities decoded; screener.in's own copy sometimes doubles an apostrophe. */
+    private static String prose(String html) {
+        return decode(text(html)).replace("''", "'");
+    }
+
+    private static Instant instant(String timestamp) {
+        try {
+            return OffsetDateTime.parse(timestamp).toInstant();
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     private static Double first(Map<String, List<Double>> values, String name) {

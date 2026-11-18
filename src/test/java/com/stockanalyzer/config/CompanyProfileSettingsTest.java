@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** How often, and how many a night, the company details of the symbols outside symbols.txt are read. */
+/** How often, and how many a night, the company details of the tracked symbols and of every other one are read. */
 class CompanyProfileSettingsTest {
 
     @Test
@@ -17,8 +17,18 @@ class CompanyProfileSettingsTest {
 
         assertEquals(90, config.companyProfileUntrackedRefreshDays());
         assertEquals(50, config.companyProfileUntrackedMaxPagesPerRun());
-        assertEquals(7, config.companyProfileRefreshDays(), "the tracked symbols keep their weekly round");
-        assertEquals(12, config.companyProfileMaxPagesPerRun());
+        assertEquals(1, config.companyProfileRefreshDays(), "the tracked symbols every evening, for their filings");
+        assertEquals(0, config.companyProfileMaxPagesPerRun(), "all of them, however many are due");
+    }
+
+    @Test
+    @DisplayName("every tracked company each evening fits the evening batch at the screener.in pace")
+    void theTrackedRoundFitsTheEvening() {
+        AppConfig config = AppConfig.load();
+
+        long minutes = config.stockSymbols().size() * config.screenerRequestIntervalMillis() / 60_000;
+        assertTrue(minutes <= 15, "the tracked round takes " + minutes + " minutes for "
+                + config.stockSymbols().size() + " companies");
     }
 
     @Test

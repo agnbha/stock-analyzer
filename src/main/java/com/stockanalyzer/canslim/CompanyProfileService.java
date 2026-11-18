@@ -24,8 +24,8 @@ import java.util.Set;
  * the pages are read one at a time (see {@link ScreenerCompanyClient}) and a nightly run takes a few, which
  * turns a week's worth of companies over a week. Anything left over is simply picked up next time.
  *
- * <p>Two tiers. The symbols in {@code symbols.txt} are the ones watched closely, and are kept current every week
- * ({@link #refresh}). Every other instrument the database knows, the whole market's daily bars and any stock
+ * <p>Two tiers. The symbols in {@code symbols.txt} are the ones watched closely, and are read every evening
+ * ({@link #refresh}), so their latest filings are at most a day old. Every other instrument the database knows, the whole market's daily bars and any stock
  * traded outside the list, is read on a much slower round, a few pages a night so that a throttle only delays
  * it ({@link #refreshUntracked}); a stock you have traded comes ahead of the rest, because those are the ones
  * opened on the page.
@@ -33,6 +33,12 @@ import java.util.Set;
 public final class CompanyProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(CompanyProfileService.class);
+    /**
+     * The evening run starts at about the same time each night but reaches a company a little earlier or later than
+     * the night before. A copy this close to its refresh period counts as due, so a page read last night is read
+     * again tonight rather than every other night.
+     */
+    private static final long NIGHTLY_SLACK_SECONDS = 6 * 3_600L;
 
     private final CompanyFundamentalsClient client;
     private final CompanyProfileRepository profiles;
@@ -109,12 +115,13 @@ public final class CompanyProfileService {
     private record Due(String symbol, long instrumentId, long fetchedAt) {
     }
 
-    /** The candidates whose copy is stale, never-read ones first and then the oldest. */
+    /** The candidates whose copy is stale (within the nightly slack), never-read ones first and then the oldest. */
     private List<Due> due(List<Candidate> candidates, long staleAfterSeconds, boolean force, long now) {
         List<Due> due = new ArrayList<>();
+        long threshold = staleAfterSeconds - Math.min(NIGHTLY_SLACK_SECONDS, staleAfterSeconds / 4);
         for (Candidate candidate : candidates) {
             long fetchedAt = profiles.fetchedAt(candidate.instrumentId()).orElse(0L);
-            if (force || fetchedAt == 0 || now - fetchedAt >= staleAfterSeconds) {
+            if (force || fetchedAt == 0 || now - fetchedAt >= threshold) {
                 due.add(new Due(candidate.symbol(), candidate.instrumentId(), fetchedAt));
             }
         }

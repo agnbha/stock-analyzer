@@ -6,6 +6,7 @@ import com.stockanalyzer.store.Database;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Types;
 import java.time.YearMonth;
 import java.util.Optional;
 
@@ -72,6 +73,40 @@ public final class SqliteCompanyProfileRepository implements CompanyProfileRepos
                     insert.executeUpdate();
                 }
             }
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO company_announcement (instrument_id, position, announced_at, title, summary, url)
+                    VALUES (?,?,?,?,?,?)""")) {
+                int position = 1;
+                for (CompanyProfile.Announcement announcement : profile.announcements()) {
+                    insert.setLong(1, instrumentId);
+                    insert.setInt(2, position++);
+                    if (announcement.at() == null) {
+                        insert.setNull(3, Types.INTEGER);
+                    } else {
+                        insert.setLong(3, announcement.at().getEpochSecond());
+                    }
+                    insert.setString(4, announcement.title());
+                    insert.setString(5, announcement.summary());
+                    insert.setString(6, announcement.url());
+                    insert.executeUpdate();
+                }
+            }
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO company_concall
+                      (instrument_id, position, period, transcript_url, presentation_url, recording_url, summary_url)
+                    VALUES (?,?,?,?,?,?,?)""")) {
+                int position = 1;
+                for (CompanyProfile.Concall concall : profile.concalls()) {
+                    insert.setLong(1, instrumentId);
+                    insert.setInt(2, position++);
+                    insert.setString(3, month(concall.period()));
+                    insert.setString(4, concall.transcriptUrl());
+                    insert.setString(5, concall.presentationUrl());
+                    insert.setString(6, concall.recordingUrl());
+                    insert.setString(7, concall.summaryUrl());
+                    insert.executeUpdate();
+                }
+            }
         });
     }
 
@@ -102,7 +137,8 @@ public final class SqliteCompanyProfileRepository implements CompanyProfileRepos
     }
 
     private static void clear(java.sql.Connection connection, long instrumentId) throws java.sql.SQLException {
-        for (String table : new String[]{"company_profile", "company_quarter", "company_holding"}) {
+        for (String table : new String[]{"company_profile", "company_quarter", "company_holding",
+                "company_announcement", "company_concall"}) {
             try (PreparedStatement delete = connection.prepareStatement(
                     "DELETE FROM " + table + " WHERE instrument_id = ?")) {
                 delete.setLong(1, instrumentId);
