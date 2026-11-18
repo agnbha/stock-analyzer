@@ -26,6 +26,8 @@ import java.util.Locale;
  *                              company details: the stalest first, at most company.profile.max.pages.per.run
  *   profiles --symbol S        one company, now, whatever its copy's age
  *   profiles --max-pages N     a different budget for this run; 0 reads every company that is due
+ *   markets                    read the US 10- and 2-year yields (the Treasury) and Brent and WTI (FRED, with
+ *                              FRED_API_KEY), for the page linked from CAN SLIM's header
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -42,10 +44,14 @@ public final class CanSlimMain {
             profiles(parsed);
             return;
         }
+        if (command.equals("markets")) {
+            markets();
+            return;
+        }
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
-                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N]");
+                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets");
             System.exit(2);
         }
 
@@ -67,6 +73,25 @@ public final class CanSlimMain {
             // configured is the one thing a person has to act on, so it leaves a status behind.
             if (report.screenerFailed()) {
                 System.exit(report.needsLogin() ? 3 : 1);
+            }
+        }
+    }
+
+    /**
+     * Reads the US Treasury yields and crude oil prices. A series that could not be read is reported and the others are
+     * still read; only a run that read none of them leaves a failing status for the evening log.
+     */
+    private static void markets() {
+        AppConfig config = AppConfig.load();
+        try (AppContext context = new AppContext(config)) {
+            List<com.stockanalyzer.markets.MarketSeriesService.Result> results = context.marketSeriesService()
+                    .refresh(com.stockanalyzer.markets.MarketSources.ALL, config.marketsHistoryDays());
+            for (com.stockanalyzer.markets.MarketSeriesService.Result result : results) {
+                System.out.printf("%-14s %s%n", result.series(), result.error() != null ? "not read: " + result.error()
+                        : result.stored() + " readings, newest " + result.latest());
+            }
+            if (!results.isEmpty() && results.stream().allMatch(result -> result.error() != null)) {
+                System.exit(1);
             }
         }
     }
