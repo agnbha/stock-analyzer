@@ -299,6 +299,37 @@ class GrafanaDashboardQueryTest {
     }
 
     @Test
+    @DisplayName("every time chart declares its time column")
+    void timeChartsDeclareTheirTimeColumn() throws Exception {
+        // The SQLite datasource returns epoch seconds as a plain number unless the target names the column in
+        // timeColumns; a time chart then draws nothing but "Data is missing a time field".
+        Pattern selectsTime = Pattern.compile("\\bAS\\s+\"?time\"?(?![\\w\"])", Pattern.CASE_INSENSITIVE);
+        int checked = 0;
+        for (Path file : dashboardFiles()) {
+            JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
+            for (JsonNode panel : root.withArray("panels")) {
+                if (!panel.path("type").asText().equals("timeseries")) {
+                    continue;
+                }
+                for (JsonNode target : panel.withArray("targets")) {
+                    if (!selectsTime.matcher(target.path("rawQueryText").asText()).find()) {
+                        continue;
+                    }
+                    checked++;
+                    boolean declared = false;
+                    for (JsonNode column : target.path("timeColumns")) {
+                        declared |= column.asText().equals("time");
+                    }
+                    assertTrue(declared, file.getFileName() + " panel " + panel.path("id").asInt() + " ("
+                            + panel.path("title").asText() + ") target " + target.path("refId").asText()
+                            + ": selects a time column but does not list it in timeColumns");
+                }
+            }
+        }
+        assertTrue(checked >= 10, "expected many time charts, found " + checked);
+    }
+
+    @Test
     @DisplayName("dashboards point at the provisioned datasource")
     void dashboardsUseTheProvisionedDatasource() throws Exception {
         for (Path file : dashboardFiles()) {

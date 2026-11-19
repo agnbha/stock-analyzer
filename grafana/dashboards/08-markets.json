@@ -532,7 +532,10 @@
           "refId": "A",
           "queryType": "table",
           "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"MCX crude\"\nFROM market_series\nWHERE series = 'MCX_CRUDEOIL'\nORDER BY observed_on",
-          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"MCX crude\"\nFROM market_series\nWHERE series = 'MCX_CRUDEOIL'\nORDER BY observed_on"
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"MCX crude\"\nFROM market_series\nWHERE series = 'MCX_CRUDEOIL'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
         }
       ],
       "fieldConfig": {
@@ -600,7 +603,10 @@
           "refId": "A",
           "queryType": "table",
           "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 3.11034768, 2) AS \"Gold\"\nFROM market_series\nWHERE series = 'MCX_GOLD'\nORDER BY observed_on",
-          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 3.11034768, 2) AS \"Gold\"\nFROM market_series\nWHERE series = 'MCX_GOLD'\nORDER BY observed_on"
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 3.11034768, 2) AS \"Gold\"\nFROM market_series\nWHERE series = 'MCX_GOLD'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
         }
       ],
       "fieldConfig": {
@@ -668,7 +674,10 @@
           "refId": "A",
           "queryType": "table",
           "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 0.0311034768, 2) AS \"Silver\"\nFROM market_series\nWHERE series = 'MCX_SILVER'\nORDER BY observed_on",
-          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 0.0311034768, 2) AS \"Silver\"\nFROM market_series\nWHERE series = 'MCX_SILVER'\nORDER BY observed_on"
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 0.0311034768, 2) AS \"Silver\"\nFROM market_series\nWHERE series = 'MCX_SILVER'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
         }
       ],
       "fieldConfig": {
