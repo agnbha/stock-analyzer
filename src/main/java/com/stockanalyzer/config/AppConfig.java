@@ -458,6 +458,27 @@ public final class AppConfig {
         return Integer.parseInt(get("markets.history.days", "760"));
     }
 
+    /** NSDL's archive of daily FPI investment, the Archive.aspx form. */
+    public String marketsNsdlFpiUrl() {
+        return get("markets.nsdl.fpi.url", "https://www.fpi.nsdl.co.in/web/Reports/Archive.aspx");
+    }
+
+    /** NSE's provisional FII and DII cash-market figures, the JSON its FII/DII page loads. */
+    public String marketsNseFiiDiiUrl() {
+        return get("markets.nse.fiidii.url", "https://www.nseindia.com/api/fiidiiTradeReact");
+    }
+
+    /** NSE's participant-wise open interest file, with %s for the date written ddMMyyyy. */
+    public String marketsNseParticipantOiUrl() {
+        return get("markets.nse.participant.oi.url",
+                "https://nsearchives.nseindia.com/content/nsccl/fao_participant_oi_%s.csv");
+    }
+
+    /** How far back the open interest is read the first time, in days: a file a trading day, so not years. */
+    public int marketsParticipantOiHistoryDays() {
+        return Integer.parseInt(get("markets.participant.oi.history.days", "365"));
+    }
+
     /** How old a company's profile may be before its screener.in page is read again. */
     public int companyProfileRefreshDays() {
         return Integer.parseInt(get("company.profile.refresh.days", "1"));

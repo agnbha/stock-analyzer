@@ -542,16 +542,26 @@ public final class AppContext implements AutoCloseable {
 
     /**
      * Reads the US Treasury yields (from the Treasury), Brent and WTI (the EIA's, via an open dataset), and MCX's crude
-     * oil, gold and silver (Groww's candles of their futures; the login happens only when those are read).
+     * oil, gold and silver (Groww's candles of their futures; the login happens only when those are read); and the
+     * institutions' flows: NSDL's FPI figures, NSE's FII and DII cash-market figures and its participant-wise open
+     * interest.
      */
     public com.stockanalyzer.markets.MarketSeriesService marketSeriesService() {
         GrowwInstrumentCatalog catalog = instrumentCatalog();
+        java.time.Clock utc = java.time.Clock.systemUTC();
+        // NSE's address for the FII/DII figures answers from its other domain.
+        HttpClient redirecting = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL).build();
         com.stockanalyzer.markets.MarketSources sources = new com.stockanalyzer.markets.MarketSources(
                 new com.stockanalyzer.markets.TreasuryYieldClient(httpClient, config.marketsTreasuryBaseUrl()),
                 new com.stockanalyzer.markets.OilPricesClient(httpClient, config.marketsOilPricesUrl()),
                 new com.stockanalyzer.markets.McxFuturesClient(underlying -> catalog.futures("MCX", underlying),
-                        new LazyCandleDataClient(memoize(this::wideRangeCandleDataClient)), java.time.Clock.systemUTC(),
-                        clock.zone()));
+                        new LazyCandleDataClient(memoize(this::wideRangeCandleDataClient)), utc, clock.zone()),
+                new com.stockanalyzer.markets.NsdlFpiClient(httpClient, config.marketsNsdlFpiUrl(), utc, clock.zone(),
+                        Duration.ofSeconds(1)),
+                new com.stockanalyzer.markets.NseFiiDiiClient(redirecting, config.marketsNseFiiDiiUrl()),
+                new com.stockanalyzer.markets.NseParticipantOiClient(httpClient, config.marketsNseParticipantOiUrl(),
+                        utc, clock.zone(), config.marketsParticipantOiHistoryDays(), Duration.ofMillis(400)));
         return new com.stockanalyzer.markets.MarketSeriesService(sources, sources::rereadDays,
                 new com.stockanalyzer.store.jdbc.SqliteMarketSeriesRepository(database), java.time.Clock.systemUTC());
     }

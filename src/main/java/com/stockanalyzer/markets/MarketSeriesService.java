@@ -12,9 +12,9 @@ import java.util.function.BiFunction;
 import java.util.function.ToIntFunction;
 
 /**
- * Keeps the bond yields and commodity prices the page linked from CAN SLIM draws. Each evening every series is read
- * from a little before its newest reading ({@link MarketSources#rereadDays}), or over the whole history the first
- * time: a source can revise a recent reading, and an oil price arrives a week late.
+ * Keeps the bond yields, commodity prices and institutional flows the two pages linked from CAN SLIM draw. Each day
+ * every series is read from a little before its newest reading ({@link MarketSources#rereadDays}), or over the whole
+ * history the first time: a source can revise a recent reading, and an oil price arrives a week late.
  */
 public final class MarketSeriesService {
 

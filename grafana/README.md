@@ -111,6 +111,7 @@ What each tab needs:
 | Decision Reasons | trades with reasons attached | `trades reasons --month ...` |
 | CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
 | Bonds and Commodities | the yields and prices; Groww's login for the MCX ones | `CanSlimMain markets` (or the nightly `evening.sh`) |
+| Institutional Investment | the FPI, FII and DII flows and positions | `CanSlimMain markets` (or `evening.sh`) |
 | Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
@@ -332,6 +333,21 @@ which refreshes them weekly, so they run about a week behind; and MCX crude oil,
 candles of their futures, the close of whichever contract traded most that day, up to the day before. Gold and silver
 are shown per troy ounce (MCX quotes gold per 10 grams and silver per kilogram). Groww has candles only for contracts
 still trading, so the MCX history starts when the oldest of them was listed, a few months back, and grows each evening.
+
+**Institutional Investment** — also opened from CAN SLIM's header (on the same range), for what the big institutions
+are doing with Indian shares: foreign portfolio investors (FPIs; NSE calls them FIIs) and domestic institutions (DIIs:
+mutual funds, insurers, banks, pension funds). Buttons across the top open NSE's FII/DII page and NSDL's latest and
+archived FPI reports. Under them, each flow's net buying in rupees crore on its latest day, and summed over the last
+five days, the month and the year (green buying, red selling); then FII and DII cash-market buying side by side a day
+at a time; FPI equity a month, on the exchanges and through the primary market (IPOs, placements) stacked; FPI equity a
+day with its 20-day sum; FPI debt a month; and, from the index futures each group holds at a day's end, the share
+held long (above 50, net long) for FIIs, DIIs, proprietary traders and clients. `CanSlimMain markets` reads them in the
+same step as the yields and prices: NSDL's daily FPI figures from its archive a month at a time (two years back the
+first time; a reporting day covers the trading day before it); NSE's provisional FII and DII figures, which NSE keeps
+up only until the next day's, so that chart starts on the first run and a weekday the run misses stays empty; and
+NSE's participant-wise open interest file for each trading day (a year back the first time,
+`markets.participant.oi.history.days`). NSDL's site refuses the default names HTTP libraries send, so these requests,
+like the other market reads, carry the app's own name.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.

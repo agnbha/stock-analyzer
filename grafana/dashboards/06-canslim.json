@@ -29,6 +29,18 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": "US Treasury yields, crude oil, gold and silver"
+    },
+    {
+      "title": "Institutional Investment",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-institutional/institutional-investment",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "FPI, FII and DII flows, and their index-futures positions"
     }
   ],
   "annotations": {

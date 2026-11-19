@@ -1,0 +1,955 @@
+{
+  "uid": "stockanalyzer-institutional",
+  "title": "Institutional Investment",
+  "description": "What the big institutions are doing with Indian shares: foreign portfolio investors (FPIs, NSE's FIIs) from NSDL's daily record and NSE's provisional figures, domestic institutions (DIIs: mutual funds, insurers, banks, pension funds) from NSE, and both sides' index-futures positions. Linked from CAN SLIM's header.",
+  "tags": [
+    "stock-analyzer",
+    "screening",
+    "markets",
+    "institutions"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1h",
+  "time": {
+    "from": "now-1y",
+    "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Last 3 months",
+        "from": "now-3M",
+        "to": "now"
+      },
+      {
+        "display": "Last 6 months",
+        "from": "now-6M",
+        "to": "now"
+      },
+      {
+        "display": "Last 1 year",
+        "from": "now-1y",
+        "to": "now"
+      },
+      {
+        "display": "Last 2 years",
+        "from": "now-2y",
+        "to": "now"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard",
+        "target": {
+          "limit": 200,
+          "matchAny": true,
+          "tags": [
+            "BUY",
+            "SELL"
+          ],
+          "type": "tags"
+        }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Saved notes",
+        "target": {
+          "queryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "rawQueryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      }
+    ]
+  },
+  "templating": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "CAN SLIM",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-canslim/can-slim",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "Back to the CAN SLIM screen"
+    },
+    {
+      "title": "Bonds and Commodities",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-markets/bonds-and-commodities",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "US Treasury yields, crude oil, gold and silver"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "description": "The sources' own pages, for the latest figures and anything older than the charts hold. The table and charts below are read once a day.",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 18,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<a href=\"https://www.nseindia.com/reports/fii-dii\" target=\"_blank\" title=\"NSE's provisional FII and DII cash-market figures for the latest day\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">NSE FII/DII, latest</a>\n<a href=\"https://www.fpi.nsdl.co.in/web/Reports/Latest.aspx\" target=\"_blank\" title=\"NSDL's latest daily FPI investment report\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">NSDL FPI, latest</a>\n<a href=\"https://www.fpi.nsdl.co.in/web/Reports/Archive.aspx\" target=\"_blank\" title=\"NSDL's daily FPI reports for any date: a month at a time\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">NSDL FPI, archive</a>\n</div>"
+      }
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "",
+      "description": "When the flows were last read: each afternoon after the close, by `CanSlimMain markets` in evening.sh. Each source is a day behind: NSE publishes a day's FII and DII figures that evening and its open interest file the same evening, and NSDL's figures for a day's trades are reported the next day. The buttons beside open the latest on each site.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 1
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series\nWHERE series IN ('FPI_EQUITY', 'FPI_EQUITY_EXCHANGE', 'FPI_EQUITY_PRIMARY', 'FPI_DEBT', 'FPI_TOTAL', 'FII_CASH_BUY', 'FII_CASH_SELL', 'FII_CASH_NET', 'DII_CASH_BUY', 'DII_CASH_SELL', 'DII_CASH_NET', 'IDX_FUT_CLIENT_LONG', 'IDX_FUT_CLIENT_SHORT', 'IDX_FUT_DII_LONG', 'IDX_FUT_DII_SHORT', 'IDX_FUT_FII_LONG', 'IDX_FUT_FII_SHORT', 'IDX_FUT_PRO_LONG', 'IDX_FUT_PRO_SHORT')",
+          "queryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series\nWHERE series IN ('FPI_EQUITY', 'FPI_EQUITY_EXCHANGE', 'FPI_EQUITY_PRIMARY', 'FPI_DEBT', 'FPI_TOTAL', 'FII_CASH_BUY', 'FII_CASH_SELL', 'FII_CASH_NET', 'DII_CASH_BUY', 'DII_CASH_SELL', 'DII_CASH_NET', 'IDX_FUT_CLIENT_LONG', 'IDX_FUT_CLIENT_SHORT', 'IDX_FUT_DII_LONG', 'IDX_FUT_DII_SHORT', 'IDX_FUT_FII_LONG', 'IDX_FUT_FII_SHORT', 'IDX_FUT_PRO_LONG', 'IDX_FUT_PRO_SHORT')"
+        }
+      ],
+      "transparent": true
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Net buying, ₹ crore: the latest day and the days before it",
+      "description": "Each flow's purchases less sales, in rupees crore: green is net buying, red net selling. The latest day held and its date, then the sums over the last five days held, the month and the year to that day.\n\n- **FII/FPI and DII in the cash market** are NSE's provisional figures for the trading day, published that evening from what the brokers report. NSE shows only the latest day, so these start on the first day this page was read and build up from there.\n- **FPI** figures are NSDL's, the depositories' record from what the custodians report: the reporting day covers the trading day before it. They include what the exchanges' figures do not: shares bought in IPOs, placements and block deals (primary market and others), and debt. Read back two years.\n\nForeign selling with domestic buying absorbing it is the pattern of most of the recent years; both selling at once is when the market falls hardest.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH names(series, name, position) AS (\n  VALUES ('FII_CASH_NET', 'FII/FPI in the cash market (NSE, provisional)', 1),\n         ('DII_CASH_NET', 'DII in the cash market (NSE, provisional)', 2),\n         ('FPI_EQUITY', 'FPI equity, every route (NSDL)', 3),\n         ('FPI_EQUITY_EXCHANGE', 'FPI equity on the exchanges (NSDL)', 4),\n         ('FPI_EQUITY_PRIMARY', 'FPI equity, primary market and others (NSDL)', 5),\n         ('FPI_DEBT', 'FPI debt (NSDL)', 6)),\nlatest AS (\n  SELECT n.series, n.name, n.position, MAX(m.observed_on) AS day\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  GROUP BY n.series, n.name, n.position)\nSELECT l.name AS \"Flow\",\n       CAST(strftime('%d', l.day) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', l.day) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', l.day) AS \"As of\",\n       (SELECT ROUND(m.value) FROM market_series m WHERE m.series = l.series AND m.observed_on = l.day) AS \"Latest day\",\n       (SELECT ROUND(SUM(v.value)) FROM (SELECT m.value FROM market_series m WHERE m.series = l.series\n          ORDER BY m.observed_on DESC LIMIT 5) v) AS \"Last 5 days\",\n       (SELECT ROUND(SUM(m.value)) FROM market_series m WHERE m.series = l.series\n          AND m.observed_on >= substr(l.day, 1, 7) || '-01') AS \"Month to date\",\n       (SELECT ROUND(SUM(m.value)) FROM market_series m WHERE m.series = l.series\n          AND m.observed_on >= substr(l.day, 1, 4) || '-01-01') AS \"Year to date\"\nFROM latest l\nORDER BY l.position",
+          "queryText": "WITH names(series, name, position) AS (\n  VALUES ('FII_CASH_NET', 'FII/FPI in the cash market (NSE, provisional)', 1),\n         ('DII_CASH_NET', 'DII in the cash market (NSE, provisional)', 2),\n         ('FPI_EQUITY', 'FPI equity, every route (NSDL)', 3),\n         ('FPI_EQUITY_EXCHANGE', 'FPI equity on the exchanges (NSDL)', 4),\n         ('FPI_EQUITY_PRIMARY', 'FPI equity, primary market and others (NSDL)', 5),\n         ('FPI_DEBT', 'FPI debt (NSDL)', 6)),\nlatest AS (\n  SELECT n.series, n.name, n.position, MAX(m.observed_on) AS day\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  GROUP BY n.series, n.name, n.position)\nSELECT l.name AS \"Flow\",\n       CAST(strftime('%d', l.day) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', l.day) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', l.day) AS \"As of\",\n       (SELECT ROUND(m.value) FROM market_series m WHERE m.series = l.series AND m.observed_on = l.day) AS \"Latest day\",\n       (SELECT ROUND(SUM(v.value)) FROM (SELECT m.value FROM market_series m WHERE m.series = l.series\n          ORDER BY m.observed_on DESC LIMIT 5) v) AS \"Last 5 days\",\n       (SELECT ROUND(SUM(m.value)) FROM market_series m WHERE m.series = l.series\n          AND m.observed_on >= substr(l.day, 1, 7) || '-01') AS \"Month to date\",\n       (SELECT ROUND(SUM(m.value)) FROM market_series m WHERE m.series = l.series\n          AND m.observed_on >= substr(l.day, 1, 4) || '-01-01') AS \"Year to date\"\nFROM latest l\nORDER BY l.position"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Flow"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 340
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "FII and DII net buying in the cash market (₹ crore a day, NSE)",
+      "description": "NSE's provisional figures: each day's purchases less sales by foreign institutions (FII/FPI) and domestic ones (DII), side by side. NSE keeps only the latest day, so the bars start on the first day this page was read; a weekday the afternoon run missed stays empty.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"FII/FPI\"\nFROM market_series\nWHERE series = 'FII_CASH_NET'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"FII/FPI\"\nFROM market_series\nWHERE series = 'FII_CASH_NET'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "B",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"DII\"\nFROM market_series\nWHERE series = 'DII_CASH_NET'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"DII\"\nFROM market_series\nWHERE series = 'DII_CASH_NET'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars",
+            "barWidthFactor": 0.45,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FII/FPI"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": -1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "FPI net investment in equity a month (₹ crore, NSDL)",
+      "description": "NSDL's daily FPI equity figures added up by month (the current month so far): bought and sold on the exchanges, and through the primary market and other routes (IPOs, placements, block deals off the exchange), stacked. Months of selling on the exchanges while the primary market still takes money in are common: FPIs selling what they hold while buying new issues.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"On the exchanges\"\nFROM market_series\nWHERE series = 'FPI_EQUITY_EXCHANGE'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "queryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"On the exchanges\"\nFROM market_series\nWHERE series = 'FPI_EQUITY_EXCHANGE'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "B",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"Primary market and others\"\nFROM market_series\nWHERE series = 'FPI_EQUITY_PRIMARY'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "queryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"Primary market and others\"\nFROM market_series\nWHERE series = 'FPI_EQUITY_PRIMARY'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "barWidthFactor": 0.8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "On the exchanges"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Primary market and others"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "FPI net investment in equity a day, and over 20 days (₹ crore, NSDL)",
+      "description": "Every route, a reporting day at a time (bars, left axis), and the sum of the last 20 reporting days, about a month (line, right axis). The line crossing zero is the foreign money turning.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time,\n       value AS \"A day\",\n       ROUND(SUM(value) OVER (ORDER BY observed_on ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)) AS \"20 days\"\nFROM market_series\nWHERE series = 'FPI_EQUITY'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time,\n       value AS \"A day\",\n       ROUND(SUM(value) OVER (ORDER BY observed_on ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)) AS \"20 days\"\nFROM market_series\nWHERE series = 'FPI_EQUITY'\nORDER BY observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "A day"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "20 days"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "FPI net investment in debt a month (₹ crore, NSDL)",
+      "description": "NSDL's daily FPI debt figures (the general limit, the voluntary retention route and the fully accessible route, which holds the government bonds in global bond indices) added up by month. Foreign money comes into Indian bonds when the yield gap over US Treasuries is wide and the rupee steady; see Bonds and Commodities for the US side.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"Debt\"\nFROM market_series\nWHERE series = 'FPI_DEBT'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "queryText": "SELECT CAST(strftime('%s', substr(observed_on, 1, 7) || '-01') AS INTEGER) AS time,\n       ROUND(SUM(value)) AS \"Debt\"\nFROM market_series\nWHERE series = 'FPI_DEBT'\nGROUP BY substr(observed_on, 1, 7)\nORDER BY 1",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars",
+            "barWidthFactor": 0.8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Debt"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Index futures: the share of each side's open contracts held long (%)",
+      "description": "From NSE's participant-wise open interest at each day's end: of the index futures each group holds, the share that is long. Above 50 the group is net long, below it net short. FIIs' share is the one most watched: a low and falling share is foreign money betting on a fall or hedging what it holds; clients (retail) tend to sit on the other side.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"FII\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_FII_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_FII_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "queryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"FII\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_FII_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_FII_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "B",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"DII\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_DII_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_DII_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "queryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"DII\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_DII_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_DII_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "C",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"Proprietary\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_PRO_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_PRO_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "queryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"Proprietary\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_PRO_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_PRO_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "D",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"Clients\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_CLIENT_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_CLIENT_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "queryText": "SELECT CAST(strftime('%s', l.observed_on) AS INTEGER) AS time,\n       ROUND(100.0 * l.value / (l.value + s.value), 1) AS \"Clients\"\nFROM market_series l\nJOIN market_series s ON s.series = 'IDX_FUT_CLIENT_SHORT' AND s.observed_on = l.observed_on\nWHERE l.series = 'IDX_FUT_CLIENT_LONG' AND l.value + s.value > 0\nORDER BY l.observed_on",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "line",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 50
+              }
+            ]
+          },
+          "min": 0,
+          "max": 100
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DII"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Proprietary"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Clients"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    }
+  ]
+}
