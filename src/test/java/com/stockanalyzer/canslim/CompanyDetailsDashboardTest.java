@@ -166,6 +166,7 @@ class CompanyDetailsDashboardTest {
         profiles.save(id("WELSPUNLIV"), welspun, NOW);
 
         Map<String, Object> quarter = only(panel(10, "WELSPUNLIV"));
+        assertEquals("Jun 2026", quarter.get("Since"));
         assertEquals(-2.59, number(quarter, "Promoters"), 1e-9, "63.77 from 66.36");
         assertEquals(3.86, number(quarter, "FII"), 1e-9);
         assertEquals(0.71, number(quarter, "DII"), 1e-9);
@@ -173,6 +174,7 @@ class CompanyDetailsDashboardTest {
         assertEquals(-9.1, number(quarter, "Shareholders"), 1e-9, "203,526 from 223,860, in percent");
 
         Map<String, Object> year = only(panel(11, "WELSPUNLIV"));
+        assertEquals("Sep 2025", year.get("Since"));
         assertEquals(-2.47, number(year, "Promoters"), 1e-9, "63.77 from Sep 2025's 66.24");
         assertEquals(4.10, number(year, "FII"), 1e-9);
         assertEquals(3.51, number(year, "DII"), 1e-9);
@@ -189,6 +191,40 @@ class CompanyDetailsDashboardTest {
         List<Map<String, Object>> table = panel(12, "WELSPUNLIV");
         assertEquals(8, table.size());
         assertEquals("Sep 2026", table.getFirst().get("Quarter"), "newest first");
+    }
+
+    @Test
+    @DisplayName("a pattern filed between quarter-ends is compared with the quarter-end a quarter and a year back, named in Since")
+    void holdingChangesFromAPatternFiledBetweenQuarterEnds() throws IOException {
+        // A share issue in October: the company files an extra pattern for Oct 2026 after its Sep 2026 one.
+        profiles.save(id("ISSUE"), holdings(
+                holding("2025-06", 61.00, 2.00, 6.00, 31.00, 10_000),
+                holding("2025-09", 61.00, 2.20, 6.30, 30.50, 10_400),
+                holding("2026-03", 60.90, 2.50, 6.80, 29.80, 11_000),
+                holding("2026-06", 60.90, 2.60, 7.00, 29.50, 12_000),
+                holding("2026-09", 60.80, 2.90, 7.20, 29.10, 12_500),
+                holding("2026-10", 57.80, 6.40, 7.60, 28.20, 12_600)), NOW);
+
+        Map<String, Object> quarter = only(panel(10, "ISSUE"));
+        assertEquals("Jun 2026", quarter.get("Since"), "Jul 2026 was not filed; Sep 2026 is a month back, not a quarter");
+        assertEquals(-3.10, number(quarter, "Promoters"), 1e-9, "57.80 from 60.90");
+        assertEquals(3.80, number(quarter, "FII"), 1e-9);
+        assertEquals(5.0, number(quarter, "Shareholders"), 1e-9, "12,600 from 12,000");
+
+        Map<String, Object> year = only(panel(11, "ISSUE"));
+        assertEquals("Sep 2025", year.get("Since"), "Oct 2025 was not filed");
+        assertEquals(-3.20, number(year, "Promoters"), 1e-9, "57.80 from 61.00");
+        assertEquals(4.20, number(year, "FII"), 1e-9);
+
+        // Every half year only: nothing a quarter back, so the quarter stays blank rather than spanning six months.
+        profiles.save(id("HALF"), holdings(
+                holding("2025-09", 70.00, 0.00, 0.00, 30.00, 900),
+                holding("2026-03", 70.00, 0.00, 0.00, 30.00, 950),
+                holding("2026-09", 69.00, 0.50, 0.00, 30.50, 1_000)), NOW);
+        Map<String, Object> half = only(panel(10, "HALF"));
+        assertNull(half.get("Since"));
+        assertNull(half.get("Promoters"));
+        assertEquals("Sep 2025", only(panel(11, "HALF")).get("Since"));
     }
 
     @Test
@@ -419,6 +455,21 @@ class CompanyDetailsDashboardTest {
         return new CompanyProfile("A company.", classification, marketCapCr, 100.0, 120.0, 80.0, 20.0, 50.0, 1.0,
                 15.0, 12.0, 1.0, 5.0, 0.5, 10.0, 10.0, 10.0, 10.0, latest, null, quarters, List.of(), List.of(),
                 List.of());
+    }
+
+    private static CompanyProfile.Holding holding(String period, double promoters, double fiis, double diis,
+                                                  double publicShare, double shareholders) {
+        return new CompanyProfile.Holding(YearMonth.parse(period), promoters, fiis, diis, null, publicShare, null,
+                shareholders);
+    }
+
+    private static CompanyProfile holdings(CompanyProfile.Holding... holdings) {
+        CompanyProfile base = company("Industrials › Capital Goods › Industrial Products", 1_000.0, List.of());
+        return new CompanyProfile(base.about(), base.classification(), base.marketCapCr(), base.price(),
+                base.high52w(), base.low52w(), base.pe(), base.bookValue(), base.dividendYield(), base.roce(),
+                base.roe(), base.faceValue(), base.epsTtm(), base.debtToEquity(), base.salesGrowthTtm(),
+                base.salesGrowth3y(), base.profitGrowthTtm(), base.profitGrowth3y(), null,
+                holdings[holdings.length - 1].period(), List.of(), List.of(holdings), List.of(), List.of());
     }
 
     private static double number(Map<String, Object> row, String column) {
