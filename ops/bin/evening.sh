@@ -60,9 +60,10 @@ run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$
 # company.profile.refresh.days.
 # Then up to company.profile.untracked.max.pages.per.run pages of every other symbol the database holds (traded
 # ones first), each read again after 90 days: about ten more minutes a night, and a refusal only ends the round.
-# US Treasury yields (the Treasury's file) and Brent and WTI (the open oil-prices dataset), for the page linked from
-# CAN SLIM's header: a few small requests, no keys.
-run_step "read US yields and crude oil" com.stockanalyzer.CanSlimMain markets
+# US Treasury yields (the Treasury's file), Brent and WTI (the open oil-prices dataset) and MCX crude oil, gold and
+# silver (Groww's daily candles of their nearest futures), for the Bonds and Commodities page linked from CAN SLIM's
+# header: a dozen small requests.
+run_step "read bonds and commodities" com.stockanalyzer.CanSlimMain markets
 run_step "refresh company profiles" com.stockanalyzer.CanSlimMain profiles
 run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan --market
 

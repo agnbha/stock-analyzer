@@ -1,7 +1,7 @@
 {
   "uid": "stockanalyzer-markets",
-  "title": "US Yields and Crude Oil",
-  "description": "The US Treasury yields and crude oil prices behind the market's direction: what FII money and India's import bill answer to. Daily readings from the US Treasury and the EIA, read each evening, and buttons to today's prices.",
+  "title": "Bonds and Commodities",
+  "description": "What outside the market moves it most: US Treasury yields, crude oil, gold and silver. Linked from CAN SLIM's header.",
   "tags": [
     "stock-analyzer",
     "screening",
@@ -142,10 +142,27 @@
   },
   "panels": [
     {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "description": "Today's prices, live: the yields and the two crudes on CNBC, MCX's crude, gold and silver on Groww. The table and charts below are daily readings, which lag.",
+      "transparent": true,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 18,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<a href=\"https://www.cnbc.com/quotes/US10Y\" target=\"_blank\" title=\"The US 10-year Treasury yield now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">US 10-year yield, live</a>\n<a href=\"https://www.cnbc.com/quotes/US2Y\" target=\"_blank\" title=\"The US 2-year Treasury yield now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">US 2-year yield, live</a>\n<a href=\"https://www.cnbc.com/quotes/@LCO.1\" target=\"_blank\" title=\"The front-month ICE Brent future now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">Brent crude, live</a>\n<a href=\"https://www.cnbc.com/quotes/@CL.1\" target=\"_blank\" title=\"The front-month WTI future now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">WTI crude, live</a>\n<a href=\"https://groww.in/commodities/mcx_crudeoil\" target=\"_blank\" title=\"MCX crude oil's front contract now, on Groww\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">MCX crude, live</a>\n<a href=\"https://groww.in/commodities/mcx_gold\" target=\"_blank\" title=\"MCX gold's front contract now, on Groww\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">MCX gold, live</a>\n<a href=\"https://groww.in/commodities/mcx_silver\" target=\"_blank\" title=\"MCX silver's front contract now, on Groww\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">MCX silver, live</a>\n</div>"
+      }
+    },
+    {
       "id": 90,
       "type": "stat",
       "title": "",
-      "description": "When the yields and oil prices were last read: each evening, by `CanSlimMain markets` in evening.sh. The sources are behind the markets themselves: the yields by a US trading day, the oil prices by about a week. The buttons beside open today's prices.",
+      "description": "When the yields and prices were last read: each evening, by `CanSlimMain markets` in evening.sh. Each source is behind the market itself: the yields by a US trading day, Brent and WTI by about a week, and MCX's crude, gold and silver by a day, since a day is read once it is over. The buttons beside open today's prices.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -196,27 +213,10 @@
       "transparent": true
     },
     {
-      "id": 1,
-      "type": "text",
-      "title": "",
-      "description": "Today's prices, live, on CNBC. The table and charts below are daily readings, which lag.",
-      "transparent": true,
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 18,
-        "h": 2
-      },
-      "options": {
-        "mode": "html",
-        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<a href=\"https://www.cnbc.com/quotes/US10Y\" target=\"_blank\" title=\"The US 10-year Treasury yield now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">US 10-year yield, live</a>\n<a href=\"https://www.cnbc.com/quotes/US2Y\" target=\"_blank\" title=\"The US 2-year Treasury yield now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">US 2-year yield, live</a>\n<a href=\"https://www.cnbc.com/quotes/@LCO.1\" target=\"_blank\" title=\"The front-month ICE Brent future now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">Brent crude, live</a>\n<a href=\"https://www.cnbc.com/quotes/@CL.1\" target=\"_blank\" title=\"The front-month WTI future now, on CNBC\" style=\"display: inline-block; padding: 4px 14px; border: 1px solid rgba(128, 128, 128, 0.45); border-radius: 4px; background-color: rgba(128, 128, 128, 0.12); color: inherit; text-decoration: none; font-weight: 500;\">WTI crude, live</a>\n</div>"
-      }
-    },
-    {
       "id": 2,
       "type": "table",
       "title": "Latest readings, and how far they have moved",
-      "description": "Each series' newest daily reading and its date, then the move since the reading a month, three months and a year before it.\n\n- **Yields** move in basis points (bp): 25 bp is a quarter of a percentage point. Higher US yields pull foreign money out of emerging markets, India's included, and lift the dollar against the rupee.\n- **Crude** moves in percent. India imports most of its oil, so dearer crude widens the trade deficit, weakens the rupee and squeezes the margins of oil marketers, paints, tyres and airlines.\n\nThe yields are the US Treasury's daily par yield curve rates, from the Treasury the evening after the US trading day. Brent and WTI are the EIA's daily spot prices, from the open oil-prices dataset (github.com/datasets/oil-prices), which refreshes them weekly, so they run about a week behind; the buttons above have today's.",
+      "description": "Each series' newest daily reading and its date, then the move since the reading a month, three months and a year before it.\n\n- **Yields** move in basis points (bp): 25 bp is a quarter of a percentage point. Higher US yields pull foreign money out of emerging markets, India's included, and lift the dollar against the rupee.\n- **Prices** move in percent. India imports most of its oil, so dearer crude widens the trade deficit, weakens the rupee and squeezes the margins of oil marketers, paints, tyres and airlines.\n- **Gold and silver** rise when money leaves riskier assets, and with the rupee's fall, since MCX prices them in rupees off the dollar price. A rally in them alongside falling shares is money looking for safety.\n\nThe yields are the US Treasury's daily par yield curve rates, from the Treasury the evening after the US trading day. Brent and WTI are the EIA's daily spot prices, from the open oil-prices dataset (github.com/datasets/oil-prices), which refreshes them weekly, so they run about a week behind. MCX crude oil, gold and silver are the day's closing price of whichever of their futures traded most that day, from Groww, read the evening after. Gold and silver are per troy ounce (31.1 g): MCX quotes gold per 10 grams and silver per kilogram, so the price on Groww's page is this one divided by 3.11 for gold, and multiplied by 32.15 for silver. The buttons above have today's prices.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -225,7 +225,7 @@
         "x": 0,
         "y": 2,
         "w": 24,
-        "h": 6
+        "h": 9
       },
       "targets": [
         {
@@ -235,8 +235,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "WITH names(series, name, kind, position) AS (\n  VALUES ('US10Y', 'US 10-year Treasury yield', 'yield', 1),\n         ('US2Y', 'US 2-year Treasury yield', 'yield', 2),\n         ('BRENT', 'Brent crude (USD a barrel)', 'price', 3),\n         ('WTI', 'WTI crude (USD a barrel)', 'price', 4)),\nlatest AS (\n  SELECT n.name, n.kind, n.position, m.series, m.observed_on, m.value\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  WHERE m.observed_on = (SELECT MAX(x.observed_on) FROM market_series x WHERE x.series = n.series)),\nback AS (\n  SELECT l.*,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 month')\n           ORDER BY b.observed_on DESC LIMIT 1) AS month_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-3 months')\n           ORDER BY b.observed_on DESC LIMIT 1) AS quarter_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 year')\n           ORDER BY b.observed_on DESC LIMIT 1) AS year_ago\n  FROM latest l)\nSELECT name AS \"Series\",\n       CASE kind WHEN 'yield' THEN printf('%.2f%%', value) ELSE printf('%.2f', value) END AS \"Latest\",\n       CAST(strftime('%d', observed_on) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', observed_on) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', observed_on) AS \"As of\",\n       CASE WHEN month_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - month_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / month_ago - 1) * 100) END AS \"Over a month\",\n       CASE WHEN quarter_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - quarter_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / quarter_ago - 1) * 100) END AS \"Over 3 months\",\n       CASE WHEN year_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - year_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / year_ago - 1) * 100) END AS \"Over a year\"\nFROM back\nORDER BY position",
-          "queryText": "WITH names(series, name, kind, position) AS (\n  VALUES ('US10Y', 'US 10-year Treasury yield', 'yield', 1),\n         ('US2Y', 'US 2-year Treasury yield', 'yield', 2),\n         ('BRENT', 'Brent crude (USD a barrel)', 'price', 3),\n         ('WTI', 'WTI crude (USD a barrel)', 'price', 4)),\nlatest AS (\n  SELECT n.name, n.kind, n.position, m.series, m.observed_on, m.value\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  WHERE m.observed_on = (SELECT MAX(x.observed_on) FROM market_series x WHERE x.series = n.series)),\nback AS (\n  SELECT l.*,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 month')\n           ORDER BY b.observed_on DESC LIMIT 1) AS month_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-3 months')\n           ORDER BY b.observed_on DESC LIMIT 1) AS quarter_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 year')\n           ORDER BY b.observed_on DESC LIMIT 1) AS year_ago\n  FROM latest l)\nSELECT name AS \"Series\",\n       CASE kind WHEN 'yield' THEN printf('%.2f%%', value) ELSE printf('%.2f', value) END AS \"Latest\",\n       CAST(strftime('%d', observed_on) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', observed_on) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', observed_on) AS \"As of\",\n       CASE WHEN month_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - month_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / month_ago - 1) * 100) END AS \"Over a month\",\n       CASE WHEN quarter_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - quarter_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / quarter_ago - 1) * 100) END AS \"Over 3 months\",\n       CASE WHEN year_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - year_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / year_ago - 1) * 100) END AS \"Over a year\"\nFROM back\nORDER BY position"
+          "rawQueryText": "WITH names(series, name, kind, position, per) AS (\n  VALUES ('US10Y', 'US 10-year Treasury yield', 'yield', 1, 1),\n         ('US2Y', 'US 2-year Treasury yield', 'yield', 2, 1),\n         ('BRENT', 'Brent crude (USD a barrel)', 'usd', 3, 1),\n         ('WTI', 'WTI crude (USD a barrel)', 'usd', 4, 1),\n         ('MCX_CRUDEOIL', 'MCX crude oil (₹ a barrel)', 'inr', 5, 1),\n         ('MCX_GOLD', 'MCX gold (₹ a troy ounce)', 'inr', 6, 3.11034768),\n         ('MCX_SILVER', 'MCX silver (₹ a troy ounce)', 'inr', 7, 0.0311034768)),\nlatest AS (\n  SELECT n.name, n.kind, n.position, n.per, m.series, m.observed_on, m.value\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  WHERE m.observed_on = (SELECT MAX(x.observed_on) FROM market_series x WHERE x.series = n.series)),\nback AS (\n  SELECT l.*,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 month')\n           ORDER BY b.observed_on DESC LIMIT 1) AS month_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-3 months')\n           ORDER BY b.observed_on DESC LIMIT 1) AS quarter_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 year')\n           ORDER BY b.observed_on DESC LIMIT 1) AS year_ago\n  FROM latest l)\nSELECT name AS \"Series\",\n       CASE kind WHEN 'yield' THEN printf('%.2f%%', value)\n                 WHEN 'usd' THEN printf('%.2f', value)\n                 ELSE printf('%,d', CAST(ROUND(value * per) AS INTEGER)) END AS \"Latest\",\n       CAST(strftime('%d', observed_on) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', observed_on) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', observed_on) AS \"As of\",\n       CASE WHEN month_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - month_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / month_ago - 1) * 100) END AS \"Over a month\",\n       CASE WHEN quarter_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - quarter_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / quarter_ago - 1) * 100) END AS \"Over 3 months\",\n       CASE WHEN year_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - year_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / year_ago - 1) * 100) END AS \"Over a year\"\nFROM back\nORDER BY position",
+          "queryText": "WITH names(series, name, kind, position, per) AS (\n  VALUES ('US10Y', 'US 10-year Treasury yield', 'yield', 1, 1),\n         ('US2Y', 'US 2-year Treasury yield', 'yield', 2, 1),\n         ('BRENT', 'Brent crude (USD a barrel)', 'usd', 3, 1),\n         ('WTI', 'WTI crude (USD a barrel)', 'usd', 4, 1),\n         ('MCX_CRUDEOIL', 'MCX crude oil (₹ a barrel)', 'inr', 5, 1),\n         ('MCX_GOLD', 'MCX gold (₹ a troy ounce)', 'inr', 6, 3.11034768),\n         ('MCX_SILVER', 'MCX silver (₹ a troy ounce)', 'inr', 7, 0.0311034768)),\nlatest AS (\n  SELECT n.name, n.kind, n.position, n.per, m.series, m.observed_on, m.value\n  FROM names n\n  JOIN market_series m ON m.series = n.series\n  WHERE m.observed_on = (SELECT MAX(x.observed_on) FROM market_series x WHERE x.series = n.series)),\nback AS (\n  SELECT l.*,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 month')\n           ORDER BY b.observed_on DESC LIMIT 1) AS month_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-3 months')\n           ORDER BY b.observed_on DESC LIMIT 1) AS quarter_ago,\n         (SELECT b.value FROM market_series b WHERE b.series = l.series AND b.observed_on <= date(l.observed_on, '-1 year')\n           ORDER BY b.observed_on DESC LIMIT 1) AS year_ago\n  FROM latest l)\nSELECT name AS \"Series\",\n       CASE kind WHEN 'yield' THEN printf('%.2f%%', value)\n                 WHEN 'usd' THEN printf('%.2f', value)\n                 ELSE printf('%,d', CAST(ROUND(value * per) AS INTEGER)) END AS \"Latest\",\n       CAST(strftime('%d', observed_on) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', observed_on) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', observed_on) AS \"As of\",\n       CASE WHEN month_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - month_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / month_ago - 1) * 100) END AS \"Over a month\",\n       CASE WHEN quarter_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - quarter_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / quarter_ago - 1) * 100) END AS \"Over 3 months\",\n       CASE WHEN year_ago IS NULL THEN NULL\n            WHEN kind = 'yield' THEN printf('%+d bp', CAST(ROUND((value - year_ago) * 100) AS INTEGER))\n            ELSE printf('%+.1f%%', (value / year_ago - 1) * 100) END AS \"Over a year\"\nFROM back\nORDER BY position"
         }
       ],
       "options": {
@@ -279,7 +279,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 11,
         "w": 12,
         "h": 11
       },
@@ -412,7 +412,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Crude oil (USD a barrel)",
+      "title": "Crude oil: Brent and WTI (USD a barrel)",
       "description": "Brent, the benchmark India's crude is priced off, and WTI, the US benchmark, as daily spot prices.",
       "datasource": {
         "type": "frser-sqlite-datasource",
@@ -420,7 +420,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 8,
+        "y": 11,
         "w": 12,
         "h": 11
       },
@@ -506,6 +506,210 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "MCX crude oil (₹ a barrel)",
+      "description": "MCX's crude oil future, which follows WTI in rupees: the day's close of whichever contract traded most. Against WTI above, it adds the rupee's own move against the dollar. Groww has candles only for contracts still trading, so the line starts when the oldest of them was listed, a few months back, and grows each evening.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 8,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"MCX crude\"\nFROM market_series\nWHERE series = 'MCX_CRUDEOIL'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, value AS \"MCX crude\"\nFROM market_series\nWHERE series = 'MCX_CRUDEOIL'\nORDER BY observed_on"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MCX crude"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "dark-orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Gold (₹ a troy ounce, MCX)",
+      "description": "MCX's gold future per troy ounce (MCX quotes it per 10 grams; this is that times 3.11): the day's close of whichever contract traded most. Groww has candles only for contracts still trading, so the line starts when the oldest of them was listed, a few months back, and grows each evening.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 22,
+        "w": 8,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 3.11034768, 2) AS \"Gold\"\nFROM market_series\nWHERE series = 'MCX_GOLD'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 3.11034768, 2) AS \"Gold\"\nFROM market_series\nWHERE series = 'MCX_GOLD'\nORDER BY observed_on"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gold"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Silver (₹ a troy ounce, MCX)",
+      "description": "MCX's silver future per troy ounce (MCX quotes it per kilogram; this is that divided by 32.15): the day's close of whichever contract traded most. Groww has candles only for contracts still trading, so the line starts when the oldest of them was listed, a few months back, and grows each evening.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 22,
+        "w": 8,
+        "h": 11
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 0.0311034768, 2) AS \"Silver\"\nFROM market_series\nWHERE series = 'MCX_SILVER'\nORDER BY observed_on",
+          "queryText": "SELECT CAST(strftime('%s', observed_on) AS INTEGER) AS time, ROUND(value * 0.0311034768, 2) AS \"Silver\"\nFROM market_series\nWHERE series = 'MCX_SILVER'\nORDER BY observed_on"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Silver"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E99A4"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     }
   ]

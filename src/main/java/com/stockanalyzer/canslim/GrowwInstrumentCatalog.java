@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,7 +45,8 @@ import java.util.regex.Pattern;
  * </ul>
  *
  * The 20 MB file is kept on disk and reused for {@code maxAge}; if a refresh fails, the old copy
- * is used rather than losing the scan.
+ * is used rather than losing the scan. The same file also lists the futures still trading on an
+ * underlying ({@link #futures}), for MCX's commodity prices.
  */
 public final class GrowwInstrumentCatalog implements MarketCatalog {
 
@@ -88,6 +90,71 @@ public final class GrowwInstrumentCatalog implements MarketCatalog {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read the instrument list " + file, e);
         }
+    }
+
+    /**
+     * A futures contract the instrument list carries, such as an MCX gold future.
+     *
+     * @param lotSize how many of the units its price is quoted in one lot is: 100 for MCX gold, quoted per 10 grams
+     *                and traded by the kilogram
+     */
+    public record FutureContract(String symbol, String underlying, LocalDate expiry, int lotSize) {
+    }
+
+    /**
+     * The futures on one underlying that the list carries, nearest expiry first. The list carries only contracts still
+     * trading; Groww drops a contract once it expires.
+     */
+    public List<FutureContract> futures(String exchange, String underlying) {
+        Path file = refreshedFile();
+        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            return parseFutures(reader, exchange, underlying);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not read the instrument list " + file, e);
+        }
+    }
+
+    @SuppressWarnings("resource")
+    static List<FutureContract> parseFutures(Reader reader, String exchange, String underlying) throws IOException {
+        BufferedReader lines = reader instanceof BufferedReader b ? b : new BufferedReader(reader);
+        String header = lines.readLine();
+        if (header == null) {
+            return List.of();
+        }
+        Map<String, Integer> column = new HashMap<>();
+        List<String> names = splitCsv(header);
+        for (int i = 0; i < names.size(); i++) {
+            column.put(names.get(i), i);
+        }
+        for (String required : List.of("exchange", "trading_symbol", "instrument_type", "underlying_symbol",
+                "expiry_date", "lot_size")) {
+            if (!column.containsKey(required)) {
+                throw new IllegalStateException("The instrument list has no '" + required + "' column - "
+                        + "has Groww changed its format? Columns: " + names);
+            }
+        }
+        List<FutureContract> contracts = new ArrayList<>();
+        String line;
+        while ((line = lines.readLine()) != null) {
+            // Most of the 140,000 rows are other exchanges' instruments; skip them before splitting.
+            if (!line.startsWith(exchange + ",")) {
+                continue;
+            }
+            List<String> f = splitCsv(line);
+            if (f.size() < names.size() || !"FUT".equals(f.get(column.get("instrument_type")))
+                    || !underlying.equals(f.get(column.get("underlying_symbol")))) {
+                continue;
+            }
+            try {
+                contracts.add(new FutureContract(f.get(column.get("trading_symbol")), underlying,
+                        LocalDate.parse(f.get(column.get("expiry_date"))),
+                        (int) Double.parseDouble(f.get(column.get("lot_size")))));
+            } catch (RuntimeException e) {
+                log.warn("Skipped an unreadable futures row: {}", line);
+            }
+        }
+        contracts.sort(Comparator.comparing(FutureContract::expiry));
+        return contracts;
     }
 
     private Path refreshedFile() {

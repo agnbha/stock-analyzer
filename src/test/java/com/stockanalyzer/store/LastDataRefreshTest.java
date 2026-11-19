@@ -176,7 +176,7 @@ class LastDataRefreshTest {
     }
 
     @Test
-    @DisplayName("US Yields and Crude Oil reports when the series were last read, and nothing of the stocks")
+    @DisplayName("Bonds and Commodities reports when the series were last read, and nothing of the stocks")
     void markets() throws IOException {
         liveCandle(9_000);
         tradingDay(8_000);

@@ -110,7 +110,7 @@ What each tab needs:
 | Account Overview | trades, and a balance for a true account value | `trades import`, `trades balance --cash ...` |
 | Decision Reasons | trades with reasons attached | `trades reasons --month ...` |
 | CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
-| US Yields and Crude Oil | when the yields and crude were last read; the series themselves run a US day (yields) and about a week (crude) behind |
+| Bonds and Commodities | the yields and prices; Groww's login for the MCX ones | `CanSlimMain markets` (or the nightly `evening.sh`) |
 | Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
@@ -320,15 +320,18 @@ breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
 full score sheet, letter by letter, is at the bottom.
 
-**US Yields and Crude Oil** — opened from CAN SLIM's header (on the same range), for the two things outside the market
-that move it most: US yields, which FII money answers to, and crude, which India imports. Buttons across the top open
-today's prices on CNBC (the US 10- and 2-year yields, Brent and WTI). Under them, each series' latest daily reading
-and date, and its move over a month, three months and a year (basis points for a yield, percent for crude); then the
-yields with the 10-year less 2-year gap, and the two crudes, over the range picked. `CanSlimMain markets` reads them
-each evening from files published openly for programs, with no key: the yields from the US Treasury's own daily yield
-curve file, the evening after the US trading day, and Brent and WTI from the EIA's daily spot prices in the open
-oil-prices dataset (github.com/datasets/oil-prices, public domain), which refreshes them weekly, so they run about a
-week behind; the buttons have today's.
+**Bonds and Commodities** — opened from CAN SLIM's header (on the same range), for what outside the market moves it
+most: US yields, which FII money answers to; crude, which India imports; and gold and silver, where money goes when it
+leaves shares. Buttons across the top open today's prices: the US 10- and 2-year yields, Brent and WTI on CNBC, and
+MCX crude, gold and silver on Groww. Under them, each series' latest daily reading and date, and its move over a month,
+three months and a year (basis points for a yield, percent for a price); then the yields with the 10-year less 2-year
+gap, Brent and WTI, and MCX crude, gold and silver, over the range picked. `CanSlimMain markets` reads them each
+evening: the yields from the US Treasury's own daily yield curve file, the evening after the US trading day; Brent and
+WTI from the EIA's daily spot prices in the open oil-prices dataset (github.com/datasets/oil-prices, public domain),
+which refreshes them weekly, so they run about a week behind; and MCX crude oil, gold and silver from Groww's daily
+candles of their futures, the close of whichever contract traded most that day, up to the day before. Gold and silver
+are shown per troy ounce (MCX quotes gold per 10 grams and silver per kilogram). Groww has candles only for contracts
+still trading, so the MCX history starts when the oldest of them was listed, a few months back, and grows each evening.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.

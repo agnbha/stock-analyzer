@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-/** Daily market series read from outside the broker (US Treasury yields, crude oil), by the source's series id. */
+/** Daily market series (US Treasury yields, crude oil, gold and silver), by series id. */
 public interface MarketSeriesRepository {
 
     /** Inserts each reading, or replaces the one held for that day; {@code fetchedAtEpoch} records when. */

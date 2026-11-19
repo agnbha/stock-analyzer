@@ -78,6 +78,23 @@ class MarketSeriesServiceTest {
     }
 
     @Test
+    @DisplayName("a series whose closes are final is read again only from its newest day")
+    void rereadsAsFarBackAsTheSourceSays() {
+        available.put("MCX_GOLD", List.of(on("2026-11-16", 110000), on("2026-11-17", 111000)));
+        available.put("US10Y", List.of(on("2026-11-16", 5.1)));
+        MarketSeriesService service = new MarketSeriesService((series, from) -> {
+            asked.add(series + " from " + from);
+            return available.get(series).stream().filter(o -> !o.date().isBefore(from)).toList();
+        }, series -> series.startsWith("MCX_") ? 0 : 31, repository, CLOCK);
+
+        service.refresh(List.of("MCX_GOLD", "US10Y"), 760);
+        asked.clear();
+        service.refresh(List.of("MCX_GOLD", "US10Y"), 760);
+
+        assertEquals(List.of("MCX_GOLD from 2026-11-17", "US10Y from 2026-10-16"), asked);
+    }
+
+    @Test
     @DisplayName("a reading the source revises replaces the one held; a late oil price fills in its own day")
     void revisionsAndLateReadings() {
         available.put("BRENT", List.of(on("2026-11-10", 91.0), on("2026-11-11", 92.0)));

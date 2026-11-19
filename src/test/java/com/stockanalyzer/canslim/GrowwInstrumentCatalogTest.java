@@ -65,6 +65,29 @@ class GrowwInstrumentCatalogTest {
     }
 
     @Test
+    @DisplayName("an underlying's futures, nearest expiry first, with their lot size; not its options or another's")
+    void futures() throws IOException {
+        String csv = """
+                exchange,exchange_token,trading_symbol,groww_symbol,name,instrument_type,segment,series,isin,underlying_symbol,underlying_exchange_token,expiry_date,strike_price,lot_size
+                MCX,1001,GOLD05FEB27FUT,MCX-GOLD-05Feb27-FUT,,FUT,COMMODITY,,MCX_GOLD05FEB27FUT,GOLD,,2027-02-05,0,100
+                MCX,1002,GOLD04DEC26FUT,MCX-GOLD-04Dec26-FUT,,FUT,COMMODITY,,MCX_GOLD04DEC26FUT,GOLD,,2026-12-04,0,100
+                MCX,1003,GOLD29JAN27150000CE,MCX-GOLD-29Jan27-150000-CE,,CE,COMMODITY,,MCX_GOLD29JAN27150000CE,GOLD,,2027-01-29,150000,100
+                MCX,1004,GOLDM03DEC26FUT,MCX-GOLDM-03Dec26-FUT,,FUT,COMMODITY,,MCX_GOLDM03DEC26FUT,GOLDM,,2026-12-03,0,10
+                MCX,1005,SILVER04DEC26FUT,MCX-SILVER-04Dec26-FUT,,FUT,COMMODITY,,MCX_SILVER04DEC26FUT,SILVER,,2026-12-04,0,30
+                NSE,1006,GOLDBEES,NSE-GOLDBEES,Gold Bees,EQ,CASH,EQ,INF204KB17I5,,,,,1
+                """;
+
+        assertEquals(List.of(
+                new GrowwInstrumentCatalog.FutureContract("GOLD04DEC26FUT", "GOLD", java.time.LocalDate.of(2026, 12, 4), 100),
+                new GrowwInstrumentCatalog.FutureContract("GOLD05FEB27FUT", "GOLD", java.time.LocalDate.of(2027, 2, 5), 100)),
+                GrowwInstrumentCatalog.parseFutures(new StringReader(csv), "MCX", "GOLD"));
+        assertEquals(30, GrowwInstrumentCatalog.parseFutures(new StringReader(csv), "MCX", "SILVER").getFirst().lotSize());
+        assertThrows(IllegalStateException.class,
+                () -> GrowwInstrumentCatalog.parseFutures(new StringReader(CSV), "MCX", "GOLD"),
+                "a list without the futures' columns is a changed format, not one without futures");
+    }
+
+    @Test
     @DisplayName("only listed equity shares: no bonds, ETFs, derivatives or SME boards")
     void equitiesOnly() throws IOException {
         List<String> symbols = parse(MAIN_BOARD).stream().map(MarketListing::symbol).toList();

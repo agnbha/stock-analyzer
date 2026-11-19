@@ -19,16 +19,16 @@
   },
   "links": [
     {
-      "title": "US Yields and Crude Oil",
+      "title": "Bonds and Commodities",
       "type": "link",
       "icon": "dashboard",
-      "url": "/d/stockanalyzer-markets/us-yields-and-crude-oil",
+      "url": "/d/stockanalyzer-markets/bonds-and-commodities",
       "includeVars": false,
       "keepTime": true,
       "targetBlank": false,
       "asDropdown": false,
       "tags": [],
-      "tooltip": "US Treasury yields and crude oil: daily history and today's prices"
+      "tooltip": "US Treasury yields, crude oil, gold and silver"
     }
   ],
   "annotations": {

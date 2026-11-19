@@ -29,8 +29,9 @@ import java.util.Locale;
  *   summary --symbol S         read screener.in's AI summary of S's latest earnings call into Company Details, with
  *                              the signed-in session (SCREENER_SESSION_ID); --call 2026-10 for another listed call,
  *                              --again to read one already held. A free account may open 10 in 30 days.
- *   markets                    read the US 10- and 2-year yields (the Treasury) and Brent and WTI (the EIA's, via
- *                              the open oil-prices dataset), for the page linked from CAN SLIM's header
+ *   markets                    read the US 10- and 2-year yields (the Treasury), Brent and WTI (the EIA's, via the
+ *                              open oil-prices dataset) and MCX crude oil, gold and silver (Groww's candles of their
+ *                              futures), for the Bonds and Commodities page linked from CAN SLIM's header
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -118,7 +119,7 @@ public final class CanSlimMain {
     }
 
     /**
-     * Reads the US Treasury yields and crude oil prices. A series that could not be read is reported and the others are
+     * Reads the bond yields and commodity prices. A series that could not be read is reported and the others are
      * still read; only a run that read none of them leaves a failing status for the evening log.
      */
     private static void markets() {
