@@ -31,7 +31,9 @@ import java.util.Locale;
  *                              --again to read one already held. A free account may open 10 in 30 days.
  *   markets                    read the US 10- and 2-year yields (the Treasury), Brent and WTI (the EIA's, via the
  *                              open oil-prices dataset) and MCX crude oil, gold and silver (Groww's candles of their
- *                              futures), for the Bonds and Commodities page linked from CAN SLIM's header
+ *                              futures), for the Bonds and Commodities page; and NSDL's FPI flows, NSE's FII and DII
+ *                              cash-market flows and its participant-wise index-futures positions, for the
+ *                              Institutional Investment page. Both pages are linked from CAN SLIM's header
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and

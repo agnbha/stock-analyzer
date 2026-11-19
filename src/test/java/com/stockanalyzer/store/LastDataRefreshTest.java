@@ -122,7 +122,8 @@ class LastDataRefreshTest {
     @DisplayName("with nothing recorded yet the tiles have nothing to show")
     void empty() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
-                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json"}) {
+                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
+                "09-institutional.json"}) {
             assertNull(refreshedAt(dashboard), dashboard);
         }
     }
@@ -184,6 +185,18 @@ class LastDataRefreshTest {
         execute("INSERT INTO market_series (series, observed_on, value, fetched_at) VALUES ('US2Y', '2026-11-16', 4.8, 3000)");
 
         assertEquals(3_000_000L, refreshedAt("08-markets.json"));
+        assertNull(refreshedAt("09-institutional.json"), "the yields are not the institutions' flows");
+    }
+
+    @Test
+    @DisplayName("Institutional Investment reports when the flows were last read, and Bonds and Commodities does not")
+    void institutional() throws IOException {
+        execute("INSERT INTO market_series (series, observed_on, value, fetched_at) VALUES ('US10Y', '2026-11-16', 5.1, 9000)");
+        execute("INSERT INTO market_series (series, observed_on, value, fetched_at) VALUES ('FPI_EQUITY', '2026-11-18', 10, 4000)");
+        execute("INSERT INTO market_series (series, observed_on, value, fetched_at) VALUES ('DII_CASH_NET', '2026-11-18', -5, 4500)");
+
+        assertEquals(4_500_000L, refreshedAt("09-institutional.json"));
+        assertEquals(9_000_000L, refreshedAt("08-markets.json"), "the flows read later would not move it");
     }
 
     @Test
@@ -219,14 +232,15 @@ class LastDataRefreshTest {
                 checked++;
             }
         }
-        assertEquals(8, checked);
+        assertEquals(9, checked);
     }
 
     @Test
     @DisplayName("the tile is a one-line label in the top right corner, so it takes no room from the panels")
     void isASmallLabelInTheTopRightCorner() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
-                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json"}) {
+                "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
+                "09-institutional.json"}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
             JsonNode tile = tile(root, "Last data refresh");
             JsonNode at = tile.path("gridPos");

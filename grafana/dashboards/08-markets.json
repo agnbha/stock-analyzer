@@ -206,8 +206,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series",
-          "queryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series"
+          "rawQueryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series\nWHERE series IN ('US10Y', 'US2Y', 'BRENT', 'WTI', 'MCX_CRUDEOIL', 'MCX_GOLD', 'MCX_SILVER')",
+          "queryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM market_series\nWHERE series IN ('US10Y', 'US2Y', 'BRENT', 'WTI', 'MCX_CRUDEOIL', 'MCX_GOLD', 'MCX_SILVER')"
         }
       ],
       "transparent": true
