@@ -285,7 +285,10 @@ SLIM* at the top of this page open the same symbol on those pages.
   change against a loss or a zero is blank too, because a percentage of it means nothing.
 - *Shareholding*: who holds the shares quarter by quarter (with government and other holders, so a bar adds up to
   100%), the number of shareholders, and the change over the last quarter and the last year in percentage points
-  (promoters 63.8% from 66.4% is −2.6). Green and red show only which way it moved.
+  (promoters 63.8% from 66.4% is −2.6). Green and red show only which way it moved. Each change is against the
+  newest pattern filed three to five months (or twelve to fourteen) before the latest, named in *Since*: a company
+  that issues new shares files an extra pattern between quarter-ends (an Oct 2026 after its Sep 2026), and that one
+  is compared with Jun 2026 and Sep 2025. A company that files every half year has no change over the quarter.
 - *Compared with the other companies*: one row per company read, the symbol picked first, then the others in its
   industry group (the first two levels of the classification, so banks with banks), then the rest of its sector,
   then everyone else, each largest first. Click a symbol to show it on the page; sort by any column; filter by
