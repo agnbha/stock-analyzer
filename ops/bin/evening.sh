@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 18:30 IST, weekdays. The nightly batch.
+# 15:35 IST, weekdays, right after the close. The day's batch.
 #
 # Order matters, and it is the whole point of this script:
 #   0. consolidate             - re-fetch the now-complete day and clear staging
@@ -22,6 +22,22 @@ SESSION_DATE="${1:-$(date '+%F')}"
 MONTH="${SESSION_DATE:0:7}"
 
 log "evening batch for $SESSION_DATE"
+
+# The market-day daemon reconciles the session at 15:32 and exits a minute or so later. Starting while it still runs
+# would put two JVMs on the broker's rate limits and the database's write lock at once, so after the close wait for
+# it - up to DAEMON_WAIT_MINUTES (default 20) - and go ahead regardless after that: a stuck daemon must not cost the
+# day's batch. Before the close (a run by hand) there is nothing to wait for: the daemon runs all session.
+if (( 10#$(date +%H%M) >= 1530 )) && pgrep -f com.stockanalyzer.MarketDayDaemon >/dev/null; then
+  log "waiting for the market-day daemon to finish the close"
+  wait_limit=$(( $(date +%s) + ${DAEMON_WAIT_MINUTES:-20} * 60 ))
+  while pgrep -f com.stockanalyzer.MarketDayDaemon >/dev/null; do
+    if (( $(date +%s) >= wait_limit )); then
+      log "the market-day daemon is still running after ${DAEMON_WAIT_MINUTES:-20} minutes; going ahead anyway"
+      break
+    fi
+    sleep 15
+  done
+fi
 
 # Usually a no-op: the daemon consolidates and clears its own staging when it
 # shuts down at the close. This is the safety net for the days it did not run -

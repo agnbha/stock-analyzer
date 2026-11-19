@@ -15,7 +15,7 @@ import java.util.Optional;
  *
  * <p>Yesterday's close is what today is measured against: the baseline on the Candles and Calls
  * chart, the gap event, the prior high and low the event detector compares with. The evening batch
- * normally stores it, but a laptop that was asleep at 18:30, or a run that failed, leaves a hole
+ * normally stores it, but a laptop that was asleep at 15:35, or a run that failed, leaves a hole
  * that otherwise stays until someone notices.
  *
  * <p>It goes through the ordinary gap-filling ingestion, so a session that is already there costs a
