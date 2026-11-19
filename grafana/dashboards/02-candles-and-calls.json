@@ -2039,8 +2039,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT p.classification AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL",
-          "queryText": "SELECT p.classification AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL"
+          "rawQueryText": "SELECT COALESCE(p.classification, '') AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL",
+          "queryText": "SELECT COALESCE(p.classification, '') AS \"Sector\",\n       p.about          AS \"About\",\n       datetime(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read from screener.in\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol' AND p.about IS NOT NULL"
         }
       ],
       "options": {
