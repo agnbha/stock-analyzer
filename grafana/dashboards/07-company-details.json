@@ -143,7 +143,7 @@
       "id": 1,
       "type": "table",
       "title": "$symbol - what the company does",
-      "description": "From the company's public page on screener.in, read by `CanSlimMain profiles` (evening.sh reads every tracked company each evening; other stocks on a slower round, every three months). **Latest results** is the last quarter the company has reported, **Shareholding as of** the last shareholding pattern filed, **Read on** the day its screener.in page was read. The links in the corner open the company on screener.in and on Candles and Calls.",
+      "description": "From the company's public page on screener.in, read by `CanSlimMain profiles` (evening.sh reads every tracked company each evening; other stocks on a slower round, every three months). **Read on** is the day its screener.in page was read; the quarter each section below shows is in its own table. The links in the corner open the company on screener.in and on Candles and Calls.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
@@ -151,8 +151,8 @@
       "gridPos": {
         "x": 0,
         "y": 1,
-        "w": 24,
-        "h": 8
+        "w": 12,
+        "h": 6
       },
       "links": [
         {
@@ -173,13 +173,13 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT p.classification AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END) AS \"About\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.results_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.results_quarter,1,4) AS \"Latest results\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.holding_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.holding_quarter,1,4) AS \"Shareholding as of\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'",
-          "queryText": "SELECT p.classification AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END) AS \"About\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.results_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.results_quarter,1,4) AS \"Latest results\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(p.holding_quarter,6,2) AS INTEGER) - 1) * 3 + 1, 3) || ' ' || substr(p.holding_quarter,1,4) AS \"Shareholding as of\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'"
+          "rawQueryText": "SELECT COALESCE(p.classification, '') AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END, '') AS \"About\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'",
+          "queryText": "SELECT COALESCE(p.classification, '') AS \"Sector\",\n       COALESCE(p.about,\n                CASE WHEN p.market_cap_cr IS NULL AND p.results_quarter IS NULL\n                     THEN 'screener.in had no company figures for this symbol when it was read: an ETF or an index fund has none.'\n                END, '') AS \"About\",\n       date(p.fetched_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Read on\"\nFROM company_profile p\nJOIN instrument i ON i.id = p.instrument_id\nWHERE i.symbol = '$symbol'"
         }
       ],
       "options": {
         "showHeader": true,
-        "cellHeight": "lg"
+        "cellHeight": "sm"
       },
       "fieldConfig": {
         "defaults": {
@@ -200,31 +200,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 300
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Latest results"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 110
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Shareholding as of"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 150
+                "value": 160
               }
             ]
           },
@@ -236,7 +212,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 95
               }
             ]
           }
@@ -253,10 +229,10 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 24,
-        "h": 5
+        "x": 12,
+        "y": 1,
+        "w": 12,
+        "h": 6
       },
       "targets": [
         {
@@ -266,8 +242,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'",
-          "queryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Market cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52-week high\",\n       low_52w                          AS \"52-week low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52-week high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'"
+          "rawQueryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Mkt cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52w high\",\n       low_52w                          AS \"52w low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52w high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'",
+          "queryText": "SELECT price_now                        AS \"Price\",\n       ROUND(market_cap_now_cr)         AS \"Mkt cap (₹ Cr)\",\n       ROUND(pe_now, 1)                 AS \"P/E\",\n       ROUND(pb_now, 2)                 AS \"P/B\",\n       ROUND(dividend_yield_now, 2)     AS \"Dividend yield\",\n       ROUND(eps_ttm, 2)                AS \"EPS (TTM)\",\n       ROUND(book_value, 1)             AS \"Book value\",\n       ROUND(roe, 2)                    AS \"ROE\",\n       ROUND(roce, 2)                   AS \"ROCE\",\n       ROUND(debt_to_equity, 2)         AS \"Debt / equity\",\n       ROUND(face_value, 2)             AS \"Face value\",\n       high_52w                         AS \"52w high\",\n       low_52w                          AS \"52w low\",\n       ROUND(pct_from_52w_high, 1)      AS \"From 52w high\"\nFROM v_company_fundamentals\nWHERE symbol = '$symbol'"
         }
       ],
       "options": {
@@ -286,8 +262,8 @@
         "wideLayout": true,
         "showPercentChange": false,
         "text": {
-          "valueSize": 22,
-          "titleSize": 12
+          "valueSize": 14,
+          "titleSize": 10
         }
       },
       "fieldConfig": {
@@ -319,7 +295,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Market cap (₹ Cr)"
+              "options": "Mkt cap (₹ Cr)"
             },
             "properties": [
               {
@@ -479,7 +455,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "52-week high"
+              "options": "52w high"
             },
             "properties": [
               {
@@ -495,7 +471,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "52-week low"
+              "options": "52w low"
             },
             "properties": [
               {
@@ -511,7 +487,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "From 52-week high"
+              "options": "From 52w high"
             },
             "properties": [
               {
@@ -538,7 +514,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 7,
         "w": 24,
         "h": 4
       },
@@ -654,7 +630,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 11,
         "w": 24,
         "h": 1
       },
@@ -671,7 +647,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 12,
         "w": 12,
         "h": 9
       },
@@ -764,7 +740,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 19,
+        "y": 12,
         "w": 6,
         "h": 9
       },
@@ -842,7 +818,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 19,
+        "y": 12,
         "w": 6,
         "h": 9
       },
@@ -920,7 +896,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 21,
         "w": 24,
         "h": 10
       },
@@ -1265,7 +1241,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 38,
+        "y": 31,
         "w": 24,
         "h": 1
       },
@@ -1282,7 +1258,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 32,
         "w": 12,
         "h": 9
       },
@@ -1422,7 +1398,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 39,
+        "y": 32,
         "w": 12,
         "h": 9
       },
@@ -1500,7 +1476,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 41,
         "w": 12,
         "h": 4
       },
@@ -1612,7 +1588,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 41,
         "w": 12,
         "h": 4
       },
@@ -1724,7 +1700,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 52,
+        "y": 45,
         "w": 24,
         "h": 10
       },
@@ -1795,7 +1771,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 62,
+        "y": 55,
         "w": 24,
         "h": 1
       },
@@ -1812,7 +1788,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 63,
+        "y": 56,
         "w": 16,
         "h": 9
       },
@@ -1824,8 +1800,8 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position",
-          "queryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position"
+          "rawQueryText": "SELECT COALESCE(CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes'), '') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       COALESCE(a.summary, '') AS \"What it says\",\n       COALESCE(a.url, '') AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position",
+          "queryText": "SELECT COALESCE(CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes'), '') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       COALESCE(a.summary, '') AS \"What it says\",\n       COALESCE(a.url, '') AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position"
         }
       ],
       "options": {
@@ -1911,7 +1887,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 63,
+        "y": 56,
         "w": 8,
         "h": 9
       },
@@ -2057,7 +2033,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 65,
         "w": 24,
         "h": 12
       },
@@ -2110,7 +2086,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 84,
+        "y": 77,
         "w": 24,
         "h": 1
       },
@@ -2127,7 +2103,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 85,
+        "y": 78,
         "w": 24,
         "h": 16
       },

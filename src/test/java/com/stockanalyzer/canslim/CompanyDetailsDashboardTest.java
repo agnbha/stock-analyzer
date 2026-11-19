@@ -79,14 +79,14 @@ class CompanyDetailsDashboardTest {
         profiles.save(id("WELSPUNLIV"), welspun, NOW);
 
         Map<String, Object> about = only(panel(1, "WELSPUNLIV"));
+        assertEquals(List.of("Sector", "About", "Read on"), List.copyOf(about.keySet()),
+                "the quarters each section shows are in its own table");
         assertTrue(((String) about.get("About")).startsWith("Welspun Living Limited"));
-        assertEquals("Sep 2026", about.get("Latest results"));
-        assertEquals("Sep 2026", about.get("Shareholding as of"));
 
         Map<String, Object> valuation = only(panel(2, "WELSPUNLIV"));
         assertEquals(14, valuation.size(), "one tile per figure");
         assertEquals(254.0, number(valuation, "Price"), 1e-9, "with no price of our own, the page's");
-        assertEquals(23_968.0, number(valuation, "Market cap (₹ Cr)"), 0.5);
+        assertEquals(23_968.0, number(valuation, "Mkt cap (₹ Cr)"), 0.5);
         assertEquals(55.6, number(valuation, "P/E"), 1e-9, "254 / 4.57, to one decimal");
 
         Map<String, Object> growth = only(panel(3, "WELSPUNLIV"));
@@ -293,7 +293,7 @@ class CompanyDetailsDashboardTest {
         assertEquals("Chief Financial Officer resigns; the board names the Company's treasurer as interim CFO.",
                 first.get("What it says"));
         assertEquals("https://www.bseindia.com/stockinfo/AnnPdfOpen.aspx?Pname=aaaa1111.pdf", first.get("url"));
-        assertNull(filings.get(1).get("What it says"), "a routine filing");
+        assertEquals("", filings.get(1).get("What it says"), "a routine filing: empty, not null");
         assertEquals("4 Nov 2026, 12:21", filings.get(1).get("Filed"), "no leading zero on the day");
         assertEquals("27 Oct 2026, 18:24", filings.getLast().get("Filed"));
     }
@@ -395,6 +395,59 @@ class CompanyDetailsDashboardTest {
                 "\u2022 Two new customers in exports:",
                 "\u2003\u2003\u25e6 A five-year supply contract."),
                 rows.stream().map(row -> row.get("Summary")).toList(), "the latest call held, not April's");
+    }
+
+    @Test
+    @DisplayName("a wrapped-text table never returns a null cell, which Grafana's table cannot measure")
+    void wrappedTablesHaveNoNullCells() throws IOException {
+        // Grafana 11.6 sizes a table whose cells wrap by reading the length of the first row's value in every text
+        // column, and fails the whole panel ("An unexpected error happened") when one is null: a routine filing with no
+        // one-liner at the top of the announcements did it.
+        profiles.save(id("EXAMPLE"), withDocuments(), NOW);
+        profiles.saveEmpty(id("NIFTYBEES"), NOW);
+        profiles.save(id("NOSECTOR"), company(null, 1_000.0, List.of()), NOW);
+        int checked = 0;
+        for (Path file : List.of(DASHBOARD, DASHBOARD.resolveSibling("02-candles-and-calls.json"))) {
+            for (JsonNode panel : JsonMapper.INSTANCE.readTree(Files.readString(file)).path("panels")) {
+                if (!panel.path("type").asText().equals("table") || !panel.path("fieldConfig").path("defaults")
+                        .path("custom").path("cellOptions").path("wrapText").asBoolean()) {
+                    continue;
+                }
+                String sql = panel.path("targets").get(0).path("rawQueryText").asText();
+                for (String symbol : List.of("EXAMPLE", "NIFTYBEES", "NOSECTOR")) {
+                    for (Map<String, Object> row : rows(sql.replace("$symbol", symbol))) {
+                        for (Map.Entry<String, Object> cell : row.entrySet()) {
+                            assertTrue(cell.getValue() != null, file.getFileName() + " panel "
+                                    + panel.path("id").asInt() + ", " + symbol + ": " + cell.getKey() + " is null");
+                        }
+                    }
+                }
+                checked++;
+            }
+        }
+        assertTrue(checked >= 4, "the about tables, the announcements and the summary; found " + checked);
+    }
+
+    @Test
+    @DisplayName("the header: what the company does in the left half, the valuation tiles level with it in the right")
+    void headerSideBySide() throws IOException {
+        JsonNode about = null;
+        JsonNode valuation = null;
+        for (JsonNode panel : dashboard().path("panels")) {
+            if (panel.path("id").asInt() == 1) {
+                about = panel;
+            } else if (panel.path("id").asInt() == 2) {
+                valuation = panel;
+            }
+        }
+        JsonNode left = about.path("gridPos");
+        JsonNode right = valuation.path("gridPos");
+        assertEquals(List.of(0, 12), List.of(left.path("x").asInt(), left.path("w").asInt()));
+        assertEquals(List.of(12, 12), List.of(right.path("x").asInt(), right.path("w").asInt()));
+        assertEquals(left.path("y").asInt(), right.path("y").asInt());
+        assertEquals(left.path("h").asInt(), right.path("h").asInt());
+        assertTrue(valuation.path("options").path("text").path("valueSize").asInt() <= 14,
+                "fourteen tiles in half the width: seven to a row, small type");
     }
 
     @Test
