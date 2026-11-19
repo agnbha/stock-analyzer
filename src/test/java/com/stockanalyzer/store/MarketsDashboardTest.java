@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * US Yields and Crude Oil, the page linked from CAN SLIM's header, by running its own queries over readings stored the
+ * Bonds and Commodities, the page linked from CAN SLIM's header, by running its own queries over readings stored the
  * way {@code CanSlimMain markets} stores them. The readings are invented.
  */
 class MarketsDashboardTest {
@@ -65,17 +65,21 @@ class MarketsDashboardTest {
     }
 
     @Test
-    @DisplayName("the latest reading of each series, its date, and its move: basis points for a yield, percent for crude")
+    @DisplayName("the latest reading of each series, its date, and its move: basis points for a yield, percent for a price")
     void latestReadings() throws IOException {
         store("US10Y", "2025-11-14=4.10", "2026-08-14=4.60", "2026-10-15=4.90", "2026-10-16=4.95", "2026-11-16=5.12");
         store("US2Y", "2026-10-16=4.70", "2026-11-16=4.83");
         store("BRENT", "2026-10-10=80.00", "2026-11-11=92.00");
         store("WTI", "2026-11-11=89.62");
+        store("MCX_CRUDEOIL", "2026-10-16=6400", "2026-11-17=7040.4");
+        store("MCX_GOLD", "2026-10-16=100000", "2026-11-17=110000");
+        store("MCX_SILVER", "2026-11-17=150000");
 
         List<Map<String, Object>> rows = rows(panel(2));
 
         assertEquals(List.of("US 10-year Treasury yield", "US 2-year Treasury yield", "Brent crude (USD a barrel)",
-                "WTI crude (USD a barrel)"), rows.stream().map(row -> row.get("Series")).toList());
+                "WTI crude (USD a barrel)", "MCX crude oil (₹ a barrel)", "MCX gold (₹ a troy ounce)",
+                "MCX silver (₹ a troy ounce)"), rows.stream().map(row -> row.get("Series")).toList());
         Map<String, Object> ten = rows.getFirst();
         assertEquals("5.12%", ten.get("Latest"));
         assertEquals("16 Nov 2026", ten.get("As of"));
@@ -90,6 +94,13 @@ class MarketsDashboardTest {
         assertEquals("11 Nov 2026", brent.get("As of"), "crude's own date, a week behind the yields");
         assertEquals("+15.0%", brent.get("Over a month"), "92 against 80");
         assertNull(rows.get(3).get("Over a month"));
+
+        assertEquals("7,040", rows.get(4).get("Latest"), "rupees a barrel, as MCX quotes it");
+        assertEquals("+10.0%", rows.get(4).get("Over a month"));
+        assertEquals("17 Nov 2026", rows.get(4).get("As of"));
+        assertEquals("342,138", rows.get(5).get("Latest"), "110,000 per 10 grams is 342,138 per troy ounce");
+        assertEquals("+10.0%", rows.get(5).get("Over a month"), "the same move whatever the unit");
+        assertEquals("4,666", rows.get(6).get("Latest"), "150,000 a kilogram is 4,666 per troy ounce");
     }
 
     @Test
@@ -114,18 +125,41 @@ class MarketsDashboardTest {
     }
 
     @Test
-    @DisplayName("the buttons open today's prices in a new tab: the two yields and the two crudes")
+    @DisplayName("MCX crude is drawn in rupees a barrel, and gold and silver per troy ounce")
+    void commodityCharts() throws IOException {
+        store("MCX_CRUDEOIL", "2026-11-16=7000", "2026-11-17=7040");
+        store("MCX_GOLD", "2026-11-16=100000", "2026-11-17=110000");
+        store("MCX_SILVER", "2026-11-17=150000");
+
+        List<Map<String, Object>> crude = rows(panel(5));
+        assertEquals(2, crude.size());
+        assertEquals(LocalDate.of(2026, 11, 16).toEpochDay() * 86_400, ((Number) crude.getFirst().get("time")).longValue());
+        assertEquals(7040.0, ((Number) crude.getLast().get("MCX crude")).doubleValue());
+        assertEquals(311034.77, ((Number) rows(panel(6)).getFirst().get("Gold")).doubleValue(), 1e-9);
+        assertEquals(4665.52, ((Number) rows(panel(7)).getFirst().get("Silver")).doubleValue(), 1e-9);
+        for (int id : new int[] {5, 6, 7}) {
+            assertEquals("locale", panelNode(id).path("fieldConfig").path("defaults").path("unit").asText(),
+                    "every digit, grouped the reader's way; the rupee is in the title");
+        }
+    }
+
+    @Test
+    @DisplayName("the buttons open today's prices in a new tab: the yields and crudes on CNBC, MCX's on Groww")
     void liveQuoteButtons() throws IOException {
         JsonNode panel = panelNode(1);
         assertEquals("html", panel.path("options").path("mode").asText());
         Matcher button = BUTTON.matcher(panel.path("options").path("content").asText());
         List<String> titles = new ArrayList<>();
+        List<String> links = new ArrayList<>();
         while (button.find()) {
-            assertTrue(button.group(1).startsWith("https://www.cnbc.com/quotes/"), button.group(1));
+            links.add(button.group(1));
             titles.add(button.group(2));
         }
         assertEquals(List.of("US 10-year yield, live", "US 2-year yield, live", "Brent crude, live",
-                "WTI crude, live"), titles);
+                "WTI crude, live", "MCX crude, live", "MCX gold, live", "MCX silver, live"), titles);
+        assertTrue(links.subList(0, 4).stream().allMatch(link -> link.startsWith("https://www.cnbc.com/quotes/")));
+        assertEquals(List.of("https://groww.in/commodities/mcx_crudeoil", "https://groww.in/commodities/mcx_gold",
+                "https://groww.in/commodities/mcx_silver"), links.subList(4, 7));
     }
 
     @Test
@@ -134,6 +168,7 @@ class MarketsDashboardTest {
         JsonNode canslim = dashboard("06-canslim.json");
         JsonNode markets = dashboard("08-markets.json");
         JsonNode there = canslim.path("links").get(0);
+        assertEquals("Bonds and Commodities", markets.path("title").asText());
         assertEquals(markets.path("title").asText(), there.path("title").asText());
         assertTrue(there.path("url").asText().startsWith("/d/" + markets.path("uid").asText() + "/"));
         assertTrue(there.path("keepTime").asBoolean(), "the same months either side");

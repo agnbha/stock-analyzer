@@ -648,271 +648,13 @@
       }
     },
     {
-      "id": 103,
-      "type": "row",
-      "title": "Announcements and concalls",
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "id": 14,
-      "type": "table",
-      "title": "$symbol - the latest announcements",
-      "description": "The filings the company's screener.in page lists under Announcements when it was last read (**Read on**, at the top): the five latest, newest first, at the time they reached the exchange. **What it says** is screener.in's one line on the filing; a routine one (an investor meet, a trading window) has none. Click a subject to open the filing itself on the exchange's site.\n\nThe tracked stocks' pages are read every evening, so their filings are at most a day old. Other stocks' pages are read on a slow round, so look at **Read on** before reading these as the latest.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "stock-analyzer-sqlite"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 19,
-        "w": 16,
-        "h": 9
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "stock-analyzer-sqlite"
-          },
-          "refId": "A",
-          "queryType": "table",
-          "rawQueryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position",
-          "queryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "md"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "left",
-            "cellOptions": {
-              "type": "auto",
-              "wrapText": true
-            }
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Filed"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 150
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Announcement"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 330
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Announcement"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open the filing",
-                    "url": "${__data.fields.url}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "url"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 15,
-      "type": "table",
-      "title": "$symbol - concalls",
-      "description": "The company's latest earnings calls as its screener.in page lists them, newest first, with a link to what the page gives for each: the investor presentation, and the recording when there is one. Read signed out, screener.in shows the transcript and its own summary of a call without a link, so neither is here yet.",
-      "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "stock-analyzer-sqlite"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 19,
-        "w": 8,
-        "h": 9
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "frser-sqlite-datasource",
-            "uid": "stock-analyzer-sqlite"
-          },
-          "refId": "A",
-          "queryType": "table",
-          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position",
-          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position"
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "left",
-            "cellOptions": {
-              "type": "auto"
-            }
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Call"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Presentation"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open the presentation",
-                    "url": "${__data.fields.presentation_url}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Transcript"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open the transcript",
-                    "url": "${__data.fields.transcript_url}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Recording"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Open the recording",
-                    "url": "${__data.fields.recording_url}",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "presentation_url"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "transcript_url"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "recording_url"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "id": 100,
       "type": "row",
       "title": "Quarterly results",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 28,
+        "y": 18,
         "w": 24,
         "h": 1
       },
@@ -929,7 +671,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 29,
+        "y": 19,
         "w": 12,
         "h": 9
       },
@@ -1022,7 +764,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 29,
+        "y": 19,
         "w": 6,
         "h": 9
       },
@@ -1100,7 +842,7 @@
       },
       "gridPos": {
         "x": 18,
-        "y": 29,
+        "y": 19,
         "w": 6,
         "h": 9
       },
@@ -1178,7 +920,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 38,
+        "y": 28,
         "w": 24,
         "h": 10
       },
@@ -1523,7 +1265,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 38,
         "w": 24,
         "h": 1
       },
@@ -1540,7 +1282,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 39,
         "w": 12,
         "h": 9
       },
@@ -1680,7 +1422,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 49,
+        "y": 39,
         "w": 12,
         "h": 9
       },
@@ -1758,7 +1500,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 58,
+        "y": 48,
         "w": 12,
         "h": 4
       },
@@ -1851,7 +1593,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 58,
+        "y": 48,
         "w": 12,
         "h": 4
       },
@@ -1944,7 +1686,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 62,
+        "y": 52,
         "w": 24,
         "h": 10
       },
@@ -2009,13 +1751,328 @@
       }
     },
     {
+      "id": 103,
+      "type": "row",
+      "title": "Announcements and concalls",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "$symbol - the latest announcements",
+      "description": "The filings the company's screener.in page lists under Announcements when it was last read (**Read on**, at the top): the five latest, newest first, at the time they reached the exchange. **What it says** is screener.in's one line on the filing; a routine one (an investor meet, a trading window) has none. Click a subject to open the filing itself on the exchange's site.\n\nThe tracked stocks' pages are read every evening, so their filings are at most a day old. Other stocks' pages are read on a slow round, so look at **Read on** before reading these as the latest.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position",
+          "queryText": "SELECT CAST(strftime('%d', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y, %H:%M', a.announced_at, 'unixepoch', '+5 hours', '+30 minutes') AS \"Filed\",\n       a.title   AS \"Announcement\",\n       a.summary AS \"What it says\",\n       a.url     AS \"url\"\nFROM company_announcement a\nJOIN instrument i ON i.id = a.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY a.position"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Filed"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Announcement"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 330
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Announcement"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the filing",
+                    "url": "${__data.fields.url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "$symbol - concalls",
+      "description": "The company's latest earnings calls as its screener.in page lists them, newest first, with a link to what the page gives for each: the transcript and the investor presentation when screener.in has them, and the recording when there is one. screener.in's own summary of the latest call is below, read on request.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 63,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position",
+          "queryText": "SELECT substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(c.period,6,2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(c.period,1,4) AS \"Call\",\n       CASE WHEN c.presentation_url IS NOT NULL THEN 'Presentation' END AS \"Presentation\",\n       CASE WHEN c.transcript_url IS NOT NULL THEN 'Transcript' END     AS \"Transcript\",\n       CASE WHEN c.recording_url IS NOT NULL THEN 'Recording' END       AS \"Recording\",\n       c.presentation_url AS \"presentation_url\",\n       c.transcript_url   AS \"transcript_url\",\n       c.recording_url    AS \"recording_url\"\nFROM company_concall c\nJOIN instrument i ON i.id = c.instrument_id\nWHERE i.symbol = '$symbol'\nORDER BY c.position"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Call"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Presentation"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the presentation",
+                    "url": "${__data.fields.presentation_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Transcript"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the transcript",
+                    "url": "${__data.fields.transcript_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recording"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open the recording",
+                    "url": "${__data.fields.recording_url}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "presentation_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "transcript_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "recording_url"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "$symbol - the latest concall, as screener.in summarises it",
+      "description": "screener.in's AI summary of the company's latest earnings call that has one: the headings it writes and the points under each, as written. It is read on request only, because the screener.in account may open ten summaries in thirty days and the same allowance serves your own reading on the site:\n\n`CanSlimMain summary --symbol INFY` reads the latest call's summary (`--call 2026-07` another listed call; a summary already held is not read again unless `--again`). It needs `SCREENER_SESSION_ID` in ~/.stock-analyzer.env, and says how many of the ten are used.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH chosen AS (\n  SELECT s.instrument_id, MAX(s.period) AS period\n  FROM company_concall_summary s\n  JOIN instrument i ON i.id = s.instrument_id\n  WHERE i.symbol = '$symbol'),\nbody AS (\n  SELECT 0 AS n,\n         'The ' || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(s.period, 6, 2) AS INTEGER) - 1) * 3 + 1, 3) || ' '\n           || substr(s.period, 1, 4) || ' call, as summarised by screener.in (read '\n           || date(MAX(s.fetched_at), 'unixepoch', '+5 hours', '+30 minutes') || ')' AS line\n  FROM company_concall_summary s\n  JOIN chosen c ON c.instrument_id = s.instrument_id AND c.period = s.period\n  GROUP BY s.period\n  UNION ALL\n  SELECT s.line_no,\n         CASE WHEN s.depth = 0 THEN '▍ ' || upper(s.text)\n              WHEN s.depth = 1 THEN '• ' || s.text\n              ELSE '  ◦ ' || s.text END\n  FROM company_concall_summary s\n  JOIN chosen c ON c.instrument_id = s.instrument_id AND c.period = s.period)\nSELECT n, line AS \"Summary\" FROM body\nUNION ALL\nSELECT 0, 'No summary read for $symbol yet. screener.in lets this account open 10 a month, so they are read on request: '\n          || 'CanSlimMain summary --symbol $symbol'\nWHERE NOT EXISTS (SELECT 1 FROM body)\nORDER BY n",
+          "queryText": "WITH chosen AS (\n  SELECT s.instrument_id, MAX(s.period) AS period\n  FROM company_concall_summary s\n  JOIN instrument i ON i.id = s.instrument_id\n  WHERE i.symbol = '$symbol'),\nbody AS (\n  SELECT 0 AS n,\n         'The ' || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(s.period, 6, 2) AS INTEGER) - 1) * 3 + 1, 3) || ' '\n           || substr(s.period, 1, 4) || ' call, as summarised by screener.in (read '\n           || date(MAX(s.fetched_at), 'unixepoch', '+5 hours', '+30 minutes') || ')' AS line\n  FROM company_concall_summary s\n  JOIN chosen c ON c.instrument_id = s.instrument_id AND c.period = s.period\n  GROUP BY s.period\n  UNION ALL\n  SELECT s.line_no,\n         CASE WHEN s.depth = 0 THEN '▍ ' || upper(s.text)\n              WHEN s.depth = 1 THEN '• ' || s.text\n              ELSE '  ◦ ' || s.text END\n  FROM company_concall_summary s\n  JOIN chosen c ON c.instrument_id = s.instrument_id AND c.period = s.period)\nSELECT n, line AS \"Summary\" FROM body\nUNION ALL\nSELECT 0, 'No summary read for $symbol yet. screener.in lets this account open 10 a month, so they are read on request: '\n          || 'CanSlimMain summary --symbol $symbol'\nWHERE NOT EXISTS (SELECT 1 FROM body)\nORDER BY n"
+        }
+      ],
+      "options": {
+        "showHeader": false,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": 102,
       "type": "row",
       "title": "Compared with the other companies",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 84,
         "w": 24,
         "h": 1
       },
@@ -2032,7 +2089,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 73,
+        "y": 85,
         "w": 24,
         "h": 16
       },

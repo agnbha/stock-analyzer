@@ -91,6 +91,58 @@ public final class ScreenerCompanyClient implements CompanyFundamentalsClient {
         return Optional.empty();
     }
 
+    /**
+     * screener.in's AI summary of one earnings call, from the address its company page gives the call's "AI Summary"
+     * button ({@link CompanyProfile.Concall#summaryUrl()}), read with the signed-in session: signed out, screener.in
+     * redirects to its login page. Each read counts against the account's allowance (ten in thirty days on a free
+     * account), so it is read only when asked for, and never again on a 429.
+     *
+     * @param sessionId the browser's {@code sessionid} cookie, or the whole cookie header
+     */
+    public String concallSummary(String path, String sessionId) {
+        String cookie = ScreenerInClient.cookieHeader(sessionId);
+        if (cookie == null) {
+            throw new ScreenerException("No screener.in session configured: sign in at https://www.screener.in in a "
+                    + "browser, copy the 'sessionid' cookie, and set SCREENER_SESSION_ID.", true);
+        }
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + (path.startsWith("/") ? path : "/" + path)))
+                .timeout(Duration.ofSeconds(30))
+                .header("Accept", "text/html")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Cookie", cookie)
+                .header("User-Agent", "stock-analyzer/1.0 (personal CAN SLIM scan)")
+                .GET()
+                .build();
+        HttpResponse<String> response;
+        try {
+            pace();
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ScreenerException("Interrupted while reading a concall summary from screener.in", e);
+        } catch (Exception e) {
+            throw new ScreenerException("Could not reach screener.in for a concall summary: " + e.getMessage(), e);
+        }
+        int status = response.statusCode();
+        String location = response.headers().firstValue("Location").orElse("");
+        if (status / 100 == 3 && (location.contains("/login") || location.contains("/register"))
+                || status == 401 || status == 403) {
+            throw new ScreenerException("screener.in did not accept the session for the summary (HTTP " + status
+                    + "): the 'sessionid' cookie has expired or is wrong. Sign in again in a browser and update "
+                    + "SCREENER_SESSION_ID.", true);
+        }
+        if (status == 429) {
+            throw new ScreenerException("screener.in is rate limiting (HTTP 429); try the summary again in a minute",
+                    false);
+        }
+        if (status / 100 != 2 || !response.body().contains("<article")) {
+            throw new ScreenerException("screener.in answered HTTP " + status + " without a summary for " + path,
+                    false);
+        }
+        return response.body();
+    }
+
     /** The page body, or null when the page does not exist. */
     private String get(String url, String symbol) {
         HttpRequest request = HttpRequest.newBuilder()

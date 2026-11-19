@@ -135,7 +135,7 @@ public final class ScreenerInClient implements ScreenerClient {
     }
 
     /** Accepts the bare cookie value, or a whole {@code name=value; ...} header copied from the browser. */
-    private static String cookieHeader(String sessionId) {
+    static String cookieHeader(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
             return null;
         }

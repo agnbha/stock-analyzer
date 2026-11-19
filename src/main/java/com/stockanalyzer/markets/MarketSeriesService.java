@@ -9,26 +9,35 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.ToIntFunction;
 
 /**
- * Keeps the US Treasury yields and crude oil prices the page linked from CAN SLIM draws. Each evening every series is
- * read from a month before its newest reading, or over the whole history the first time: a source can revise a recent
- * reading, and an oil price arrives a week late.
+ * Keeps the bond yields and commodity prices the page linked from CAN SLIM draws. Each evening every series is read
+ * from a little before its newest reading ({@link MarketSources#rereadDays}), or over the whole history the first
+ * time: a source can revise a recent reading, and an oil price arrives a week late.
  */
 public final class MarketSeriesService {
 
     private static final Logger log = LoggerFactory.getLogger(MarketSeriesService.class);
-    /** How far back a series already held is read again each time. */
+    /** How far back a series already held is read again each time, unless the source says otherwise. */
     static final int REREAD_DAYS = 31;
 
     private final BiFunction<String, LocalDate, List<Observation>> source;
+    private final ToIntFunction<String> rereadDays;
     private final MarketSeriesRepository repository;
     private final Clock clock;
 
     /** @param source reads a series' readings from a date on, oldest first ({@link MarketSources}) */
     public MarketSeriesService(BiFunction<String, LocalDate, List<Observation>> source,
                                MarketSeriesRepository repository, Clock clock) {
+        this(source, series -> REREAD_DAYS, repository, clock);
+    }
+
+    /** @param rereadDays how far back before its newest reading each series is read again */
+    public MarketSeriesService(BiFunction<String, LocalDate, List<Observation>> source,
+                               ToIntFunction<String> rereadDays, MarketSeriesRepository repository, Clock clock) {
         this.source = source;
+        this.rereadDays = rereadDays;
         this.repository = repository;
         this.clock = clock;
     }
@@ -51,7 +60,7 @@ public final class MarketSeriesService {
         long now = clock.instant().getEpochSecond();
         List<Result> results = new ArrayList<>();
         for (String id : series) {
-            LocalDate from = repository.latest(id).map(latest -> latest.minusDays(REREAD_DAYS))
+            LocalDate from = repository.latest(id).map(latest -> latest.minusDays(rereadDays.applyAsInt(id)))
                     .orElse(today.minusDays(historyDays));
             try {
                 List<Observation> observations = source.apply(id, from);

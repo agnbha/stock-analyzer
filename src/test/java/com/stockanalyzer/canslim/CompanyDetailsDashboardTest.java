@@ -334,6 +334,67 @@ class CompanyDetailsDashboardTest {
         assertEquals(4, links, "the filing, and a call's presentation, transcript and recording");
     }
 
+    @Test
+    @DisplayName("the latest call's summary, a heading or point a line, under a line naming the call; until one is read, how to read one")
+    void concallSummary() throws IOException {
+        long example = id("EXAMPLE");
+        List<Map<String, Object>> none = panel(16, "EXAMPLE");
+        assertEquals(1, none.size());
+        assertTrue(((String) none.getFirst().get("Summary")).contains("CanSlimMain summary --symbol EXAMPLE"),
+                none.toString());
+
+        com.stockanalyzer.store.jdbc.SqliteConcallSummaryRepository summaries =
+                new com.stockanalyzer.store.jdbc.SqliteConcallSummaryRepository(database);
+        summaries.save(example, YearMonth.of(2026, 4), "/concalls/summary/4/",
+                List.of(new ConcallSummary.Line(0, "Older call")), NOW);
+        summaries.save(example, YearMonth.of(2026, 7), "/concalls/summary/7/", List.of(
+                new ConcallSummary.Line(0, "Key takeaways"),
+                new ConcallSummary.Line(1, "Two new customers in exports:"),
+                new ConcallSummary.Line(2, "A five-year supply contract.")), NOW);
+
+        List<Map<String, Object>> rows = panel(16, "EXAMPLE");
+        assertEquals(List.of(
+                "The Jul 2026 call, as summarised by screener.in (read 2026-10-26)",
+                "\u258d KEY TAKEAWAYS",
+                "\u2022 Two new customers in exports:",
+                "\u2003\u2003\u25e6 A five-year supply contract."),
+                rows.stream().map(row -> row.get("Summary")).toList(), "the latest call held, not April's");
+    }
+
+    @Test
+    @DisplayName("the page runs: what the company does, quarterly results, shareholding, announcements and concalls, then the comparison")
+    void sectionOrder() throws IOException {
+        List<String> rows = new ArrayList<>();
+        List<JsonNode> panels = new ArrayList<>();
+        dashboard().path("panels").forEach(panels::add);
+        panels.sort(java.util.Comparator.comparingInt(p -> p.path("gridPos").path("y").asInt()));
+        for (JsonNode panel : panels) {
+            if (panel.path("type").asText().equals("row")) {
+                rows.add(panel.path("title").asText());
+            }
+        }
+        assertEquals(List.of("Quarterly results", "Shareholding", "Announcements and concalls",
+                "Compared with the other companies"), rows);
+        for (int id : new int[]{14, 15, 16}) {
+            JsonNode at = StreamSupport.stream(dashboard().path("panels").spliterator(), false)
+                    .filter(p -> p.path("id").asInt() == id).findFirst().orElseThrow().path("gridPos");
+            int y = at.path("y").asInt();
+            int section = 0;
+            int next = Integer.MAX_VALUE;
+            for (JsonNode panel : panels) {
+                if (panel.path("type").asText().equals("row")) {
+                    int rowY = panel.path("gridPos").path("y").asInt();
+                    if (panel.path("title").asText().equals("Announcements and concalls")) {
+                        section = rowY;
+                    } else if (rowY > section && section > 0 && rowY < next) {
+                        next = rowY;
+                    }
+                }
+            }
+            assertTrue(y > section && y < next, id + " sits in its section");
+        }
+    }
+
     // ---- helpers -------------------------------------------------------------------------------------------------
 
     /** WELSPUNLIV's page with the invented Documents section in place of its own. */

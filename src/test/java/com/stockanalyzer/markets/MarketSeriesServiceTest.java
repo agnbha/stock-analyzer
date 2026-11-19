@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** What the evening read asks FRED for, and what it keeps. The readings are invented. */
+/** What the evening read asks its sources for, and what it keeps. The readings are invented. */
 class MarketSeriesServiceTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 18);
@@ -54,7 +54,7 @@ class MarketSeriesServiceTest {
         return new MarketSeriesService((series, from) -> {
             asked.add(series + " from " + from);
             if (!available.containsKey(series)) {
-                throw new MarketDataException("FRED answered HTTP 404 for " + series, null);
+                throw new MarketDataException("the source answered HTTP 404 for " + series, null);
             }
             return available.get(series).stream().filter(o -> !o.date().isBefore(from)).toList();
         }, repository, CLOCK);
@@ -75,6 +75,23 @@ class MarketSeriesServiceTest {
         assertEquals(List.of("US10Y from " + TODAY.minusDays(760), "US10Y from 2026-10-16"), asked);
         assertEquals(LocalDate.of(2026, 11, 16), repository.latest("US10Y").orElseThrow());
         assertEquals("3", scalar("SELECT COUNT(*) FROM market_series"), "read twice, held once");
+    }
+
+    @Test
+    @DisplayName("a series whose closes are final is read again only from its newest day")
+    void rereadsAsFarBackAsTheSourceSays() {
+        available.put("MCX_GOLD", List.of(on("2026-11-16", 110000), on("2026-11-17", 111000)));
+        available.put("US10Y", List.of(on("2026-11-16", 5.1)));
+        MarketSeriesService service = new MarketSeriesService((series, from) -> {
+            asked.add(series + " from " + from);
+            return available.get(series).stream().filter(o -> !o.date().isBefore(from)).toList();
+        }, series -> series.startsWith("MCX_") ? 0 : 31, repository, CLOCK);
+
+        service.refresh(List.of("MCX_GOLD", "US10Y"), 760);
+        asked.clear();
+        service.refresh(List.of("MCX_GOLD", "US10Y"), 760);
+
+        assertEquals(List.of("MCX_GOLD from 2026-11-17", "US10Y from 2026-10-16"), asked);
     }
 
     @Test

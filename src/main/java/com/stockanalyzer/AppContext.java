@@ -540,14 +540,34 @@ public final class AppContext implements AutoCloseable {
         return new WatchlistService(watchlistPickRepository);
     }
 
-    /** Reads the US Treasury yields (from the Treasury) and crude oil prices (from FRED) into the database. */
+    /**
+     * Reads the US Treasury yields (from the Treasury), Brent and WTI (the EIA's, via an open dataset), and MCX's crude
+     * oil, gold and silver (Groww's candles of their futures; the login happens only when those are read).
+     */
     public com.stockanalyzer.markets.MarketSeriesService marketSeriesService() {
+        GrowwInstrumentCatalog catalog = instrumentCatalog();
         com.stockanalyzer.markets.MarketSources sources = new com.stockanalyzer.markets.MarketSources(
                 new com.stockanalyzer.markets.TreasuryYieldClient(httpClient, config.marketsTreasuryBaseUrl()),
-                new com.stockanalyzer.markets.FredClient(httpClient, config.marketsFredApiUrl(),
-                        config.fredApiKeyOrNull()));
-        return new com.stockanalyzer.markets.MarketSeriesService(sources,
+                new com.stockanalyzer.markets.OilPricesClient(httpClient, config.marketsOilPricesUrl()),
+                new com.stockanalyzer.markets.McxFuturesClient(underlying -> catalog.futures("MCX", underlying),
+                        new LazyCandleDataClient(memoize(this::wideRangeCandleDataClient)), java.time.Clock.systemUTC(),
+                        clock.zone()));
+        return new com.stockanalyzer.markets.MarketSeriesService(sources, sources::rereadDays,
                 new com.stockanalyzer.store.jdbc.SqliteMarketSeriesRepository(database), java.time.Clock.systemUTC());
+    }
+
+    /**
+     * Reads screener.in's AI summary of a company's earnings call on request: the public page for the call, then the
+     * summary with the signed-in session (SCREENER_SESSION_ID).
+     */
+    public com.stockanalyzer.canslim.ConcallSummaryService concallSummaryService() {
+        ScreenerCompanyClient client = new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis());
+        String session = config.screenerSessionIdOrNull();
+        return new com.stockanalyzer.canslim.ConcallSummaryService(client::fetchProfile,
+                path -> client.concallSummary(path, session), companyProfileRepository,
+                new com.stockanalyzer.store.jdbc.SqliteConcallSummaryRepository(database), instrumentRepository,
+                java.time.Clock.systemUTC(), config.exchange(), config.segment());
     }
 
     /** Reads company profiles from screener.in's public pages, one at a time at the configured pace. */
@@ -623,11 +643,7 @@ public final class AppContext implements AutoCloseable {
      *              trying the scan without spending thousands of requests
      */
     public MarketScan canSlimMarket(int limit) {
-        List<MarketListing> listings = new GrowwInstrumentCatalog(httpClient, new GrowwInstrumentCatalog.Settings(
-                config.canSlimCatalogUrl(), java.nio.file.Path.of(config.canSlimCatalogCache()),
-                Duration.ofHours(config.canSlimCatalogMaxAgeHours()), config.canSlimMarketExchanges(),
-                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries(),
-                config.canSlimMarketExcluded())).listings();
+        List<MarketListing> listings = instrumentCatalog().listings();
         if (limit > 0 && limit < listings.size()) {
             List<MarketListing> sample = new ArrayList<>(limit);
             for (int i = 0; i < limit; i++) {
@@ -639,6 +655,15 @@ public final class AppContext implements AutoCloseable {
                 config.canSlimMarketMinTurnover(), config.canSlimMarketMaxStaleDays(),
                 config.canSlimMarketFundamentalsMinRs(), config.canSlimMarketKeepRuns(),
                 config.canSlimMarketMinMarketCapCr(), config.canSlimMarketRejectDays());
+    }
+
+    /** Groww's list of every instrument, kept on disk under the {@code canslim.catalog.*} settings. */
+    private GrowwInstrumentCatalog instrumentCatalog() {
+        return new GrowwInstrumentCatalog(httpClient, new GrowwInstrumentCatalog.Settings(
+                config.canSlimCatalogUrl(), java.nio.file.Path.of(config.canSlimCatalogCache()),
+                Duration.ofHours(config.canSlimCatalogMaxAgeHours()), config.canSlimMarketExchanges(),
+                config.canSlimMarketNseSeries(), config.canSlimMarketBseSeries(),
+                config.canSlimMarketExcluded()));
     }
 
     public LiveOpportunityRepository liveOpportunityRepository() {
