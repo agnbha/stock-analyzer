@@ -296,7 +296,7 @@ java -jar target/stock-analyzer.jar
 ## Scheduling
 
 Four `launchd` jobs cover routine use — the daemon at 08:58 on weekdays, a
-nightly batch at 18:30, a weekly refresh of the statistical prior on Saturday,
+batch at 15:35 right after the close, a weekly refresh of the statistical prior on Saturday,
 and a monthly close. Scripts and plists are in [ops/](ops/), and
 [ops/README.md](ops/README.md) is the runbook: what runs when, why the evening
 order is what it is, what to do when a job fails, and why you should never run a

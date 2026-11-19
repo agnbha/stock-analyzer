@@ -934,7 +934,7 @@ java -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain \
 
 Scheduling on macOS: one `launchd` plist starting `MarketDayDaemon` at 09:00 IST
 on weekdays (it exits itself after close and reconciliation), and one running
-`DailyAnalysisMain daily` at 18:30. A missed nightly run costs nothing — the
+`DailyAnalysisMain daily` at 15:35, right after the close. A missed run costs nothing — the
 set-difference planner catches up next time.
 
 ## New configuration keys
