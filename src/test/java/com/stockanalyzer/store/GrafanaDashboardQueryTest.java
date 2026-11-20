@@ -75,6 +75,8 @@ class GrafanaDashboardQueryTest {
                         .replace("${profile:sqlstring}", "'main','second'")
                         .replace("$symbol", "RELIANCE")
                         .replace("$session", "2026-08-27")
+                        // CAN SLIM's chart: the weekly path, the one with more to go wrong.
+                        .replace("$frame", "weekly")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");
                 assertFalse(executable.contains("$"),
                         "unsubstituted variable in " + file.getFileName() + ": " + sql);
