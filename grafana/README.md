@@ -324,6 +324,25 @@ breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
 full score sheet, letter by letter, is at the bottom.
 
+**Volume colors**: the volume bars under Stock Trend's and CAN SLIM's candles are colored by how each day's volume
+compares with the stock's own; the candles keep their colors.
+
+- **Red or green**: an ordinary day, red when the stock closed below the previous day's close, green otherwise. A bar
+  can differ from its candle, which compares the close with the day's own open.
+- **Light blue**: at or above the 90th percentile of the last 20 sessions, the day included (one of the two heaviest).
+- **Yellow**: at or below the 10th percentile (one of the two lightest).
+- **White**: a bull snort. The day's range (high to low) is at least 5% of the previous close, and the close is in the
+  top third of that range and above the previous close. White wins over the other colors.
+- **Q** (a light dot above the bar): the highest or lowest volume since the same date three months back.
+- **Y** (an orange dot): the same over twelve months. Y wins over Q. On a white bar, a dot can mean either.
+- **Magenta glow** behind the bar: over 1 million shares traded, and a close at least 5% above the previous close.
+
+Percentages are rounded to six places before they are compared, so a move of exactly 5% counts. Q and Y start only once
+the daily bars reach back that far. Grafana can't write text on a chart, so the legend names
+the dots, and hovering a day names its bar. The candlestick panel colors its own volume bars only by the candle, so
+the volume is drawn again as one bar series per color on the volume's scale, and the panel's own bars are made
+transparent.
+
 **Bonds and Commodities** — opened from CAN SLIM's header (on the same range), for what outside the market moves it
 most: US yields, which FII money answers to; crude, which India imports; and gold and silver, where money goes when it
 leaves shares. Buttons across the top open today's prices: the US 10- and 2-year yields, Brent and WTI on CNBC, and
