@@ -38,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The volume bars under the daily candles of Stock Trend and CAN SLIM, colored by how each day's volume compares with
- * the stock's own, by running the two charts' queries. An ordinary day is red or green as its candle; light blue at or
+ * the stock's own, by running the two charts' queries. An ordinary day is red when the stock closed below the previous
+ * day's close, else green (the candles compare the close with the day's open, and keep their colors); light blue at or
  * above the 90th percentile of the last 20 sessions, yellow at or below the 10th; the highest or lowest volume of the
  * last 3 months gets a Q dot above its bar, of the last 12 months a Y dot. The candles keep their colors. The volumes
  * and prices are invented.
@@ -186,18 +187,22 @@ class VolumeColorsTest {
     }
 
     @Test
-    @DisplayName("an ordinary day's bar is its candle's color: red when it closed below its open, else green")
-    void ordinaryDaysTakeTheCandlesColor() {
+    @DisplayName("an ordinary day's bar is red when it closed below the previous day's close, else green, whatever its candle")
+    void ordinaryDaysAgainstThePreviousClose() {
         store("STOCK", List.of(
                 new Session(FIRST, 101, 100, 1000),
-                new Session(FIRST.plusDays(1), 100, 101, 1000),
-                new Session(FIRST.plusDays(2), 100, 100, 1000)));
+                new Session(FIRST.plusDays(1), 99, 100.5, 1000),
+                new Session(FIRST.plusDays(2), 102, 101, 1000),
+                new Session(FIRST.plusDays(3), 99, 100, 1000),
+                new Session(FIRST.plusDays(4), 99, 100, 1000)));
 
         for (Path chart : CHARTS.keySet()) {
             List<Map<String, Double>> rows = rows(chart, "STOCK");
-            assertDrawn(Kind.DOWN, 1000, rows.get(0), "closed below its open");
-            assertDrawn(Kind.UP, 1000, rows.get(1), "closed above it");
-            assertDrawn(Kind.UP, 1000, rows.get(2), "unchanged: the candle is drawn as an up one too");
+            assertDrawn(Kind.DOWN, 1000, rows.get(0), "the first bar has no previous close: below its own open");
+            assertDrawn(Kind.UP, 1000, rows.get(1), "above the previous close");
+            assertDrawn(Kind.UP, 1000, rows.get(2), "a red candle, but above the previous close");
+            assertDrawn(Kind.DOWN, 1000, rows.get(3), "a green candle, but below the previous close");
+            assertDrawn(Kind.UP, 1000, rows.get(4), "unchanged from the previous close");
         }
     }
 
@@ -290,7 +295,8 @@ class VolumeColorsTest {
                 return Kind.LIGHT;
             }
         }
-        return day.close() < day.open() ? Kind.DOWN : Kind.UP;
+        double previous = at == 0 ? day.open() : sessions.get(at - 1).close();
+        return day.close() < previous ? Kind.DOWN : Kind.UP;
     }
 
     /** The highest (or lowest) volume after {@code from}, up to and including the session {@code at}. */

@@ -327,7 +327,8 @@ full score sheet, letter by letter, is at the bottom.
 **Volume colors**: the volume bars under Stock Trend's and CAN SLIM's candles are colored by how each day's volume
 compares with the stock's own; the candles keep their colors.
 
-- **Red or green**: an ordinary day, the same color as its candle.
+- **Red or green**: an ordinary day, red when the stock closed below the previous day's close, green otherwise. A bar
+  can differ from its candle, which compares the close with the day's own open.
 - **Light blue**: at or above the 90th percentile of the last 20 sessions, the day included (one of the two heaviest).
 - **Yellow**: at or below the 10th percentile (one of the two lightest).
 - **Q** (a light dot above the bar): the highest or lowest volume since the same date three months back.
