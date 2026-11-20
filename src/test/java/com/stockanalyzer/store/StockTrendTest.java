@@ -362,11 +362,17 @@ class StockTrendTest {
         });
     }
 
-    /** Each session opening at the last close, its high and low a rupee either side. */
+    /**
+     * Each session opening at the last close, its high and low a rupee either side, and its volume swinging wider and
+     * wider, so that each new swing is the heaviest and the lightest yet: every color of the volume bars shows.
+     */
     private void series(long instrument, int sessions, IntToDoubleFunction close) {
         List<LocalDate> days = weekdays(sessions);
         for (int i = 0; i < sessions; i++) {
-            bar(instrument, days.get(i), close.applyAsDouble(Math.max(0, i - 1)), close.applyAsDouble(i));
+            double open = close.applyAsDouble(Math.max(0, i - 1));
+            double last = close.applyAsDouble(i);
+            long volume = Math.round(1000 + 200 * Math.sin(i * 0.7) * (1 + i / 100.0));
+            bar(instrument, days.get(i), open, Math.max(open, last) + 1, Math.min(open, last) - 1, last, volume);
         }
     }
 
@@ -385,10 +391,15 @@ class StockTrendTest {
     }
 
     private void bar(long instrument, LocalDate date, double open, double high, double low, double close) {
+        bar(instrument, date, open, high, low, close, 1000);
+    }
+
+    private void bar(long instrument, LocalDate date, double open, double high, double low, double close,
+                     long volume) {
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO daily_bar (instrument_id, session_date, ts_epoch, open, high, low, close, volume)
-                    VALUES (?,?,?,?,?,?,?,1000)""")) {
+                    VALUES (?,?,?,?,?,?,?,?)""")) {
                 insert.setLong(1, instrument);
                 insert.setString(2, date.toString());
                 insert.setLong(3, epoch(date));
@@ -396,6 +407,7 @@ class StockTrendTest {
                 insert.setDouble(5, high);
                 insert.setDouble(6, low);
                 insert.setDouble(7, close);
+                insert.setLong(8, volume);
                 insert.executeUpdate();
             }
         });
