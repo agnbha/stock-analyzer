@@ -135,6 +135,56 @@ class VolumeColorsTest {
     }
 
     @Test
+    @DisplayName("in Weekly, CAN SLIM's volume bars follow the same rules with a week for a day, over 2.5 years of weeks")
+    void weeklyBarsByTheSameRules() {
+        Random random = new Random(5);
+        // Every ninth week trades 6 times as much, so that some weeks reach 3 times the 50-week average; one stock's
+        // volume rising (new highs), the other's falling (new lows).
+        Map<String, List<Session>> stocks = new LinkedHashMap<>();
+        stocks.put("RISING", sessions(650,
+                i -> Math.round((100_000 + 600 * i) * (0.5 + random.nextDouble()) * ((i / 5) % 9 == 4 ? 6 : 1)), random));
+        stocks.put("FALLING", sessions(650,
+                i -> Math.round((400_000 - 450 * i) * (0.5 + random.nextDouble()) * ((i / 5) % 9 == 4 ? 6 : 1)), random));
+        Set<Kind> seen = EnumSet.noneOf(Kind.class);
+        int glows = 0;
+        for (Map.Entry<String, List<Session>> stock : stocks.entrySet()) {
+            store(stock.getKey(), stock.getValue());
+            List<Session> weeks = weeks(stock.getValue());
+            List<Map<String, Double>> rows = rows(CANSLIM, stock.getKey(), "weekly");
+            assertEquals(weeks.size(), rows.size(), stock.getKey() + ": a bar a week");
+            for (int i = 0; i < weeks.size(); i++) {
+                Session week = weeks.get(i);
+                String what = stock.getKey() + ", the week of " + week.date();
+                assertEquals(epoch(week.date()), rows.get(i).get("time").longValue(), what + ": at its first session");
+                Drawn drawn = expected(weeks, i);
+                seen.add(drawn.bar());
+                seen.add(drawn.extreme() == null ? drawn.bar() : drawn.extreme());
+                glows += drawn.glow() ? 1 : 0;
+                assertDrawn(drawn, week.volume(), rows.get(i), what);
+            }
+        }
+        assertEquals(EnumSet.allOf(Kind.class), seen, "every rule had a week to show");
+        assertTrue(glows > 0, "and a glow");
+    }
+
+    /** The days as weeks, Monday to Sunday: the first open, the highest high, the lowest low, the last close. */
+    private static List<Session> weeks(List<Session> days) {
+        Map<LocalDate, List<Session>> byMonday = new LinkedHashMap<>();
+        for (Session day : days) {
+            LocalDate monday = day.date().minusDays(day.date().getDayOfWeek().getValue() - 1);
+            byMonday.computeIfAbsent(monday, m -> new ArrayList<>()).add(day);
+        }
+        List<Session> weeks = new ArrayList<>();
+        for (List<Session> week : byMonday.values()) {
+            weeks.add(new Session(week.getFirst().date(), week.getFirst().open(),
+                    week.stream().mapToDouble(Session::high).max().orElseThrow(),
+                    week.stream().mapToDouble(Session::low).min().orElseThrow(),
+                    week.getLast().close(), week.stream().mapToLong(Session::volume).sum()));
+        }
+        return weeks;
+    }
+
+    @Test
     @DisplayName("the two heaviest and the two lightest of the last 20 sessions, the day included, are colored")
     void twoHeaviestAndTwoLightestOfTwenty() {
         Map<Integer, Long> volumes = Map.of(5, 9000L, 30, 5000L, 31, 4000L, 32, 3000L, 35, 100L, 36, 200L, 37, 300L);
@@ -623,15 +673,20 @@ class VolumeColorsTest {
         return out;
     }
 
-    /** The chart's rows for the symbol, oldest first, each column by the name the chart shows. */
+    /** The chart's rows for the symbol, in daily candles. */
     private List<Map<String, Double>> rows(Path dashboard, String symbol) {
+        return rows(dashboard, symbol, "daily");
+    }
+
+    /** The chart's rows for the symbol, oldest first, each column by the name the chart shows; CAN SLIM's in a frame. */
+    private List<Map<String, Double>> rows(Path dashboard, String symbol, String frame) {
         String sql;
         try {
             sql = panel(dashboard, CHARTS.get(dashboard)).path("targets").get(0).path("rawQueryText").asText();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        String query = sql.replace("$symbol", symbol);
+        String query = sql.replace("$symbol", symbol).replace("$frame", frame);
         return database.read(connection -> {
             List<Map<String, Double>> rows = new ArrayList<>();
             try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(query)) {
