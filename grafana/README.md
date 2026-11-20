@@ -332,12 +332,15 @@ compares with the stock's own; the candles keep their colors.
 - **Light blue**: at or above the 90th percentile of the last 20 sessions, the day included (one of the two heaviest).
 - **Yellow**: at or below the 10th percentile (one of the two lightest).
 - **White**: a bull snort. The day's range (high to low) is at least 5% of the previous close, and the close is in the
-  top third of that range and above the previous close. White wins over the other colors.
+  top third of that range and above the previous close, on at least 3 times the average volume of the 50 sessions
+  before it (so a stock needs 50 sessions of history first). White wins over the other colors.
 - **Q** (a light dot above the bar): the highest or lowest volume since the same date three months back.
 - **Y** (an orange dot): the same over twelve months. Y wins over Q. On a white bar, a dot can mean either.
-- **Magenta glow** behind the bar: over 1 million shares traded, and a close at least 5% above the previous close.
+- **Magenta glow** behind the bar: over 1 million shares traded, and a close at least 4.95% above the previous close.
+  The bar is 4.95% rather than 5% so that a 5% upper circuit counts: the limit price is rounded to the tick, so such a
+  day can close 4.99% up.
 
-Percentages are rounded to six places before they are compared, so a move of exactly 5% counts. Q and Y start only once
+Percentages are rounded to six places before they are compared, so a move of exactly 5% (or 4.95%) counts. Q and Y start only once
 the daily bars reach back that far. Grafana can't write text on a chart, so the legend names
 the dots, and hovering a day names its bar. The candlestick panel colors its own volume bars only by the candle, so
 the volume is drawn again as one bar series per color on the volume's scale, and the panel's own bars are made
