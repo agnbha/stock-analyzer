@@ -365,14 +365,15 @@ class StockTrendTest {
     /**
      * Each session opening at the last close, its high and low a rupee either side, and its volume swinging about a
      * million shares, wider and wider, so that each new swing is the heaviest and the lightest yet: with swings of the
-     * price of 5% and more, every color of the volume bars shows.
+     * price of 5% and more, every color of the volume bars shows. Session 270 trades 4 times as much: on the stock
+     * page's prices a 5% range closing at its high, so a bull snort, after the 12-month highs and lows it would hide.
      */
     private void series(long instrument, int sessions, IntToDoubleFunction close) {
         List<LocalDate> days = weekdays(sessions);
         for (int i = 0; i < sessions; i++) {
             double open = close.applyAsDouble(Math.max(0, i - 1));
             double last = close.applyAsDouble(i);
-            long volume = Math.round(1_000_000 + 200_000 * Math.sin(i * 0.7) * (1 + i / 100.0));
+            long volume = Math.round((1_000_000 + 200_000 * Math.sin(i * 0.7) * (1 + i / 100.0)) * (i == 270 ? 4 : 1));
             bar(instrument, days.get(i), open, Math.max(open, last) + 1, Math.min(open, last) - 1, last, volume);
         }
     }

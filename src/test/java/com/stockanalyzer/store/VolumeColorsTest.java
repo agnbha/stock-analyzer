@@ -40,10 +40,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The volume bars under the daily candles of Stock Trend and CAN SLIM, colored by how each day's volume compares with
  * the stock's own, by running the two charts' queries. An ordinary day is red when the stock closed below the previous
  * day's close, else green (the candles compare the close with the day's open, and keep their colors); light blue at or
- * above the 90th percentile of the last 20 sessions, yellow at or below the 10th; white on a bull snort, over any other
- * color. The highest or lowest volume of the last 3 months gets a Q dot above its bar, of the last 12 months a Y dot;
- * over 1 million shares on a close 5% or more above the previous one, a glow behind it. The volumes and prices are
- * invented.
+ * above the 90th percentile of the last 20 sessions, yellow at or below the 10th; white on a bull snort (on 3 times the
+ * average volume of the 50 sessions before), over any other color. The highest or lowest volume of the last 3 months
+ * gets a Q dot above its bar, of the last 12 months a Y dot; over 1 million shares on a close 4.95% or more above the
+ * previous one (a 5% upper circuit, rounded to the tick), a glow behind it. The volumes and prices are invented.
  */
 class VolumeColorsTest {
 
@@ -54,7 +54,7 @@ class VolumeColorsTest {
 
     private static final String Q = "Q · highest or lowest in 3 months";
     private static final String Y = "Y · highest or lowest in 12 months";
-    private static final String GLOW = "Over 1 million shares, up 5% or more";
+    private static final String GLOW = "Over 1 million shares, up 4.95% or more";
 
     private enum Kind { DOWN, UP, HEAVY, LIGHT, BULL_SNORT, QUARTER_HIGH, QUARTER_LOW, YEAR_HIGH, YEAR_LOW }
 
@@ -64,7 +64,7 @@ class VolumeColorsTest {
             Kind.UP, "Volume, price up",
             Kind.HEAVY, "Volume ≥ 90th percentile of 20 sessions",
             Kind.LIGHT, "Volume ≤ 10th percentile of 20 sessions",
-            Kind.BULL_SNORT, "Bull snort (range ≥ 5%, top-third close, up)",
+            Kind.BULL_SNORT, "Bull snort (range ≥ 5%, top-third close, up, 3× volume)",
             Kind.QUARTER_HIGH, "Highest volume in 3 months",
             Kind.QUARTER_LOW, "Lowest volume in 3 months",
             Kind.YEAR_HIGH, "Highest volume in 12 months",
@@ -102,8 +102,9 @@ class VolumeColorsTest {
     @DisplayName("every day's bar is the one the rules give, the same on both charts, over 15 months of volumes")
     void everyDayAsTheRulesSay() {
         Random random = new Random(11);
+        // Every seventh day a spike, so that some days reach 3 times the 50-session average: a bull snort's volume.
         List<Session> rising = sessions(320,
-                i -> Math.round((100_000 + 6_000 * i) * (0.5 + random.nextDouble())), random);
+                i -> Math.round((100_000 + 6_000 * i) * (0.5 + random.nextDouble()) * (i % 7 == 3 ? 6 : 1)), random);
         List<Session> ties = sessions(320,
                 i -> 500 * Math.round((9000 - 20 * i) * (0.5 + random.nextDouble()) / 500), random);
         store("RISING", rising);
@@ -223,35 +224,58 @@ class VolumeColorsTest {
     @Test
     @DisplayName("a bull snort is white: a range of 5% of the previous close, a close in its top third and above the previous close")
     void bullSnorts() {
-        LocalDate[] d = weekdays(11).toArray(LocalDate[]::new);
-        store("STOCK", List.of(
-                new Session(d[0], 100, 110, 100, 109, 1000),
-                new Session(d[1], 100, 100.5, 99.5, 100, 1000),
-                new Session(d[2], 100, 105, 100, 104, 1000),
-                new Session(d[3], 100, 100.5, 99.5, 100, 1000),
-                new Session(d[4], 100, 104.9, 100, 104.9, 1000),
-                new Session(d[5], 100, 100.5, 99.5, 100, 1000),
-                new Session(d[6], 100, 106, 100, 104, 1000),
-                new Session(d[7], 100, 100.5, 99.5, 100, 1000),
-                new Session(d[8], 100, 106, 100, 103.9, 1000),
-                new Session(d[9], 100, 100.5, 99.5, 100, 1000),
-                new Session(d[10], 95, 101, 95, 100, 1000)));
+        // Fifty quiet sessions first, for the volume's average; each candidate on ten times their volume, so heavy
+        // (one of the two heaviest of 20, the ties included) when it is not a snort.
+        List<LocalDate> d = weekdays(61);
+        List<Session> days = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            days.add(quiet(d.get(i)));
+        }
+        days.add(new Session(d.get(50), 100, 105, 100, 104, 10_000));
+        days.add(quiet(d.get(51)));
+        days.add(new Session(d.get(52), 100, 104.9, 100, 104.9, 10_000));
+        days.add(quiet(d.get(53)));
+        days.add(new Session(d.get(54), 100, 106, 100, 104, 10_000));
+        days.add(quiet(d.get(55)));
+        days.add(new Session(d.get(56), 100, 106, 100, 103.9, 10_000));
+        days.add(quiet(d.get(57)));
+        days.add(new Session(d.get(58), 95, 101, 95, 100, 10_000));
+        days.add(quiet(d.get(59)));
+        days.add(new Session(d.get(60), 100, 110, 100, 109, 10_000));
+        store("STOCK", days);
 
         for (Path chart : CHARTS.keySet()) {
             List<Map<String, Double>> rows = rows(chart, "STOCK");
-            assertDrawn(Kind.UP, 1000, rows.get(0), "the first bar has no previous close to clear");
-            assertDrawn(Kind.BULL_SNORT, 1000, rows.get(2), "a range of exactly 5%, closing 80% up it");
-            assertDrawn(Kind.UP, 1000, rows.get(4), "a range of 4.9%");
-            assertDrawn(Kind.BULL_SNORT, 1000, rows.get(6), "closing exactly two thirds up its range");
-            assertDrawn(Kind.UP, 1000, rows.get(8), "closing just under the top third");
-            assertDrawn(Kind.UP, 1000, rows.get(10), "closing level with the previous close, not above it");
+            assertDrawn(Kind.BULL_SNORT, 10_000, rows.get(50), "a range of exactly 5%, closing 80% up it");
+            assertDrawn(Kind.HEAVY, 10_000, rows.get(52), "a range of 4.9%");
+            assertDrawn(Kind.BULL_SNORT, 10_000, rows.get(54), "closing exactly two thirds up its range");
+            assertDrawn(Kind.HEAVY, 10_000, rows.get(56), "closing just under the top third");
+            assertDrawn(Kind.HEAVY, 10_000, rows.get(58), "closing level with the previous close, not above it");
+            assertDrawn(Kind.BULL_SNORT, 10_000, rows.get(60), "a range of 10%, closing near the high");
+        }
+    }
+
+    @Test
+    @DisplayName("a bull snort needs at least 3 times the average volume of the 50 sessions before it")
+    void bullSnortVolume() {
+        Map<String, List<Session>> stocks = Map.of(
+                "THREE", afterQuiet(50, 3000),
+                "UNDER", afterQuiet(50, 2999),
+                "SHORT", afterQuiet(49, 100_000));
+        stocks.forEach(this::store);
+
+        for (Path chart : CHARTS.keySet()) {
+            assertDrawn(Kind.BULL_SNORT, 3000, rows(chart, "THREE").get(50), "exactly 3 times the average of 1,000");
+            assertDrawn(Kind.HEAVY, 2999, rows(chart, "UNDER").get(50), "just under 3 times: heavy only");
+            assertDrawn(Kind.HEAVY, 100_000, rows(chart, "SHORT").get(49),
+                    "100 times the volume, but only 49 sessions before it to average");
         }
     }
 
     @Test
     @DisplayName("white wins over light blue and over a Q's bar color, and the Q dot stays")
     void bullSnortOverOtherColors() {
-        LocalDate heavy = LocalDate.of(2026, 3, 2);
+        LocalDate heavy = LocalDate.of(2026, 3, 16);
         LocalDate quarter = LocalDate.of(2026, 4, 6);
         List<Session> days = new ArrayList<>();
         for (Session day : flat(80)) {
@@ -270,15 +294,16 @@ class VolumeColorsTest {
     }
 
     @Test
-    @DisplayName("over 1 million shares and a close at least 5% above the previous close glow, whatever the bar")
+    @DisplayName("over 1 million shares and a close at least 4.95% above the previous close glow, whatever the bar")
     void heavyFivePercentUpDaysGlow() {
-        List<LocalDate> dates = weekdays(40);
+        List<LocalDate> dates = weekdays(60);
         Map<Integer, Session> marked = Map.of(
                 22, new Session(dates.get(22), 107, 108, 106, 106.05, 1_000_001),
                 25, new Session(dates.get(25), 107, 108, 106, 106.05, 1_000_000),
-                28, new Session(dates.get(28), 107, 108, 106, 106, 2_000_000),
-                31, new Session(dates.get(31), 100, 109, 100, 108, 3_000_000));
-        List<Session> days = new ArrayList<>(flat(40));
+                28, new Session(dates.get(28), 107, 108, 105, 105.9995, 2_000_000),
+                31, new Session(dates.get(31), 107, 108, 105, 105.98, 2_000_000),
+                55, new Session(dates.get(55), 100, 109, 100, 108, 3_000_000));
+        List<Session> days = new ArrayList<>(flat(60));
         marked.forEach(days::set);
         store("STOCK", days);
 
@@ -287,8 +312,10 @@ class VolumeColorsTest {
             assertDrawn(new Drawn(Kind.HEAVY, null, true), 1_000_001, rows.get(22),
                     "exactly 5% above the previous close of 101");
             assertDrawn(new Drawn(Kind.HEAVY, null, false), 1_000_000, rows.get(25), "1 million is not beyond it");
-            assertDrawn(new Drawn(Kind.HEAVY, null, false), 2_000_000, rows.get(28), "4.95% up");
-            assertDrawn(new Drawn(Kind.BULL_SNORT, null, true), 3_000_000, rows.get(31), "a bull snort glows too");
+            assertDrawn(new Drawn(Kind.HEAVY, null, true), 2_000_000, rows.get(28),
+                    "exactly 4.95% up, as a 5% upper circuit rounded to the tick can close");
+            assertDrawn(new Drawn(Kind.HEAVY, null, false), 2_000_000, rows.get(31), "4.93% up");
+            assertDrawn(new Drawn(Kind.BULL_SNORT, null, true), 3_000_000, rows.get(55), "a bull snort glows too");
         }
     }
 
@@ -365,10 +392,12 @@ class VolumeColorsTest {
         Session day = sessions.get(at);
         Double previous = at == 0 ? null : sessions.get(at - 1).close();
         Kind extreme = extreme(sessions, at);
-        boolean glow = previous != null && day.volume() > 1_000_000 && percent(day.close() - previous, previous) >= 5;
+        boolean glow = previous != null && day.volume() > 1_000_000
+                && percent(day.close() - previous, previous) >= 4.95;
         Kind bar;
         if (previous != null && day.close() > previous && percent(day.high() - day.low(), previous) >= 5
-                && day.close() - day.low() >= 2.0 / 3 * (day.high() - day.low()) - 1e-9) {
+                && day.close() - day.low() >= 2.0 / 3 * (day.high() - day.low()) - 1e-9
+                && atLeastThreeTimesTheAverage(sessions, at)) {
             bar = Kind.BULL_SNORT;
         } else if (extreme != null) {
             bar = extreme;
@@ -424,6 +453,15 @@ class VolumeColorsTest {
         return best;
     }
 
+    /** The day's volume at least 3 times the average of the 50 sessions before it, which must all be there. */
+    private static boolean atLeastThreeTimesTheAverage(List<Session> sessions, int at) {
+        if (at < 50) {
+            return false;
+        }
+        long total = sessions.subList(at - 50, at).stream().mapToLong(Session::volume).sum();
+        return sessions.get(at).volume() * 50 >= 3 * total;
+    }
+
     private static List<Long> last20(List<Session> sessions, int at) {
         return sessions.subList(at - 19, at + 1).stream().map(Session::volume).toList();
     }
@@ -448,6 +486,7 @@ class VolumeColorsTest {
         for (Map.Entry<Kind, String> bar : BAR.entrySet()) {
             Double value = row.get(bar.getValue());
             if (bar.getKey() == drawn.bar()) {
+                assertNotNull(value, message + ": should be " + bar.getValue());
                 assertEquals(volume, value, 1e-9, message + ": " + bar.getValue());
             } else {
                 assertNull(value, message + ": not " + bar.getValue() + " but " + BAR.get(drawn.bar()));
@@ -478,6 +517,22 @@ class VolumeColorsTest {
         for (int i = 0; i < count; i++) {
             days.add(day(dates.get(i), 100, 101, 1000 + (i * 37L) % 100));
         }
+        return days;
+    }
+
+    /** A quiet session: 99.50 to 100.50, closing at 100 on 1,000 shares. */
+    private static Session quiet(LocalDate date) {
+        return new Session(date, 100, 100.5, 99.5, 100, 1000);
+    }
+
+    /** {@code count} quiet sessions, then a bull snort's candle (range 6%, closing 5% up) on the volume given. */
+    private static List<Session> afterQuiet(int count, long volume) {
+        List<LocalDate> dates = weekdays(count + 1);
+        List<Session> days = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            days.add(quiet(dates.get(i)));
+        }
+        days.add(new Session(dates.get(count), 100, 106, 100, 105, volume));
         return days;
     }
 
