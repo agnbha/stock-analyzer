@@ -35,7 +35,7 @@ class StockLinksTest {
      * Of a style attribute, what Grafana 11.6's text panel keeps (its sanitizer's CSS list, plus the flex properties
      * Grafana adds to it); anything else is dropped without a word, and the buttons would lose their look.
      */
-    private static final Set<String> KEPT_BY_GRAFANA = Set.of("display", "flex-wrap", "gap", "align-items",
+    static final Set<String> KEPT_BY_GRAFANA = Set.of("display", "flex-wrap", "gap", "align-items",
             "padding", "border", "border-radius", "background-color", "color", "text-decoration", "font-weight");
 
     private record Row(String page, int chart, List<String> buttons) {
@@ -85,6 +85,9 @@ class StockLinksTest {
             while (button.find()) {
                 String href = button.group(1);
                 String title = button.group(2);
+                if (href.startsWith("/d/" + dashboard.path("uid").asText() + "/")) {
+                    continue; // the page's own buttons (CAN SLIM's Daily and Weekly): CanSlimWeeklyTest
+                }
                 titles.add(title);
                 JsonNode target = byTitle.get(title);
                 assertTrue(target != null, row.page() + ": no page called " + title);
@@ -144,7 +147,8 @@ class StockLinksTest {
                     .path("options").path("content").asText());
             int checked = 0;
             while (style.find()) {
-                for (String declaration : style.group(1).split(";")) {
+                // A variable in a style (the look of the button picked) is checked where it is defined.
+                for (String declaration : style.group(1).replaceAll("\\$\\{\\w+}", "").split(";")) {
                     if (declaration.isBlank()) {
                         continue;
                     }

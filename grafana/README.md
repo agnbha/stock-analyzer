@@ -211,7 +211,7 @@ whatever time range is picked at the top.
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and
 Calls**, **CAN SLIM**, **Company Details**), and CAN SLIM under its chart of the symbol (**Candles and Calls**,
-**Stock Trend**, **Company Details**). A button
+**Stock Trend**, **Company Details**, after its own **Daily** and **Weekly**). A button
 takes the symbol along, and the detector between Candles and Calls and Stock Trend, which both have that box. It does
 not take the time range: each page opens on its own, because today's minutes would be a single candle on a page of
 daily ones. CAN SLIM lists only the stocks in its last scan, and Company Details only the companies whose page has been
@@ -322,7 +322,13 @@ top, then two lists: breakouts and setups about to break out (stocks that passed
 the screener.in query), and rallies that have ended (stop losses, heavy-volume
 breaks of the 50-day average, climax runs). Click a symbol for its daily chart
 with the 50- and 200-day averages, the pivot and every scan's reading of it; the
-full score sheet, letter by letter, is at the bottom.
+full score sheet, letter by letter, is at the bottom. The **Daily** and **Weekly**
+buttons under the chart switch it between a candle a day and a candle a week,
+keeping the symbol and the time range. A week (Monday to Friday, a Muhurat Sunday
+included) is drawn at its first session: the first open, the highest high, the
+lowest low, the last close and the week's volume. The averages stay the 50- and
+200-day ones, as they stood at the week's last session, and a buy or sell signal
+marks the week it fell in.
 
 **Volume colors**: the volume bars under Stock Trend's and CAN SLIM's candles are colored by how each day's volume
 compares with the stock's own; the candles keep their colors.
@@ -339,6 +345,9 @@ compares with the stock's own; the candles keep their colors.
 - **Magenta glow** behind the bar: over 1 million shares traded, and a close at least 4.95% above the previous close.
   The bar is 4.95% rather than 5% so that a 5% upper circuit counts: the limit price is rounded to the tick, so such a
   day can close 4.99% up.
+
+On CAN SLIM's weekly candles the same rules compare weeks: a week's close against the week before, 20 weeks for light
+blue and yellow, the 50 weeks before for a bull snort's volume, a week's total for the 1 million of the glow.
 
 Percentages are rounded to six places before they are compared, so a move of exactly 5% (or 4.95%) counts. Q and Y start only once
 the daily bars reach back that far. Grafana can't write text on a chart, so the legend names
