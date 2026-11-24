@@ -9,6 +9,7 @@ import com.stockanalyzer.model.RealizedLot;
 import com.stockanalyzer.model.Side;
 import com.stockanalyzer.model.Trade;
 import com.stockanalyzer.model.TradeAttribution;
+import com.stockanalyzer.note.NoteDashboard;
 import com.stockanalyzer.report.CaptureReporter;
 import com.stockanalyzer.report.ConsolePnlReporter;
 import com.stockanalyzer.report.CsvStatementExporter;
@@ -54,6 +55,8 @@ import java.util.stream.Collectors;
  *   chartnotes list [--symbol S]              the notes written on the charts, with their symbol and sentiment
  *   chartnotes assign --id N[,N...] --symbol S
  *                                             give notes that carry no symbol tag a symbol, by hand
+ *   chartnotes draw --symbol S --on candles,canslim|all
+ *                                             draw the notes given S by hand on those dashboards only (all: every chart)
  *   pnl --period day|week|month|fy [--date D | --of D | --month YYYY-MM | --year YYYY-YY]
  *   pnl --rebuild                             re-match every stored trade
  *   statement --from D --to D --out FILE      one row per realized lot
@@ -307,25 +310,40 @@ public final class TradeJournalMain {
                 }
             }
             case "assign" -> {
-                String symbol = args.require("symbol").toUpperCase(Locale.ROOT);
-                String known = context.instrumentRepository().findAll().stream().map(i -> i.symbol())
-                        .filter(s -> s.equalsIgnoreCase(symbol)).findFirst().orElse(null);
-                if (known == null) {
-                    System.err.println("Unknown symbol " + symbol + ": it is not one of the instruments in the database");
-                    System.exit(2);
-                    return;
-                }
+                String known = knownSymbol(context, args.require("symbol"));
                 for (String id : args.require("id").split(",")) {
                     boolean found = context.chartNoteRepository().assignSymbol(Long.parseLong(id.trim()), known);
                     System.out.println(found ? "Note " + id.trim() + " is now about " + known
                             : "No note " + id.trim() + " (run `chartnotes sync` first)");
                 }
             }
+            case "draw" -> {
+                if (!args.has("symbol")) {
+                    printLimits(context);
+                    return;
+                }
+                String known = knownSymbol(context, args.require("symbol"));
+                List<NoteDashboard> on;
+                try {
+                    on = NoteDashboard.parseList(args.require("on"));
+                } catch (IllegalArgumentException e) {
+                    System.err.println(e.getMessage());
+                    System.exit(2);
+                    return;
+                }
+                context.chartNoteRepository().limitTo(known, on.stream().map(NoteDashboard::uid).toList(),
+                        Instant.now().getEpochSecond());
+                System.out.println(on.isEmpty()
+                        ? "The notes given " + known + " by hand are drawn on every chart again"
+                        : "The notes given " + known + " by hand are now drawn on "
+                                + on.stream().map(NoteDashboard::title).collect(Collectors.joining(", ")) + " only");
+            }
             default -> {
                 var found = context.chartNoteRepository()
                         .findLive(args.value("symbol").map(v -> v.toUpperCase(Locale.ROOT)).orElse(null));
                 if (found.isEmpty()) {
                     System.out.println("No chart notes. Run `chartnotes sync` to copy them from Grafana.");
+                    printLimits(context);
                     return;
                 }
                 System.out.printf("%n%-4s %-17s %-12s %-10s %-14s %s%n", "ID", "WHEN (IST)", "SYMBOL", "SENTIMENT", "TAGS", "NOTE");
@@ -338,8 +356,32 @@ public final class TradeJournalMain {
                             note.note() == null ? "" : note.note().replace('\n', ' '));
                 }
                 System.out.println();
+                printLimits(context);
             }
         }
+    }
+
+    /** The instrument's symbol as the database spells it; exits for one that is not an instrument. */
+    private static String knownSymbol(AppContext context, String typed) {
+        String symbol = typed.toUpperCase(Locale.ROOT);
+        String known = context.instrumentRepository().findAll().stream().map(i -> i.symbol())
+                .filter(s -> s.equalsIgnoreCase(symbol)).findFirst().orElse(null);
+        if (known == null) {
+            System.err.println("Unknown symbol " + symbol + ": it is not one of the instruments in the database");
+            System.exit(2);
+        }
+        return known;
+    }
+
+    private static void printLimits(AppContext context) {
+        Map<String, List<String>> limits = context.chartNoteRepository().limits();
+        if (limits.isEmpty()) {
+            return;
+        }
+        System.out.println("Notes given a symbol by hand, drawn on some charts only (`chartnotes draw --symbol S --on all` undoes one):");
+        limits.forEach((symbol, uids) -> System.out.printf("  %-12s %s%n", symbol,
+                uids.stream().map(NoteDashboard::titleOf).collect(Collectors.joining(", "))));
+        System.out.println();
     }
 
     private static void notes(AppContext context, ProfileContext profile, Args args) {

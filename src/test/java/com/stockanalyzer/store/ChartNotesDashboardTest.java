@@ -16,7 +16,9 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,6 +56,10 @@ class ChartNotesDashboardTest {
     }
 
     private static String sql(String dashboard, String panelOrLayer, boolean layer) throws IOException {
+        return sql(dashboard, panelOrLayer, layer, "BHARTIARTL");
+    }
+
+    private static String sql(String dashboard, String panelOrLayer, boolean layer, String symbol) throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
         JsonNode query = layer
                 ? StreamSupport.stream(root.path("annotations").path("list").spliterator(), false)
@@ -61,7 +67,7 @@ class ChartNotesDashboardTest {
                 : StreamSupport.stream(root.path("panels").spliterator(), false)
                         .filter(p -> p.path("id").asInt() == Integer.parseInt(panelOrLayer)).findFirst().orElseThrow()
                         .path("targets").get(0);
-        String text = query.path("queryText").asText().replace("$symbol", "BHARTIARTL");
+        String text = query.path("queryText").asText().replace("$symbol", symbol);
         assertTrue(!text.contains("$"), "an unfilled variable would make this prove nothing: " + text);
         return text;
     }
@@ -130,5 +136,59 @@ class ChartNotesDashboardTest {
         List<List<String>> markers = run(sql("01-overview.json", "Saved notes", true), "text");
 
         assertEquals(List.of(List.of("BHARTIARTL: one"), List.of("WIPRO: two")), markers);
+    }
+
+    private static final List<String> SAVED_NOTES_DASHBOARDS = List.of("01-overview.json", "02-candles-and-calls.json",
+            "03-decision-reasons.json", "04-stock-trend.json", "06-canslim.json", "08-markets.json", "09-institutional.json");
+
+    /** What the Saved notes layer of each dashboard draws, with {@code symbol} picked where there is a picker. */
+    private Map<String, List<String>> drawn(String symbol) throws IOException {
+        Map<String, List<String>> drawn = new LinkedHashMap<>();
+        for (String dashboard : SAVED_NOTES_DASHBOARDS) {
+            drawn.put(dashboard, run(sql(dashboard, "Saved notes", true, symbol), "text").stream()
+                    .map(List::getFirst).toList());
+        }
+        return drawn;
+    }
+
+    private static Map<String, List<String>> expected(List<String> candles, List<String> trend, List<String> canslim,
+                                                      List<String> accountViews) {
+        Map<String, List<String>> expected = new LinkedHashMap<>();
+        expected.put("01-overview.json", accountViews);
+        expected.put("02-candles-and-calls.json", candles);
+        expected.put("03-decision-reasons.json", accountViews);
+        expected.put("04-stock-trend.json", trend);
+        expected.put("06-canslim.json", canslim);
+        expected.put("08-markets.json", accountViews);
+        expected.put("09-institutional.json", accountViews);
+        return expected;
+    }
+
+    @Test
+    @DisplayName("a symbol kept to some charts is drawn on those only, and on every chart again once that is undone")
+    void aSymbolKeptToSomeCharts() throws IOException {
+        notes.upsert(List.of(note(1, 1_793_764_438L, null, null, "BULLISH", "kept to two charts"),
+                note(2, 1_793_765_000L, null, null, "BEARISH", "drawn everywhere")));
+        notes.assignSymbol(1, "INFY");
+        notes.assignSymbol(2, "WIPRO");
+        List<String> kept = List.of("INFY - BULLISH: kept to two charts");
+        List<String> everywhere = List.of("WIPRO - BEARISH: drawn everywhere");
+        List<String> both = List.of(kept.getFirst(), everywhere.getFirst());
+
+        notes.limitTo("INFY", List.of("stockanalyzer-candles", "stockanalyzer-canslim"), 9_100);
+
+        assertEquals(Map.of("INFY", List.of("stockanalyzer-candles", "stockanalyzer-canslim")), notes.limits());
+        assertEquals(expected(kept, List.of(), kept, everywhere), drawn("INFY"),
+                "with INFY picked: on Candles and Calls and CAN SLIM only");
+        assertEquals(expected(everywhere, everywhere, everywhere, everywhere), drawn("WIPRO"),
+                "a symbol with no limit is drawn on every chart");
+
+        notes.limitTo("INFY", List.of("stockanalyzer-trend"), 9_200);
+        assertEquals(Map.of("INFY", List.of("stockanalyzer-trend")), notes.limits(), "a new limit replaces the old one");
+        assertEquals(expected(List.of(), kept, List.of(), everywhere), drawn("INFY"));
+
+        notes.limitTo("INFY", List.of(), 9_300);
+        assertTrue(notes.limits().isEmpty());
+        assertEquals(expected(kept, kept, kept, both), drawn("INFY"), "undone: drawn on every chart again");
     }
 }

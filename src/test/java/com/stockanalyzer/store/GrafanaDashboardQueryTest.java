@@ -227,6 +227,11 @@ class GrafanaDashboardQueryTest {
             assertEquals(sql, saved.path("target").path("rawQueryText").asText(), name);
             assertTrue(sql.contains("FROM chart_note") && sql.contains("symbol_source = 'MANUAL'"),
                     name + ": only notes given a symbol by hand, since a tagged one is already drawn by Grafana: " + sql);
+            String uid = root.path("uid").asText();
+            assertTrue(sql.contains("FROM chart_note_limit l")
+                            && sql.contains("instr(',' || l.dashboards || ',', '," + uid + ",') = 0"),
+                    name + ": a symbol kept to some charts (chartnotes draw) is drawn here only when this dashboard ("
+                            + uid + ") is one of them: " + sql);
             assertTrue(sql.contains("n.symbol = '$symbol'") == hasSymbol, name + (hasSymbol
                     ? ": with a symbol picker, limit to the symbol picked" : ": without one, do not limit to a symbol"));
         }

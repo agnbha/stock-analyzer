@@ -14,7 +14,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public final class SqliteChartNoteRepository implements ChartNoteRepository {
 
@@ -137,6 +139,41 @@ public final class SqliteChartNoteRepository implements ChartNoteRepository {
                                 rs.getString(4), rs.getString(5), rs.getLong(6), (Long) rs.getObject(7), rs.getString(8),
                                 tags(rs), rs.getString(10), rs.getLong(11), (Long) rs.getObject(12)));
                     }
+                }
+            }
+            return found;
+        });
+    }
+
+    @Override
+    public void limitTo(String symbol, List<String> dashboardUids, long nowEpoch) {
+        database.inTransaction(connection -> {
+            if (dashboardUids.isEmpty()) {
+                try (PreparedStatement delete = connection.prepareStatement("DELETE FROM chart_note_limit WHERE symbol = ?")) {
+                    delete.setString(1, symbol);
+                    delete.executeUpdate();
+                }
+                return;
+            }
+            try (PreparedStatement upsert = connection.prepareStatement("""
+                    INSERT INTO chart_note_limit (symbol, dashboards, set_at) VALUES (?,?,?)
+                    ON CONFLICT (symbol) DO UPDATE SET dashboards = excluded.dashboards, set_at = excluded.set_at""")) {
+                upsert.setString(1, symbol);
+                upsert.setString(2, String.join(",", dashboardUids));
+                upsert.setLong(3, nowEpoch);
+                upsert.executeUpdate();
+            }
+        });
+    }
+
+    @Override
+    public Map<String, List<String>> limits() {
+        return database.read(connection -> {
+            Map<String, List<String>> found = new TreeMap<>();
+            try (PreparedStatement select = connection.prepareStatement("SELECT symbol, dashboards FROM chart_note_limit");
+                 ResultSet rs = select.executeQuery()) {
+                while (rs.next()) {
+                    found.put(rs.getString(1), List.of(rs.getString(2).split(",")));
                 }
             }
             return found;
