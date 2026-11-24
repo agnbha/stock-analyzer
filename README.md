@@ -238,7 +238,7 @@ the generic one they stand for (`UP` is `BULLISH`, `DOWN` is `BEARISH`, `LEVEL` 
 stored without a symbol until you give it one with `chartnotes assign`. `grafana.db.path` says where Grafana's database
 is (under Docker, point it at a copy). The *notes written on the charts* table on Candles and Calls lists them.
 A note given its symbol by hand is drawn on every chart that draws notes; `chartnotes draw` keeps one symbol's to the
-dashboards you name (`overview`, `candles`, `reasons`, `trend`, `canslim`, `markets`, `institutional`), and
+dashboards you name (`overview`, `candles`, `reasons`, `trend`, `canslim`, `markets`, `institutional`, `marketwatch`), and
 `chartnotes draw` with no symbol lists the ones kept so.
 
 ### Part 6 - dashboards

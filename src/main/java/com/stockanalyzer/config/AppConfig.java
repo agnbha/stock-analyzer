@@ -479,6 +479,43 @@ public final class AppConfig {
         return Integer.parseInt(get("markets.participant.oi.history.days", "365"));
     }
 
+    /** The indices Market Watch follows, in the page's order. */
+    public List<String> marketWatchIndices() {
+        return List.copyOf(csvSet("marketwatch.indices", "NIFTY 50,NIFTY 500,NIFTY MIDCAP 150,NIFTY SMALLCAP 250"));
+    }
+
+    /**
+     * An index's members from the settings ({@code marketwatch.members.<NAME>}, its spaces as underscores), upper-cased;
+     * empty when none are set, and the list is read from NSE.
+     */
+    public List<String> marketWatchMembers(String index) {
+        String key = "marketwatch.members." + index.trim().replaceAll("\\s+", "_");
+        return csvSet(key, "").stream().map(symbol -> symbol.toUpperCase(java.util.Locale.ROOT)).distinct().toList();
+    }
+
+    /**
+     * An index's own symbol at the broker, as {@code EXCHANGE:SYMBOL} ({@code marketwatch.index.symbol.<NAME>}, its
+     * spaces as underscores), for its bars and RSI; null when none is set.
+     */
+    public String[] marketWatchIndexSymbol(String index) {
+        String value = get("marketwatch.index.symbol." + index.trim().replaceAll("\\s+", "_"), "").trim();
+        if (value.isEmpty()) {
+            return null;
+        }
+        String[] parts = value.split(":", 2);
+        return parts.length == 2 ? new String[]{parts[0].trim(), parts[1].trim()} : new String[]{"NSE", value};
+    }
+
+    /** Where NSE keeps an index's list of members, with {@code %s} for the index's name as its file names spell it. */
+    public String marketWatchNseListUrl() {
+        return get("marketwatch.nse.list.url", "https://nsearchives.nseindia.com/content/indices/ind_%slist.csv");
+    }
+
+    /** How far back each member's daily bars should reach, in days. */
+    public int marketWatchHistoryDays() {
+        return Integer.parseInt(get("marketwatch.history.days", "760"));
+    }
+
     /** How old a company's profile may be before its screener.in page is read again. */
     public int companyProfileRefreshDays() {
         return Integer.parseInt(get("company.profile.refresh.days", "1"));

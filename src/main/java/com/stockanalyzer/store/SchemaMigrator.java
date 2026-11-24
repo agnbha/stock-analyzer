@@ -95,6 +95,7 @@ public final class SchemaMigrator {
         all.put(27, v27());
         all.put(28, v28());
         all.put(29, v29());
+        all.put(30, v30());
         return all;
     }
 
@@ -109,6 +110,58 @@ public final class SchemaMigrator {
                   symbol TEXT PRIMARY KEY,
                   dashboards TEXT NOT NULL,
                   set_at INTEGER NOT NULL
+                ) WITHOUT ROWID""");
+    }
+
+    /**
+     * v30: what Market Watch draws from, kept by {@code CanSlimMain marketwatch}.
+     * <ul>
+     *   <li>{@code index_member}: the members of the indices it follows, read from NSE's lists or, for an index NSE
+     *       does not publish such as the SENSEX, from the settings. An index's members are replaced whenever its list
+     *       is read; {@code index_position} is the order the page shows the indices in.</li>
+     *   <li>{@code market_breadth}: for every session, how many stocks of the whole market closed above and below their
+     *       10-, 20-, 50- and 200-day averages, out of those with that many sessions of bars ({@code counted}) and of
+     *       all with a bar that day ({@code stocks}). Worked out again from {@code daily_bar} on each run.</li>
+     *   <li>{@code daily_bar_reach}: how far back a stock's daily bars have been asked for, so a stock listed more
+     *       recently than that is not asked again every night for bars that do not exist.</li>
+     *   <li>{@code index_bar}: each index's own daily bars, from the broker, with its 14-day RSI (Wilder's).</li>
+     * </ul>
+     */
+    private List<String> v30() {
+        return List.of("""
+                CREATE TABLE index_member (
+                  index_name TEXT NOT NULL,
+                  symbol TEXT NOT NULL,
+                  exchange TEXT NOT NULL,
+                  index_position INTEGER NOT NULL,
+                  source TEXT NOT NULL,
+                  fetched_at INTEGER NOT NULL,
+                  PRIMARY KEY (index_name, symbol)
+                ) WITHOUT ROWID""", """
+                CREATE TABLE market_breadth (
+                  session_date TEXT NOT NULL,
+                  sma_days INTEGER NOT NULL,
+                  above INTEGER NOT NULL,
+                  below INTEGER NOT NULL,
+                  counted INTEGER NOT NULL,
+                  stocks INTEGER NOT NULL,
+                  ts_epoch INTEGER NOT NULL,
+                  computed_at INTEGER NOT NULL,
+                  PRIMARY KEY (session_date, sma_days)
+                ) WITHOUT ROWID""", """
+                CREATE TABLE daily_bar_reach (
+                  instrument_id INTEGER PRIMARY KEY REFERENCES instrument(id),
+                  asked_from TEXT NOT NULL,
+                  asked_at INTEGER NOT NULL
+                )""", """
+                CREATE TABLE index_bar (
+                  index_name TEXT NOT NULL,
+                  session_date TEXT NOT NULL,
+                  ts_epoch INTEGER NOT NULL,
+                  open REAL, high REAL, low REAL, close REAL NOT NULL,
+                  rsi14 REAL,
+                  fetched_at INTEGER NOT NULL,
+                  PRIMARY KEY (index_name, session_date)
                 ) WITHOUT ROWID""");
     }
 

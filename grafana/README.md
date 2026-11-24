@@ -116,6 +116,8 @@ What each tab needs:
 | CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
 | Bonds and Commodities | the yields and prices; Groww's login for the MCX ones | `CanSlimMain markets` (or the nightly `evening.sh`) |
 | Institutional Investment | the FPI, FII and DII flows and positions | `CanSlimMain markets` (or `evening.sh`) |
+| Market Watch | the indices' members and own bars, every stock's bars two years back, the breadth | `CanSlimMain marketwatch` (or `evening.sh`) |
+| Liquidity and Float | the daily bars; the companies' screener.in pages for the shareholding | `CanSlimMain scan --market`, `CanSlimMain profiles` (or `evening.sh`) |
 | Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
@@ -386,6 +388,57 @@ up only until the next day's, so that chart starts on the first run and a weekda
 NSE's participant-wise open interest file for each trading day (a year back the first time,
 `markets.participant.oi.history.days`). NSDL's site refuses the default names HTTP libraries send, so these requests,
 like the other market reads, carry the app's own name.
+
+**Market Watch** — opened from CAN SLIM's and Stock Trend's headers (on the same range), for the state of the market
+as a whole and which way its leadership is turning.
+
+*The whole market's breadth* comes first: of every listed NSE and BSE equity the nightly scan prices (each company once,
+the main boards; about 2,800), the share that closed above its own 10-, 20-, 50- and 200-day average and the share below
+(a stock counts for an average once it has that many sessions; a close equal to its average is neither), with the change
+over five sessions. An average is **+** when more stocks are above it than below. The short term (10 and 20-day) and the
+long term (50 and 200-day) are each both +, both - or one of each, and the grid of the two puts the market in one of four
+states: **strong or overbought** (all four +, dark green), **weak or oversold** (all four -, dark red), **improving or
+strong but weakening** (light green: the short term both + while the long term is not, or the long term both + with the
+short term mixed) and **worsening or weak but strengthening** (light red: the rest). The latest session is marked in
+the grid; under it, the state a session at a time, then the share above each average as lines. A session is drawn for an
+average once half the stocks with a bar that day have that many sessions behind them.
+
+*Then each index*: its **net new highs** a session, how many of its members made a new 52-week high less
+how many made a new 52-week low. A new high is a day's high above every high of the 52 weeks (364 days) before it, a new
+low a low below every low of them; a member counts only once a year of its daily bars lies behind the day, so a stock
+listed within the year is left out rather than making a new high every day. Net new highs above zero three sessions in
+a row is a **positive bias**, shaded green from the third of them for as long as the run lasts; below zero three in a row
+a **negative bias**, shaded red. A day with as many highs as lows ends a run, and a day is marked as it is confirmed, so
+none changes colour later. The definitions are those of the *NSE Net New Highs* indicator on TradingView, counted for
+each index's members rather than the whole exchange. A table gives each index's latest session: its highs, lows, net
+new highs and their 10-day average, its bias, the run it is in and the index's RSI; then a row for each index picked,
+with its net new highs (green bars more highs, red more lows, the 10-day average as a line; hover a day for the counts
+and net new highs as a share of the members counted) and the index's own 14-day RSI (Wilder's, as TradingView's, from
+its daily closes at the broker, `marketwatch.index.symbol.<NAME>`; 70 and 30 marked) with the index beside it; and
+last, the members that made a new 52-week high or low on the latest session, each linking to CAN SLIM.
+The indices are `marketwatch.indices` (NIFTY 50, SENSEX, NIFTY 500, NIFTY MIDCAP 150 and NIFTY SMALLCAP 250).
+`CanSlimMain marketwatch` reads each one's members every evening from NSE's list for it; the SENSEX is BSE's, which
+publishes no such file, so its members are `marketwatch.members.SENSEX`, to be brought up to date when BSE reviews it in
+June and December. The members are today's, so a stock that joined or left an index since changes its past a little.
+The same step reads the daily bars the page needs and the scan does not keep: the CAN SLIM scan reads 400 days of every
+stock, which puts a year (52-week highs) or 200 sessions (the 200-day average) behind only the last month or so. So for
+every member and every stock of the market whose bars do not reach back `marketwatch.history.days` (760), it reads the
+span before the first bar held, once: one request a stock, about 2,800 the first time (some 25 minutes); a stock listed
+since is noted and not asked again. It also brings any member the scan missed up to date, reads each index's own bars
+(two requests an index) and works the breadth out again from all the bars, a few seconds.
+
+**Liquidity and Float** — opened from Market Watch's header, two lists of the whole market. *High liquidity*: every
+stock trading on the latest session whose average daily value traded over the last three months (its average volume
+times its average close, to the latest session) is above the amount picked (₹8 crore by default; 5 to 100 offered),
+most traded first, with its market cap and free float where its company page has been read. Volume is the stock's own
+exchange's. *Low float*: companies whose free float, the shares neither the promoters nor the government hold, is at
+or below the share picked (25% by default, the least a listed company must keep in public hands; 10 to 40 offered) in
+their latest quarter's shareholding pattern (one up to about four months old, as a pattern is filed up to three weeks
+after its quarter ends), fewest free shares first, with who holds the rest, the free-float market cap and the value
+traded. The shareholding comes from screener.in's company pages, read for every tracked company each evening and a few
+dozen others a night, so the low-float list grows over the weeks; the tile on the right says how many companies it
+covers, and `CanSlimMain profiles --max-other-pages N` reads more in one go (12 seconds a page). Each symbol opens
+Stock Trend.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.

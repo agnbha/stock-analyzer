@@ -567,6 +567,26 @@ public final class AppContext implements AutoCloseable {
     }
 
     /**
+     * Keeps the index members and daily bars the Market Watch page counts net new highs from: NSE's lists of members
+     * (or the settings' list, for the SENSEX), and the bars through the wide-range client, which logs in to Groww only
+     * when a stock's bars are read.
+     */
+    public com.stockanalyzer.marketwatch.MarketWatchService marketWatchService() {
+        com.stockanalyzer.marketwatch.NseIndexListClient nse =
+                new com.stockanalyzer.marketwatch.NseIndexListClient(httpClient, config.marketWatchNseListUrl());
+        CandleDataClient daily = new LazyCandleDataClient(memoize(this::wideRangeCandleDataClient));
+        java.time.Clock utc = java.time.Clock.systemUTC();
+        return new com.stockanalyzer.marketwatch.MarketWatchService(nse::members, nse::url,
+                (symbol, exchange, from, to) -> com.stockanalyzer.canslim.CompletedBars.of(daily.fetchCandles(symbol,
+                        exchange, config.segment(), from.atStartOfDay(), to == null
+                                ? java.time.LocalDateTime.now(utc.withZone(clock.zone())) : to.atTime(23, 59),
+                        1440).candles(), clock, utc),
+                new com.stockanalyzer.store.jdbc.SqliteMarketWatchRepository(database), instrumentRepository,
+                new SqliteDailyBarRepository(database), clock, utc, config.exchange(), config.segment(),
+                config.marketWatchHistoryDays());
+    }
+
+    /**
      * Reads screener.in's AI summary of a company's earnings call on request: the public page for the call, then the
      * summary with the signed-in session (SCREENER_SESSION_ID).
      */

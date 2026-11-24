@@ -11,7 +11,7 @@ shift the hours in the plists to match a 09:15–15:30 session.
 | **08:58** Mon–Fri | `market-day.sh` | `MarketDayDaemon` | Starts before the open, makes sure the previous session is stored, and watches the day's purchases for their sell targets. Exits on its own after the close — this is a daily launch, not a service to keep alive. |
 | 09:15–15:30 | — | the daemon scans every 3 minutes, and every 10 seconds for a symbol you have traded today | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → check purchases against their sell targets → redraw. Every symbol is scanned every 3 minutes (`monitor.poll.interval.seconds`); a symbol with a fill today, a buy or a sell, is scanned every 10 seconds (`monitor.active.poll.interval.seconds`) so a position is watched closely and its sell targets are announced within seconds. Every minute (`trades.live.import.interval.minutes`, 0 = off) it pulls the day's fills from the broker, so your buys and sells show on Candles and Calls while you trade, and a symbol moves to the faster scan within a minute of its first fill. The daemon logs how many traded symbols the day's request budget (`ingest.rate.limit.per.day`) has room for at that speed. |
 | ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
-| **15:35** Mon–Fri | `evening.sh` | ingest → log watchlist shortlist → evaluate → import fills → sync chart notes → capture → broker balance → day P&L → company profiles → CAN SLIM scan | Right after the close. The daemon has reconciled the session and exited by about 15:33 (the script waits for it if not), and the day's fills are all in the broker's order list, which serves only the current day. |
+| **15:35** Mon–Fri | `evening.sh` | ingest → log watchlist shortlist → evaluate → import fills → sync chart notes → capture → broker balance → day P&L → company profiles → CAN SLIM scan → Market Watch | Right after the close. The daemon has reconciled the session and exited by about 15:33 (the script waits for it if not), and the day's fills are all in the broker's order list, which serves only the current day. |
 | **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, 52-week ranges, week P&L | The prior has to be current before Monday's open, because the daemon's baseline entry signal reads it. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
 
@@ -244,6 +244,13 @@ java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stocka
 # Slow by design: pages are 12 s apart.
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.CanSlimMain \
      profiles --symbol RELIANCE
+
+# Market Watch: read the indices' members now; for every stock whose bars do not reach back marketwatch.history.days,
+# the span before its first bar (once); the indices' own bars and RSI; and work out the market's breadth (evening.sh does
+# this after the CAN SLIM scan; the first run is some 25 minutes). --no-bars reads the members and works out the
+# breadth from the bars held, reading nothing from the broker.
+# Not during market hours: the bars go through the broker's rate limits, which the daemon is using.
+java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.CanSlimMain marketwatch
 
 # After changing the charge schedule
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.TradeJournalMain pnl --rebuild
