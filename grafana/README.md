@@ -59,7 +59,11 @@ Grafana's own tags are never rewritten: a note tagged `UP` stays `UP` there and 
 
 **A note with no symbol tag** (one written before the symbol tag was needed) is not drawn, and cannot be edited from the
 chart. List them with `chartnotes list`, and give each a symbol with `chartnotes assign --id 3 --symbol RELIANCE`: it is
-then drawn on that symbol's charts, from the analyzer's copy.
+then drawn on that symbol's charts, from the analyzer's copy, and on Account Overview, Decision Reasons, Bonds and
+Commodities and Institutional Investment whatever its tags. To keep a symbol's notes to some dashboards,
+`chartnotes draw --symbol RELIANCE --on candles,canslim` (the names are the dashboards' uids without `stockanalyzer-`);
+`--on all` draws them everywhere again. This governs only the notes given a symbol by hand: one tagged with its symbol
+is drawn by Grafana itself, wherever its tag matches.
 
 To record *why* a call was made against the fills themselves, use `trades note` (see the main README). The call is
 drawn on the candle charts for you, as a light-blue (buy) or orange (sell) dashed marker with the sentiment and your

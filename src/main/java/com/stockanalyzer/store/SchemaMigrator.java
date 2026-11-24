@@ -94,7 +94,22 @@ public final class SchemaMigrator {
         all.put(26, v26());
         all.put(27, v27());
         all.put(28, v28());
+        all.put(29, v29());
         return all;
+    }
+
+    /**
+     * v29: which charts draw a symbol's notes. A note given its symbol by hand is drawn by the "Saved notes" layer of
+     * every dashboard that has one; a row here keeps that symbol's notes to the dashboards it lists (their uids,
+     * comma-separated), set with {@code chartnotes draw}. A symbol with no row is drawn everywhere, as before.
+     */
+    private List<String> v29() {
+        return List.of("""
+                CREATE TABLE chart_note_limit (
+                  symbol TEXT PRIMARY KEY,
+                  dashboards TEXT NOT NULL,
+                  set_at INTEGER NOT NULL
+                ) WITHOUT ROWID""");
     }
 
     /**

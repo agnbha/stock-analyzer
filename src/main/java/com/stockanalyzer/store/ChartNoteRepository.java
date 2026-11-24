@@ -3,6 +3,7 @@ package com.stockanalyzer.store;
 import com.stockanalyzer.model.ChartNote;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** The analyzer's copy of the notes written on the charts; see {@code chartnotes sync}. */
@@ -24,4 +25,13 @@ public interface ChartNoteRepository {
 
     /** Notes that are still in Grafana, oldest first; {@code symbolOrNull} narrows to one symbol. */
     List<ChartNote> findLive(String symbolOrNull);
+
+    /**
+     * Draws the notes given {@code symbol} by hand only on these dashboards (their uids); an empty list draws them on
+     * every chart again.
+     */
+    void limitTo(String symbol, List<String> dashboardUids, long nowEpoch);
+
+    /** The symbols whose notes are drawn on some dashboards only, by symbol, with those dashboards' uids. */
+    Map<String, List<String>> limits();
 }

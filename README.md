@@ -228,6 +228,8 @@ runs it every night.
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes sync            # copy them in (repeatable)
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes list --symbol WIPRO
 java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes assign --id 3 --symbol BHARTIARTL
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes draw --symbol RELIANCE --on candles,canslim
+java $JOPTS -cp $CP com.stockanalyzer.TradeJournalMain chartnotes draw --symbol RELIANCE --on all   # undo
 ```
 
 Tag a note with its symbol and a generic sentiment: `BULLISH`, `BEARISH` or `NEUTRAL`. Labels you used before count as
@@ -235,6 +237,9 @@ the generic one they stand for (`UP` is `BULLISH`, `DOWN` is `BEARISH`, `LEVEL` 
 `notes.sentiment.aliases`), and the same mapping applies to `trades note --sentiment`. A note with no symbol tag is
 stored without a symbol until you give it one with `chartnotes assign`. `grafana.db.path` says where Grafana's database
 is (under Docker, point it at a copy). The *notes written on the charts* table on Candles and Calls lists them.
+A note given its symbol by hand is drawn on every chart that draws notes; `chartnotes draw` keeps one symbol's to the
+dashboards you name (`overview`, `candles`, `reasons`, `trend`, `canslim`, `markets`, `institutional`), and
+`chartnotes draw` with no symbol lists the ones kept so.
 
 ### Part 6 - dashboards
 
