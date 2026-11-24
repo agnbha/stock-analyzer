@@ -364,6 +364,139 @@
       ]
     },
     {
+      "id": 7,
+      "type": "table",
+      "title": "High liquidity and low float: over ₹$min_value_cr crore a day, free float of $max_float_pct% or less",
+      "description": "The stocks on both lists below: trading on the latest session, with an average daily value over the last three months (average volume × average close) above the amount picked, and a free float (the shares neither the promoters nor the government hold, in the latest quarter's shareholding pattern) at or below the share picked. Few shares free to trade, yet enough traded to get in and out. Fewest free shares first, then the most traded. Only companies whose screener.in page has been read can be here: see the tile above. Click a symbol for it on Stock Trend.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 9
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "${__value.raw} on Stock Trend",
+                    "url": "/d/stockanalyzer-trend/stock-trend?var-symbol=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*%$"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(Market cap|Free-float market cap), .*"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quarter"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sessions"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH latest AS (SELECT MAX(session_date) AS day FROM daily_bar),\nrecent AS (\n  SELECT b.instrument_id, COUNT(*) AS sessions, AVG(b.volume) AS avg_volume, AVG(b.close) AS avg_close\n  FROM daily_bar b\n  CROSS JOIN latest\n  WHERE b.session_date > date(latest.day, '-3 months')\n  GROUP BY b.instrument_id\n),\nlast_bar AS (\n  SELECT b.instrument_id, b.close\n  FROM daily_bar b\n  CROSS JOIN latest\n  WHERE b.session_date = latest.day\n),\nholding AS (\n  SELECT h.instrument_id, h.period, h.promoters, h.government, h.fiis, h.diis, h.public,\n         100 - COALESCE(h.promoters, 0) - COALESCE(h.government, 0) AS free_float\n  FROM company_holding h\n  CROSS JOIN latest\n  WHERE h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)\n    AND h.period >= strftime('%Y-%m', latest.day, '-4 months')\n)\nSELECT i.symbol AS \"Symbol\",\n       ROUND(h.free_float, 1) AS \"Free float %\",\n       ROUND(r.avg_volume * r.avg_close / 1e7, 2) AS \"Avg daily value, ₹ crore\",\n       ROUND(p.market_cap_cr * h.free_float / 100) AS \"Free-float market cap, ₹ crore\",\n       p.market_cap_cr AS \"Market cap, ₹ crore\",\n       h.promoters AS \"Promoters %\",\n       h.government AS \"Government %\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period, 6, 2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(h.period, 1, 4) AS \"Quarter\",\n       l.close AS \"Latest close, ₹\",\n       r.sessions AS \"Sessions\"\nFROM holding h\nJOIN instrument i ON i.id = h.instrument_id AND i.segment = 'CASH'\nJOIN recent r ON r.instrument_id = h.instrument_id\nJOIN last_bar l ON l.instrument_id = h.instrument_id\nLEFT JOIN company_profile p ON p.instrument_id = h.instrument_id\nWHERE h.free_float <= $max_float_pct\n  AND r.avg_volume * r.avg_close > $min_value_cr * 1e7\nORDER BY h.free_float, r.avg_volume * r.avg_close DESC, i.symbol",
+          "queryText": "WITH latest AS (SELECT MAX(session_date) AS day FROM daily_bar),\nrecent AS (\n  SELECT b.instrument_id, COUNT(*) AS sessions, AVG(b.volume) AS avg_volume, AVG(b.close) AS avg_close\n  FROM daily_bar b\n  CROSS JOIN latest\n  WHERE b.session_date > date(latest.day, '-3 months')\n  GROUP BY b.instrument_id\n),\nlast_bar AS (\n  SELECT b.instrument_id, b.close\n  FROM daily_bar b\n  CROSS JOIN latest\n  WHERE b.session_date = latest.day\n),\nholding AS (\n  SELECT h.instrument_id, h.period, h.promoters, h.government, h.fiis, h.diis, h.public,\n         100 - COALESCE(h.promoters, 0) - COALESCE(h.government, 0) AS free_float\n  FROM company_holding h\n  CROSS JOIN latest\n  WHERE h.period = (SELECT MAX(x.period) FROM company_holding x WHERE x.instrument_id = h.instrument_id)\n    AND h.period >= strftime('%Y-%m', latest.day, '-4 months')\n)\nSELECT i.symbol AS \"Symbol\",\n       ROUND(h.free_float, 1) AS \"Free float %\",\n       ROUND(r.avg_volume * r.avg_close / 1e7, 2) AS \"Avg daily value, ₹ crore\",\n       ROUND(p.market_cap_cr * h.free_float / 100) AS \"Free-float market cap, ₹ crore\",\n       p.market_cap_cr AS \"Market cap, ₹ crore\",\n       h.promoters AS \"Promoters %\",\n       h.government AS \"Government %\",\n       substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(substr(h.period, 6, 2) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || substr(h.period, 1, 4) AS \"Quarter\",\n       l.close AS \"Latest close, ₹\",\n       r.sessions AS \"Sessions\"\nFROM holding h\nJOIN instrument i ON i.id = h.instrument_id AND i.segment = 'CASH'\nJOIN recent r ON r.instrument_id = h.instrument_id\nJOIN last_bar l ON l.instrument_id = h.instrument_id\nLEFT JOIN company_profile p ON p.instrument_id = h.instrument_id\nWHERE h.free_float <= $max_float_pct\n  AND r.avg_volume * r.avg_close > $min_value_cr * 1e7\nORDER BY h.free_float, r.avg_volume * r.avg_close DESC, i.symbol"
+        }
+      ]
+    },
+    {
       "id": 5,
       "type": "table",
       "title": "High liquidity: over ₹$min_value_cr crore traded a day, over the last 3 months",
@@ -374,7 +507,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 14,
         "w": 24,
         "h": 14
       },
@@ -495,7 +628,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 28,
         "w": 24,
         "h": 12
       },
