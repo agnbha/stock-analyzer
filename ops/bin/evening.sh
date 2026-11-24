@@ -11,7 +11,8 @@
 #   5. balance                 - what the broker says the account now holds
 #   6. print the day           - what you actually read
 #   7. CAN SLIM scan           - needs the day's closing daily bar, so after the close
-#   8. Market Watch            - the indices' members, and bars for those the scan's 400 days leave short
+#   8. Market Watch            - the indices' members and own bars, the span of bars the scan's 400 days leave
+#                                short, and the market's breadth
 #
 # Every step is idempotent. If the daemon already reconciled the session, step 1
 # finds nothing missing and does nothing; if the daemon never ran, step 1 is what
@@ -86,9 +87,10 @@ run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$
 run_step "read bonds, commodities and institutional flows" com.stockanalyzer.CanSlimMain markets
 run_step "refresh company profiles" com.stockanalyzer.CanSlimMain profiles
 run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan --market
-# Market Watch's index members (NSE's lists; the SENSEX from the settings) and the daily bars of those whose bars do
-# not reach back two years. After the scan, which has just read 400 days of every listed stock, so on most nights only
-# the newly listed are read; the first run reads about 500 stocks' two years, some ten minutes.
-run_step "Market Watch: index members and their bars" com.stockanalyzer.CanSlimMain marketwatch
+# Market Watch: the indices' members (NSE's lists; the SENSEX from the settings) and own bars with their RSI; for every
+# stock whose bars do not reach back two years, the span before its first bar, once; then the market's breadth. After
+# the scan, which has just read 400 days of every listed stock: the first run reads about 2,800 stocks (some 25
+# minutes); later nights only the newly listed, and ten requests for the indices.
+run_step "Market Watch: members, bars, breadth" com.stockanalyzer.CanSlimMain marketwatch
 
 finish

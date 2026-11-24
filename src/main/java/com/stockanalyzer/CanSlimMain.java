@@ -34,10 +34,11 @@ import java.util.Locale;
  *                              futures), for the Bonds and Commodities page; and NSDL's FPI flows, NSE's FII and DII
  *                              cash-market flows and its participant-wise index-futures positions, for the
  *                              Institutional Investment page. Both pages are linked from CAN SLIM's header
- *   marketwatch                the members of the indices on the Market Watch page (marketwatch.indices), and the
- *                              daily bars of those whose bars do not reach back marketwatch.history.days, so each day
- *                              there has a year behind it to count 52-week highs and lows against
- *   marketwatch --no-bars      the members only
+ *   marketwatch                the members of the indices on the Market Watch page (marketwatch.indices); the daily
+ *                              bars of every stock (members and the market) whose bars do not reach back
+ *                              marketwatch.history.days, so each day there has a year behind it for 52-week highs and
+ *                              200 sessions for the averages; the indices' own bars and RSI; the market's breadth
+ *   marketwatch --no-bars      the members and the breadth from the bars held, reading nothing from the broker
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -136,8 +137,12 @@ public final class CanSlimMain {
     private static void marketWatch(Args parsed) {
         AppConfig config = AppConfig.load();
         List<com.stockanalyzer.marketwatch.MarketWatchService.Index> indices = config.marketWatchIndices().stream()
-                .map(name -> new com.stockanalyzer.marketwatch.MarketWatchService.Index(name,
-                        config.marketWatchMembers(name)))
+                .map(name -> {
+                    String[] symbol = config.marketWatchIndexSymbol(name);
+                    return new com.stockanalyzer.marketwatch.MarketWatchService.Index(name,
+                            config.marketWatchMembers(name), symbol == null ? null : symbol[1],
+                            symbol == null ? null : symbol[0]);
+                })
                 .toList();
         try (AppContext context = new AppContext(config)) {
             com.stockanalyzer.marketwatch.MarketWatchService.Report report =
@@ -152,12 +157,19 @@ public final class CanSlimMain {
             }
             var bars = report.bars();
             if (bars != null) {
-                System.out.printf("Daily bars: %d stocks in the indices, %d read now (%d days back), %d could not be%s%n",
+                System.out.printf("Daily bars: %d stocks (the indices' and the market's), %d read now (back to %d days),"
+                                + " %d could not be%s%n",
                         bars.stocks(), bars.read(), config.marketWatchHistoryDays(), bars.failures().size(),
                         bars.stopped() ? "; stopped after " + bars.failures().size()
                                 + " failures in a row, the rest are left for the next run" : "");
                 bars.failures().stream().limit(10).forEach(failure -> System.out.println("  " + failure));
             }
+            for (var index : report.indexBars()) {
+                System.out.printf("%-20s %s%n", index.index(), index.error() != null ? "own bars not read: " + index.error()
+                        : String.format("own bars: %d sessions to %s, RSI(14) %.1f", index.sessions(), index.latest(),
+                        index.rsi() == null ? Double.NaN : index.rsi()));
+            }
+            System.out.printf("Market breadth worked out for %d sessions%n", report.breadthSessions());
             boolean noList = !report.indices().isEmpty()
                     && report.indices().stream().allMatch(index -> index.error() != null);
             boolean noBars = bars != null && bars.read() == 0 && !bars.failures().isEmpty();

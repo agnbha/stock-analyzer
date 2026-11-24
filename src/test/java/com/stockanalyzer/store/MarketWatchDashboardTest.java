@@ -3,7 +3,7 @@ package com.stockanalyzer.store;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.stockanalyzer.canslim.DailyBar;
 import com.stockanalyzer.store.jdbc.SqliteDailyBarRepository;
-import com.stockanalyzer.store.jdbc.SqliteIndexMemberRepository;
+import com.stockanalyzer.store.jdbc.SqliteMarketWatchRepository;
 import com.stockanalyzer.store.jdbc.SqliteInstrumentRepository;
 import com.stockanalyzer.util.JsonMapper;
 import com.stockanalyzer.util.MarketClock;
@@ -49,14 +49,14 @@ class MarketWatchDashboardTest {
     private Database database;
     private SqliteInstrumentRepository instruments;
     private SqliteDailyBarRepository dailyBars;
-    private SqliteIndexMemberRepository members;
+    private SqliteMarketWatchRepository members;
 
     @BeforeEach
     void setUp() {
         database = TestDatabase.open(directory);
         instruments = new SqliteInstrumentRepository(database);
         dailyBars = new SqliteDailyBarRepository(database);
-        members = new SqliteIndexMemberRepository(database);
+        members = new SqliteMarketWatchRepository(database);
     }
 
     @AfterEach
@@ -355,8 +355,12 @@ class MarketWatchDashboardTest {
         assertEquals("index", variable.path("name").asText());
         assertEquals(List.of("NIFTY 50", "SENSEX", "NIFTY SMALLCAP 250"),
                 rows(variable.path("query").asText()).stream().map(row -> row.get("index_name")).toList());
-        JsonNode chart = root.path("panels").get(3);
-        assertEquals("index", chart.path("repeat").asText(), "a chart for each index picked");
+        List<JsonNode> panels = StreamSupport.stream(root.path("panels").spliterator(), false).toList();
+        int row = panels.indexOf(panels.stream().filter(p -> p.path("repeat").asText().equals("index")).findFirst()
+                .orElseThrow());
+        assertEquals("row", panels.get(row).path("type").asText(), "a row of charts for each index picked");
+        assertEquals(List.of(3, 9, 21), panels.subList(row + 1, row + 4).stream().map(p -> p.path("id").asInt()).toList(),
+                "the net new highs and RSI charts in the repeated row, then a row of their own for the list");
 
         for (String page : new String[]{"06-canslim.json", "04-stock-trend.json"}) {
             assertTrue(StreamSupport.stream(dashboard(page).path("links").spliterator(), false)
@@ -366,5 +370,175 @@ class MarketWatchDashboardTest {
         List<String> back = StreamSupport.stream(root.path("links").spliterator(), false)
                 .map(link -> link.path("url").asText()).toList();
         assertEquals(List.of("/d/stockanalyzer-canslim/can-slim", "/d/stockanalyzer-trend/stock-trend"), back);
+    }
+
+    // ----- the whole market's breadth -----
+
+    @Test
+    @DisplayName("breadth: stocks above and below their 10, 20, 50 and 200-day averages, as a brute-force count has them")
+    void breadthMatchesABruteForceCount() {
+        Random random = new Random(11);
+        List<LocalDate> days = sessions(LocalDate.of(2025, 1, 6), 260);
+        Map<String, List<DailyBar>> stocks = new TreeMap<>();
+        for (int s = 0; s < 12; s++) {
+            // Three listed later, so some days count them for the short averages and not the long ones.
+            int listedAt = s < 9 ? 0 : 150 + 30 * (s - 8);
+            double price = 100;
+            List<DailyBar> bars = new ArrayList<>();
+            for (int i = listedAt; i < days.size(); i++) {
+                // One stock that does not move: its close equals every average and is neither above nor below.
+                price = s == 0 ? 100 : Math.round(price * (1 + (random.nextDouble() - 0.5) * 0.05) * 100) / 100.0;
+                bars.add(bar(days.get(i), price + 1, price - 1));
+            }
+            stocks.put("B" + s, bars);
+            store("B" + s, bars);
+        }
+        new SqliteMarketWatchRepository(database).rebuildBreadth("CASH", 1_795_000_000L);
+
+        for (LocalDate day : List.of(days.get(9), days.get(60), days.get(199), days.get(259))) {
+            for (int n : List.of(10, 20, 50, 200)) {
+                int above = 0;
+                int below = 0;
+                int counted = 0;
+                for (List<DailyBar> bars : stocks.values()) {
+                    int at = -1;
+                    for (int i = 0; i < bars.size(); i++) {
+                        if (bars.get(i).date().equals(day)) {
+                            at = i;
+                        }
+                    }
+                    if (at + 1 < n) {
+                        continue;
+                    }
+                    double average = bars.subList(at + 1 - n, at + 1).stream().mapToDouble(DailyBar::close).sum() / n;
+                    double difference = Math.round((bars.get(at).close() - average) * 1e6) / 1e6;
+                    counted++;
+                    above += difference > 0 ? 1 : 0;
+                    below += difference < 0 ? 1 : 0;
+                }
+                List<Map<String, Object>> stored = rows("SELECT above, below, counted, stocks FROM market_breadth "
+                        + "WHERE session_date = '" + day + "' AND sma_days = " + n);
+                if (counted == 0) {
+                    assertTrue(stored.isEmpty(), day + " " + n + ": no stock has the sessions for it");
+                } else {
+                    assertEquals(List.of(above, below, counted), List.of(stored.getFirst().get("above"),
+                            stored.getFirst().get("below"), stored.getFirst().get("counted")), day + " " + n);
+                }
+            }
+        }
+    }
+
+    private void breadth(String day, int sma, int above, int below, int counted, int stocks) {
+        database.inTransaction(connection -> {
+            try (var insert = connection.prepareStatement("INSERT INTO market_breadth (session_date, sma_days, above, below, "
+                    + "counted, stocks, ts_epoch, computed_at) VALUES (?,?,?,?,?,?,?,1)")) {
+                insert.setString(1, day);
+                insert.setInt(2, sma);
+                insert.setInt(3, above);
+                insert.setInt(4, below);
+                insert.setInt(5, counted);
+                insert.setInt(6, stocks);
+                insert.setLong(7, CLOCK.sessionOpenEpoch(LocalDate.parse(day)));
+                insert.executeUpdate();
+            }
+        });
+    }
+
+    /** A session's four averages, each + (more above than below) or not. */
+    private void session(String day, boolean p10, boolean p20, boolean p50, boolean p200) {
+        int sma = 0;
+        for (boolean plus : new boolean[]{p10, p20, p50, p200}) {
+            breadth(day, List.of(10, 20, 50, 200).get(sma++), plus ? 60 : 40, plus ? 40 : 60, 100, 110);
+        }
+    }
+
+    @Test
+    @DisplayName("the slide's grid: the 10 and 20-day averages against the 50 and 200-day, all nine cells")
+    void theMarketStateGrid() throws IOException {
+        Object[][] cases = {
+                // 10, 20, 50, 200 + or not, and the state the grid gives it
+                {true, false, false, true, "Worsening or weak but strengthening"},
+                {true, true, true, false, "Improving or strong but weakening"},
+                {false, false, false, true, "Worsening or weak but strengthening"},
+                {false, true, true, true, "Improving or strong but weakening"},
+                {true, true, true, true, "Strong or overbought"},
+                {false, false, true, true, "Worsening or weak but strengthening"},
+                {true, false, false, false, "Worsening or weak but strengthening"},
+                {true, true, false, false, "Improving or strong but weakening"},
+                {false, false, false, false, "Weak or oversold"}};
+        List<String> expected = new ArrayList<>();
+        LocalDate day = LocalDate.of(2026, 3, 2);
+        for (Object[] c : cases) {
+            session(day.toString(), (boolean) c[0], (boolean) c[1], (boolean) c[2], (boolean) c[3]);
+            expected.add((String) c[4]);
+            day = day.plusDays(1);
+        }
+
+        List<Map<String, Object>> states = rows(sql(7, "''", day));
+        assertEquals(expected, states.stream().map(row -> row.get("Market state")).toList());
+
+        List<Map<String, Object>> grid = rows(sql(6, "''", day));
+        assertEquals(List.of("Single 10, 20 +/-", "Both 10, 20 +", "Both 10, 20 -"),
+                grid.stream().map(row -> row.get("10 and 20-day \u2193  50 and 200-day \u2192")).toList());
+        assertEquals(List.of(
+                List.of("Worsening or weak but strengthening", "Improving or strong but weakening",
+                        "Worsening or weak but strengthening"),
+                List.of("Improving or strong but weakening", "Strong or overbought", "Improving or strong but weakening"),
+                List.of("Worsening or weak but strengthening", "Worsening or weak but strengthening",
+                        "Weak or oversold  \u25c0 now")),
+                grid.stream().map(row -> List.of(row.get("Single 50, 200 +/-"), row.get("Both 50, 200 +"),
+                        row.get("Both 50, 200 -"))).toList(), "the latest session, all four -, is marked");
+    }
+
+    @Test
+    @DisplayName("a session counts for the state only once half the stocks have 200 sessions behind them")
+    void stateNeedsTheAveragesCounted() throws IOException {
+        session("2026-03-02", true, true, true, true);
+        breadth("2026-03-03", 10, 60, 40, 100, 110);
+        breadth("2026-03-03", 20, 60, 40, 100, 110);
+        breadth("2026-03-03", 50, 60, 40, 100, 110);
+        breadth("2026-03-03", 200, 30, 20, 50, 110);
+
+        assertEquals(List.of("Strong or overbought"),
+                rows(sql(7, "''", LocalDate.of(2026, 3, 2))).stream().map(row -> row.get("Market state")).toList());
+        List<Map<String, Object>> chart = rows(sql(8, "''", LocalDate.of(2026, 3, 2)));
+        assertEquals(Arrays.asList(60.0, null), chart.stream().map(row -> row.get("Above 200-day")).toList(),
+                "50 of 110 stocks is not enough to draw");
+    }
+
+    @Test
+    @DisplayName("the breadth table: the latest session's shares above and below, its sign, and the change over five sessions")
+    void breadthTable() throws IOException {
+        LocalDate day = LocalDate.of(2026, 3, 2);
+        for (int i = 0; i < 6; i++) {
+            for (int sma : List.of(10, 20, 50, 200)) {
+                breadth(day.plusDays(i).toString(), sma, 40 + 2 * i, 58 - 2 * i, 100, 110);
+            }
+        }
+
+        List<Map<String, Object>> rows = rows(sql(5, "''", day));
+
+        assertEquals(List.of("10-day", "20-day", "50-day", "200-day"), rows.stream().map(row -> row.get("Average")).toList());
+        Map<String, Object> ten = rows.getFirst();
+        assertEquals(Arrays.asList("7 Mar 2026", 50.0, 48.0, "+", 10.0, 50, 48, 100),
+                Arrays.asList(ten.get("As of"), ten.get("% above"), ten.get("% below"), ten.get("Sign"),
+                        ten.get("% above, change over 5 sessions"), ten.get("Stocks above"), ten.get("Stocks below"),
+                        ten.get("Stocks counted")));
+    }
+
+    @Test
+    @DisplayName("the RSI chart: the index picked, its RSI and its close, once there is an RSI")
+    void rsiChart() throws IOException {
+        new SqliteMarketWatchRepository(database).upsertIndexBars("NIFTY 50", List.of(
+                new MarketWatchRepository.IndexBar(LocalDate.of(2026, 3, 2), 1, 10, 11, 9, 10.5, null),
+                new MarketWatchRepository.IndexBar(LocalDate.of(2026, 3, 3), 2, 10, 11, 9, 10.75, 61.234)), 5);
+        new SqliteMarketWatchRepository(database).upsertIndexBars("SENSEX", List.of(
+                new MarketWatchRepository.IndexBar(LocalDate.of(2026, 3, 3), 2, 10, 11, 9, 99, 40.0)), 5);
+
+        List<Map<String, Object>> rows = rows(sql(9, "'NIFTY 50'", LocalDate.of(2026, 3, 2)));
+
+        assertEquals(1, rows.size());
+        assertEquals(Arrays.asList(2L, 61.2, 10.75), Arrays.asList(((Number) rows.getFirst().get("time")).longValue(),
+                rows.getFirst().get("RSI (14)"), rows.getFirst().get("Index close")));
     }
 }

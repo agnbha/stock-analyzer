@@ -2,8 +2,8 @@ package com.stockanalyzer.marketwatch;
 
 import com.stockanalyzer.canslim.DailyBar;
 import com.stockanalyzer.store.DailyBarRepository;
-import com.stockanalyzer.store.IndexMemberRepository;
 import com.stockanalyzer.store.InstrumentRepository;
+import com.stockanalyzer.store.MarketWatchRepository;
 import com.stockanalyzer.util.MarketClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,15 +15,22 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Keeps what the Market Watch page counts its 52-week highs and lows from: the members of each index it follows, and
- * enough of each member's daily bars that every day on the page has a whole year behind it.
+ * Keeps what the Market Watch page draws from, and works out what it cannot work out for itself.
  *
- * <p>The page itself does the counting, from {@code daily_bar}: a stock makes a new 52-week high on a day when its high
- * is above every high of the 52 weeks before, and a new low when its low is below every low; net new highs are the
- * highs less the lows. The nightly CAN SLIM scan already reads 400 days of bars for every listed stock, which leaves the
- * first year of them with no year behind it. So a member whose bars do not reach back {@code historyDays} is read again
- * over that span (two requests a stock, as the daily client asks for 400 days at a time); so is one whose bars stop short of the latest session (the scan was not run, or
- * missed it). A stock listed more recently than that is read every night, which costs a request and is harmless.
+ * <ul>
+ *   <li><b>The indices' members</b>, from NSE's lists, or the settings' for an index NSE does not publish.</li>
+ *   <li><b>Daily bars reaching back {@code historyDays}</b> for every member and every stock of the market. The page
+ *       counts 52-week highs and lows, and the market's breadth against 200-day averages, over the last year: a day
+ *       needs a year, or 200 sessions, behind it. The nightly CAN SLIM scan reads 400 days of every listed stock, so
+ *       what is missing is the span before its first bar: one request a stock, once. A stock listed after that span
+ *       starts is noted as asked ({@code daily_bar_reach}) and not asked again. A member whose bars stop short of the
+ *       latest session (the scan was not run, or missed it) is read up to today too.</li>
+ *   <li><b>Each index's own bars</b> from the broker, two requests an index each run, with their 14-day RSI.</li>
+ *   <li><b>The market's breadth</b>, worked out again from the bars: how many stocks closed above and below their 10-,
+ *       20-, 50- and 200-day averages, every session.</li>
+ * </ul>
+ *
+ * The 52-week highs and lows themselves are counted by the page from {@code daily_bar}.
  */
 public final class MarketWatchService {
 
@@ -32,6 +39,7 @@ public final class MarketWatchService {
     static final int REACH_SLACK_DAYS = 14;
     /** Reads that fail in a row before the rest are left for another night: the broker is down or refusing. */
     static final int MAX_FAILURES_IN_A_ROW = 10;
+    static final int RSI_PERIOD = 14;
 
     /** An index's members, as one list. */
     @FunctionalInterface
@@ -39,18 +47,20 @@ public final class MarketWatchService {
         List<String> members(String index);
     }
 
-    /** A stock's completed daily bars from {@code from} to the latest, oldest first. */
+    /** A stock's or an index's completed daily bars from {@code from} to {@code to} (null: the latest), oldest first. */
     @FunctionalInterface
     public interface BarSource {
-        List<DailyBar> read(String symbol, String exchange, LocalDate from);
+        List<DailyBar> read(String symbol, String exchange, LocalDate from, LocalDate to);
     }
 
     /**
      * An index the page follows.
      *
-     * @param members its members from the settings; empty for one whose list is read from NSE
+     * @param members  its members from the settings; empty for one whose list is read from NSE
+     * @param symbol   the index's own symbol at the broker, for its bars and RSI; null for none
+     * @param exchange the exchange that symbol is on
      */
-    public record Index(String name, List<String> members) {
+    public record Index(String name, List<String> members, String symbol, String exchange) {
     }
 
     /**
@@ -62,21 +72,29 @@ public final class MarketWatchService {
     }
 
     /**
-     * @param stocks   the members, once each, across every index
+     * @param stocks   the members and the market's stocks, once each
      * @param read     how many were read this time
      * @param failures why each read that failed did; {@code stopped} when the run gave up on the rest
      */
     public record BarsResult(int stocks, int read, List<String> failures, boolean stopped) {
     }
 
-    /** @param bars null when the run was asked to leave the bars alone */
-    public record Report(List<IndexResult> indices, int dropped, BarsResult bars) {
+    /** @param error why the index's bars could not be read, or null */
+    public record IndexBarsResult(String index, int sessions, LocalDate latest, Double rsi, String error) {
+    }
+
+    /**
+     * @param bars           null when the run was asked to leave the bars alone
+     * @param breadthSessions the sessions the market's breadth was worked out for
+     */
+    public record Report(List<IndexResult> indices, int dropped, BarsResult bars, List<IndexBarsResult> indexBars,
+                         int breadthSessions) {
     }
 
     private final MemberSource nse;
     private final java.util.function.Function<String, String> nseUrl;
     private final BarSource bars;
-    private final IndexMemberRepository members;
+    private final MarketWatchRepository repository;
     private final InstrumentRepository instruments;
     private final DailyBarRepository dailyBars;
     private final MarketClock marketClock;
@@ -87,16 +105,17 @@ public final class MarketWatchService {
 
     /**
      * @param nseUrl      where an index's list is read from, to record with its members
-     * @param historyDays how far back each member's bars should reach: a year of days to count plus the year before them
+     * @param historyDays how far back each stock's bars should reach: a year of days to count plus the year, or 200
+     *                    sessions, before them
      */
     public MarketWatchService(MemberSource nse, java.util.function.Function<String, String> nseUrl, BarSource bars,
-                              IndexMemberRepository members, InstrumentRepository instruments,
+                              MarketWatchRepository repository, InstrumentRepository instruments,
                               DailyBarRepository dailyBars, MarketClock marketClock, Clock clock, String exchange,
                               String segment, int historyDays) {
         this.nse = nse;
         this.nseUrl = nseUrl;
         this.bars = bars;
-        this.members = members;
+        this.repository = repository;
         this.instruments = instruments;
         this.dailyBars = dailyBars;
         this.marketClock = marketClock;
@@ -107,8 +126,9 @@ public final class MarketWatchService {
     }
 
     /**
-     * Reads each index's members, drops the indices no longer followed, then (with {@code readBars}) reads the bars the
-     * members lack. An index whose list cannot be read keeps the members it had.
+     * Reads each index's members and drops the indices no longer followed; then, with {@code readBars}, the bars the
+     * stocks lack and the indices' own bars; then works out the market's breadth from the bars held. An index whose
+     * list cannot be read keeps the members it had.
      */
     public Report refresh(List<Index> indices, boolean readBars) {
         long now = clock.instant().getEpochSecond();
@@ -119,41 +139,67 @@ public final class MarketWatchService {
                 boolean fromSettings = !index.members().isEmpty();
                 List<String> symbols = fromSettings ? index.members() : nse.members(index.name());
                 String source = fromSettings ? "settings" : nseUrl.apply(index.name());
-                members.replace(index.name(), position, symbols, exchange, source, now);
+                repository.replace(index.name(), position, symbols, exchange, source, now);
                 results.add(new IndexResult(index.name(), symbols.size(), source, null));
             } catch (RuntimeException e) {
                 log.warn("Could not read the members of {}: {}", index.name(), e.getMessage());
-                members.reorder(index.name(), position);
-                results.add(new IndexResult(index.name(), members.counts().getOrDefault(index.name(), 0), null,
+                repository.reorder(index.name(), position);
+                results.add(new IndexResult(index.name(), repository.counts().getOrDefault(index.name(), 0), null,
                         e.getMessage()));
             }
         }
-        int dropped = members.retainOnly(indices.stream().map(Index::name).toList());
-        return new Report(results, dropped, readBars ? readBars() : null);
+        int dropped = repository.retainOnly(indices.stream().map(Index::name).toList());
+        BarsResult stocks = readBars ? readBars(now) : null;
+        List<IndexBarsResult> indexBars = readBars ? readIndexBars(indices, now) : List.of();
+        int breadth = repository.rebuildBreadth(segment, now);
+        return new Report(results, dropped, stocks, indexBars, breadth);
     }
 
-    private BarsResult readBars() {
-        LocalDate from = LocalDate.now(clock.withZone(marketClock.zone())).minusDays(historyDays);
-        Optional<LocalDate> latest = members.latestSession();
-        List<IndexMemberRepository.BarSpan> spans = members.barSpans(segment);
-        List<IndexMemberRepository.BarSpan> due = spans.stream().filter(span -> span.first() == null
-                || span.first().isAfter(from.plusDays(REACH_SLACK_DAYS))
-                || latest.map(day -> span.last().isBefore(day)).orElse(false)).toList();
-        log.info("Market Watch: {} of {} members need their daily bars read from {}", due.size(), spans.size(), from);
+    private LocalDate from() {
+        return LocalDate.now(clock.withZone(marketClock.zone())).minusDays(historyDays);
+    }
+
+    private BarsResult readBars(long now) {
+        LocalDate from = from();
+        LocalDate reachBy = from.plusDays(REACH_SLACK_DAYS);
+        Optional<LocalDate> latest = repository.latestSession();
+        List<MarketWatchRepository.BarSpan> spans = repository.barSpans(segment);
+        List<MarketWatchRepository.BarSpan> due = new ArrayList<>();
+        for (MarketWatchRepository.BarSpan span : spans) {
+            if (span.first() == null || shortOfReach(span, reachBy) || behind(span, latest)) {
+                due.add(span);
+            }
+        }
+        log.info("Market Watch: {} of {} stocks need daily bars read, back to {}", due.size(), spans.size(), from);
         int read = 0;
         int failedInARow = 0;
         List<String> failures = new ArrayList<>();
-        for (IndexMemberRepository.BarSpan span : due) {
+        for (MarketWatchRepository.BarSpan span : due) {
             if (failedInARow >= MAX_FAILURES_IN_A_ROW) {
                 return new BarsResult(spans.size(), read, failures, true);
             }
             try {
-                List<DailyBar> got = bars.read(span.symbol(), span.exchange(), from);
-                if (got.isEmpty()) {
-                    throw new IllegalStateException("no daily candles returned");
+                if (span.first() == null) {
+                    List<DailyBar> got = bars.read(span.symbol(), span.exchange(), from, null);
+                    if (got.isEmpty()) {
+                        throw new IllegalStateException("no daily candles returned");
+                    }
+                    long id = store(span, got);
+                    repository.markAsked(id, from, now);
+                } else {
+                    long id = instruments.findOrCreate(span.symbol(), span.exchange(), segment);
+                    if (shortOfReach(span, reachBy)) {
+                        // Only the span before the first bar held; nothing there means the stock was not yet listed.
+                        List<DailyBar> got = bars.read(span.symbol(), span.exchange(), from, span.first().minusDays(1));
+                        if (!got.isEmpty()) {
+                            store(span, got);
+                        }
+                        repository.markAsked(id, from, now);
+                    }
+                    if (behind(span, latest)) {
+                        store(span, bars.read(span.symbol(), span.exchange(), span.last(), null));
+                    }
                 }
-                long instrumentId = instruments.findOrCreate(span.symbol(), span.exchange(), segment);
-                dailyBars.upsert(instrumentId, got, bar -> marketClock.sessionOpenEpoch(bar.date()));
                 read++;
                 failedInARow = 0;
             } catch (RuntimeException e) {
@@ -161,10 +207,58 @@ public final class MarketWatchService {
                 failures.add(span.symbol() + ": " + e.getMessage());
                 failedInARow++;
             }
-            if ((read + failures.size()) % 100 == 0) {
+            if ((read + failures.size()) % 250 == 0) {
                 log.info("Market Watch: read {} of {}", read + failures.size(), due.size());
             }
         }
         return new BarsResult(spans.size(), read, failures, false);
+    }
+
+    private static boolean shortOfReach(MarketWatchRepository.BarSpan span, LocalDate reachBy) {
+        return span.first() != null && span.first().isAfter(reachBy)
+                && (span.askedFrom() == null || span.askedFrom().isAfter(reachBy));
+    }
+
+    /** Only a member is brought up to date here: the market's stocks are the nightly scan's to price. */
+    private static boolean behind(MarketWatchRepository.BarSpan span, Optional<LocalDate> latest) {
+        return span.member() && span.last() != null && latest.map(day -> span.last().isBefore(day)).orElse(false);
+    }
+
+    private long store(MarketWatchRepository.BarSpan span, List<DailyBar> got) {
+        long id = instruments.findOrCreate(span.symbol(), span.exchange(), segment);
+        if (!got.isEmpty()) {
+            dailyBars.upsert(id, got, bar -> marketClock.sessionOpenEpoch(bar.date()));
+        }
+        return id;
+    }
+
+    private List<IndexBarsResult> readIndexBars(List<Index> indices, long now) {
+        List<IndexBarsResult> results = new ArrayList<>();
+        for (Index index : indices) {
+            if (index.symbol() == null) {
+                continue;
+            }
+            try {
+                List<DailyBar> got = bars.read(index.symbol(), index.exchange(), from(), null);
+                if (got.isEmpty()) {
+                    throw new IllegalStateException("no daily candles returned for " + index.exchange() + ":"
+                            + index.symbol());
+                }
+                List<Double> rsi = Rsi.wilder(got.stream().map(DailyBar::close).toList(), RSI_PERIOD);
+                List<MarketWatchRepository.IndexBar> rows = new ArrayList<>();
+                for (int i = 0; i < got.size(); i++) {
+                    DailyBar bar = got.get(i);
+                    rows.add(new MarketWatchRepository.IndexBar(bar.date(), marketClock.sessionOpenEpoch(bar.date()),
+                            bar.open(), bar.high(), bar.low(), bar.close(), rsi.get(i)));
+                }
+                repository.upsertIndexBars(index.name(), rows, now);
+                results.add(new IndexBarsResult(index.name(), rows.size(), rows.getLast().date(),
+                        rows.getLast().rsi14(), null));
+            } catch (RuntimeException e) {
+                log.warn("Could not read {}'s own bars: {}", index.name(), e.getMessage());
+                results.add(new IndexBarsResult(index.name(), 0, null, null, e.getMessage()));
+            }
+        }
+        return results;
     }
 }

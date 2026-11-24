@@ -245,8 +245,10 @@ java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stocka
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.CanSlimMain \
      profiles --symbol RELIANCE
 
-# Market Watch: read the indices' members now, and the daily bars of those whose bars do not reach back
-# marketwatch.history.days (evening.sh does this after the CAN SLIM scan). --no-bars reads the members only.
+# Market Watch: read the indices' members now; for every stock whose bars do not reach back marketwatch.history.days,
+# the span before its first bar (once); the indices' own bars and RSI; and work out the market's breadth (evening.sh does
+# this after the CAN SLIM scan; the first run is some 25 minutes). --no-bars reads the members and works out the
+# breadth from the bars held, reading nothing from the broker.
 # Not during market hours: the bars go through the broker's rate limits, which the daemon is using.
 java --enable-native-access=ALL-UNNAMED -cp target/stock-analyzer.jar com.stockanalyzer.CanSlimMain marketwatch
 

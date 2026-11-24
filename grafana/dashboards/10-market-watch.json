@@ -1,7 +1,7 @@
 {
   "uid": "stockanalyzer-marketwatch",
   "title": "Market Watch",
-  "description": "Net new 52-week highs for the main indices, with the runs of three sessions or more on one side of zero marked as a positive or negative bias. Linked from CAN SLIM and Stock Trend.",
+  "description": "The whole market's breadth against its 10, 20, 50 and 200-day averages and the state it puts the market in; net new 52-week highs for the main indices, with their positive and negative bias, and each index's RSI. Linked from CAN SLIM and Stock Trend.",
   "tags": [
     "stock-analyzer",
     "screening",
@@ -169,7 +169,7 @@
             "$__all"
           ]
         },
-        "description": "The indices to show, in the order marketwatch.indices lists them: a chart each."
+        "description": "The indices to show, in the order marketwatch.indices lists them: a row of charts each."
       }
     ]
   },
@@ -188,7 +188,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<span style=\"padding: 4px 4px;\"><span style=\"font-weight: 600;\">Net new highs</span> = new 52-week highs less new 52-week lows, a session.</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(115, 191, 105, 0.35); font-weight: 600;\">Positive bias</span>\n<span style=\"padding: 4px 4px;\">above zero 3 sessions in a row</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(242, 73, 92, 0.35); font-weight: 600;\">Negative bias</span>\n<span style=\"padding: 4px 4px;\">below zero 3 in a row. The line is the 10-day average.</span>\n</div>"
+        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<span style=\"padding: 4px 4px;\"><span style=\"font-weight: 600;\">Net new highs</span> = new 52-week highs less new 52-week lows, a session.</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(115, 191, 105, 0.35); font-weight: 600;\">Positive bias</span>\n<span style=\"padding: 4px 4px;\">above zero 3 sessions in a row</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(242, 73, 92, 0.35); font-weight: 600;\">Negative bias</span>\n<span style=\"padding: 4px 4px;\">below zero 3 in a row. Above them, the whole market's breadth: the share of stocks above and below their 10, 20, 50 and 200-day averages, and the state it puts the market in.</span>\n</div>"
       }
     },
     {
@@ -239,11 +239,540 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM index_member",
-          "queryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM index_member"
+          "rawQueryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\"\nFROM (SELECT MAX(fetched_at) AS t FROM index_member\n      UNION ALL SELECT MAX(computed_at) FROM market_breadth\n      UNION ALL SELECT MAX(fetched_at) FROM index_bar)",
+          "queryText": "SELECT MAX(t) * 1000 AS \"Last data refresh\"\nFROM (SELECT MAX(fetched_at) AS t FROM index_member\n      UNION ALL SELECT MAX(computed_at) FROM market_breadth\n      UNION ALL SELECT MAX(fetched_at) FROM index_bar)"
         }
       ],
       "transparent": true
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "The whole market: stocks above and below their averages",
+      "description": "Every listed NSE and BSE equity the nightly scan prices (each company once, the main boards; about 2,800), on the latest session: the share that closed above its own 10-, 20-, 50- and 200-day average (of its closes, that day's included) and the share below. A stock counts for an average once it has that many sessions of bars; a close equal to its average is neither. **Sign** is + when more are above than below. The change is in the share above, against five sessions before.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 10,
+        "h": 8
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^% .*"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% above"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "super-light-red",
+                      "value": null
+                    },
+                    {
+                      "color": "super-light-green",
+                      "value": 50
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sign"
+            },
+            "properties": [
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "+": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "-": {
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "% above, change over 5 sessions"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.05
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH latest AS (\n  SELECT MAX(session_date) AS day FROM market_breadth WHERE sma_days = 200 AND counted * 2 >= stocks\n),\nearlier AS (\n  SELECT MIN(session_date) AS day\n  FROM (SELECT DISTINCT b.session_date FROM market_breadth b CROSS JOIN latest\n        WHERE b.session_date < latest.day ORDER BY b.session_date DESC LIMIT 5)\n)\nSELECT b.sma_days || '-day' AS \"Average\",\n       CAST(strftime('%d', b.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', b.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', b.session_date) AS \"As of\",\n       ROUND(100.0 * b.above / b.counted, 1) AS \"% above\",\n       ROUND(100.0 * b.below / b.counted, 1) AS \"% below\",\n       CASE WHEN b.above > b.below THEN '+' ELSE '-' END AS \"Sign\",\n       ROUND(100.0 * b.above / b.counted - 100.0 * e.above / e.counted, 1) AS \"% above, change over 5 sessions\",\n       b.above AS \"Stocks above\",\n       b.below AS \"Stocks below\",\n       b.counted AS \"Stocks counted\"\nFROM market_breadth b\nCROSS JOIN latest\nLEFT JOIN earlier\nLEFT JOIN market_breadth e ON e.session_date = earlier.day AND e.sma_days = b.sma_days\nWHERE b.session_date = latest.day\nORDER BY b.sma_days",
+          "queryText": "WITH latest AS (\n  SELECT MAX(session_date) AS day FROM market_breadth WHERE sma_days = 200 AND counted * 2 >= stocks\n),\nearlier AS (\n  SELECT MIN(session_date) AS day\n  FROM (SELECT DISTINCT b.session_date FROM market_breadth b CROSS JOIN latest\n        WHERE b.session_date < latest.day ORDER BY b.session_date DESC LIMIT 5)\n)\nSELECT b.sma_days || '-day' AS \"Average\",\n       CAST(strftime('%d', b.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', b.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', b.session_date) AS \"As of\",\n       ROUND(100.0 * b.above / b.counted, 1) AS \"% above\",\n       ROUND(100.0 * b.below / b.counted, 1) AS \"% below\",\n       CASE WHEN b.above > b.below THEN '+' ELSE '-' END AS \"Sign\",\n       ROUND(100.0 * b.above / b.counted - 100.0 * e.above / e.counted, 1) AS \"% above, change over 5 sessions\",\n       b.above AS \"Stocks above\",\n       b.below AS \"Stocks below\",\n       b.counted AS \"Stocks counted\"\nFROM market_breadth b\nCROSS JOIN latest\nLEFT JOIN earlier\nLEFT JOIN market_breadth e ON e.session_date = earlier.day AND e.sma_days = b.sma_days\nWHERE b.session_date = latest.day\nORDER BY b.sma_days"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "The market's state on the latest session",
+      "description": "Where the latest session sits in the grid: down the side, the 10- and 20-day averages; across the top, the 50- and 200-day ones; each both +, both -, or one of each. **Strong or overbought** (dark green): more stocks above than below all four averages. **Weak or oversold** (dark red): more below than above all four. **Improving or strong but weakening** (light green): the 10- and 20-day both + with the 50- and 200-day not both + (improving), or the long term both + with the short term mixed (strong but weakening). **Worsening or weak but strengthening** (light red): the rest - the short term both - while the long term is not, the long term both - with the short term mixed, or both mixed. A + is more stocks above the average than below it, that is above 50%.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 2,
+        "w": 14,
+        "h": 8
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "basic"
+            }
+          },
+          "mappings": [
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Strong or overbought.*",
+                "result": {
+                  "color": "dark-green",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Improving or strong but weakening.*",
+                "result": {
+                  "color": "super-light-green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Worsening or weak but strengthening.*",
+                "result": {
+                  "color": "super-light-red",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Weak or oversold.*",
+                "result": {
+                  "color": "dark-red",
+                  "index": 3
+                }
+              }
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10 and 20-day ↓  50 and 200-day →"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH breadth_days AS (\n  SELECT session_date, MIN(ts_epoch) AS ts,\n         MAX(CASE WHEN sma_days = 10 THEN above > below END) AS p10,\n         MAX(CASE WHEN sma_days = 20 THEN above > below END) AS p20,\n         MAX(CASE WHEN sma_days = 50 THEN above > below END) AS p50,\n         MAX(CASE WHEN sma_days = 200 THEN above > below END) AS p200,\n         SUM(counted * 2 >= stocks) AS covered\n  FROM market_breadth\n  GROUP BY session_date\n),\nstates AS (\n  SELECT session_date, ts, CASE WHEN p10 AND p20 THEN 'both+' WHEN NOT p10 AND NOT p20 THEN 'both-' ELSE 'single' END AS short_term,\n       CASE WHEN p50 AND p200 THEN 'both+' WHEN NOT p50 AND NOT p200 THEN 'both-' ELSE 'single' END AS long_term\n  FROM breadth_days\n  WHERE covered = 4\n),\ntoday AS (SELECT * FROM states ORDER BY session_date DESC LIMIT 1),\ngrid(position, short_term, label) AS (\n  VALUES (1, 'single', 'Single 10, 20 +/-'), (2, 'both+', 'Both 10, 20 +'), (3, 'both-', 'Both 10, 20 -')\n),\nterms(long_term) AS (VALUES ('single'), ('both+'), ('both-')),\ncells AS (\n  SELECT g.position, g.label, g.short_term, t.long_term,\n         CASE WHEN g.short_term = 'both+' AND t.long_term = 'both+' THEN 'Strong or overbought'\n              WHEN g.short_term = 'both-' AND t.long_term = 'both-' THEN 'Weak or oversold'\n              WHEN g.short_term = 'both+' OR t.long_term = 'both+' AND g.short_term = 'single'\n                THEN 'Improving or strong but weakening'\n              ELSE 'Worsening or weak but strengthening' END\n           || CASE WHEN g.short_term = d.short_term AND t.long_term = d.long_term THEN '  ◀ now' ELSE '' END AS cell\n  FROM grid g CROSS JOIN terms t CROSS JOIN today d\n)\nSELECT label AS \"10 and 20-day ↓  50 and 200-day →\",\n       MAX(CASE WHEN long_term = 'single' THEN cell END) AS \"Single 50, 200 +/-\",\n       MAX(CASE WHEN long_term = 'both+' THEN cell END) AS \"Both 50, 200 +\",\n       MAX(CASE WHEN long_term = 'both-' THEN cell END) AS \"Both 50, 200 -\"\nFROM cells\nGROUP BY position, label\nORDER BY position",
+          "queryText": "WITH breadth_days AS (\n  SELECT session_date, MIN(ts_epoch) AS ts,\n         MAX(CASE WHEN sma_days = 10 THEN above > below END) AS p10,\n         MAX(CASE WHEN sma_days = 20 THEN above > below END) AS p20,\n         MAX(CASE WHEN sma_days = 50 THEN above > below END) AS p50,\n         MAX(CASE WHEN sma_days = 200 THEN above > below END) AS p200,\n         SUM(counted * 2 >= stocks) AS covered\n  FROM market_breadth\n  GROUP BY session_date\n),\nstates AS (\n  SELECT session_date, ts, CASE WHEN p10 AND p20 THEN 'both+' WHEN NOT p10 AND NOT p20 THEN 'both-' ELSE 'single' END AS short_term,\n       CASE WHEN p50 AND p200 THEN 'both+' WHEN NOT p50 AND NOT p200 THEN 'both-' ELSE 'single' END AS long_term\n  FROM breadth_days\n  WHERE covered = 4\n),\ntoday AS (SELECT * FROM states ORDER BY session_date DESC LIMIT 1),\ngrid(position, short_term, label) AS (\n  VALUES (1, 'single', 'Single 10, 20 +/-'), (2, 'both+', 'Both 10, 20 +'), (3, 'both-', 'Both 10, 20 -')\n),\nterms(long_term) AS (VALUES ('single'), ('both+'), ('both-')),\ncells AS (\n  SELECT g.position, g.label, g.short_term, t.long_term,\n         CASE WHEN g.short_term = 'both+' AND t.long_term = 'both+' THEN 'Strong or overbought'\n              WHEN g.short_term = 'both-' AND t.long_term = 'both-' THEN 'Weak or oversold'\n              WHEN g.short_term = 'both+' OR t.long_term = 'both+' AND g.short_term = 'single'\n                THEN 'Improving or strong but weakening'\n              ELSE 'Worsening or weak but strengthening' END\n           || CASE WHEN g.short_term = d.short_term AND t.long_term = d.long_term THEN '  ◀ now' ELSE '' END AS cell\n  FROM grid g CROSS JOIN terms t CROSS JOIN today d\n)\nSELECT label AS \"10 and 20-day ↓  50 and 200-day →\",\n       MAX(CASE WHEN long_term = 'single' THEN cell END) AS \"Single 50, 200 +/-\",\n       MAX(CASE WHEN long_term = 'both+' THEN cell END) AS \"Both 50, 200 +\",\n       MAX(CASE WHEN long_term = 'both-' THEN cell END) AS \"Both 50, 200 -\"\nFROM cells\nGROUP BY position, label\nORDER BY position"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "state-timeline",
+      "title": "The market's state, a session at a time",
+      "description": "The grid's state for every session the four averages can be counted for. **Strong or overbought** (dark green): more stocks above than below all four averages. **Weak or oversold** (dark red): more below than above all four. **Improving or strong but weakening** (light green): the 10- and 20-day both + with the 50- and 200-day not both + (improving), or the long term both + with the short term mixed (strong but weakening). **Worsening or weak but strengthening** (light red): the rest - the short term both - while the long term is not, the long term both - with the short term mixed, or both mixed. A + is more stocks above the average than below it, that is above 50%.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.85,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Strong or overbought.*",
+                "result": {
+                  "color": "dark-green",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Improving or strong but weakening.*",
+                "result": {
+                  "color": "super-light-green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Worsening or weak but strengthening.*",
+                "result": {
+                  "color": "super-light-red",
+                  "index": 2
+                }
+              }
+            },
+            {
+              "type": "regex",
+              "options": {
+                "pattern": "^Weak or oversold.*",
+                "result": {
+                  "color": "dark-red",
+                  "index": 3
+                }
+              }
+            }
+          ],
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH breadth_days AS (\n  SELECT session_date, MIN(ts_epoch) AS ts,\n         MAX(CASE WHEN sma_days = 10 THEN above > below END) AS p10,\n         MAX(CASE WHEN sma_days = 20 THEN above > below END) AS p20,\n         MAX(CASE WHEN sma_days = 50 THEN above > below END) AS p50,\n         MAX(CASE WHEN sma_days = 200 THEN above > below END) AS p200,\n         SUM(counted * 2 >= stocks) AS covered\n  FROM market_breadth\n  GROUP BY session_date\n),\nstates AS (\n  SELECT session_date, ts, CASE WHEN p10 AND p20 THEN 'both+' WHEN NOT p10 AND NOT p20 THEN 'both-' ELSE 'single' END AS short_term,\n       CASE WHEN p50 AND p200 THEN 'both+' WHEN NOT p50 AND NOT p200 THEN 'both-' ELSE 'single' END AS long_term\n  FROM breadth_days\n  WHERE covered = 4\n)\nSELECT ts AS time, CASE WHEN short_term = 'both+' AND long_term = 'both+' THEN 'Strong or overbought'\n            WHEN short_term = 'both-' AND long_term = 'both-' THEN 'Weak or oversold'\n            WHEN short_term = 'both+' OR long_term = 'both+' AND short_term = 'single'\n              THEN 'Improving or strong but weakening'\n            ELSE 'Worsening or weak but strengthening' END AS \"Market state\"\nFROM states\nORDER BY session_date",
+          "queryText": "WITH breadth_days AS (\n  SELECT session_date, MIN(ts_epoch) AS ts,\n         MAX(CASE WHEN sma_days = 10 THEN above > below END) AS p10,\n         MAX(CASE WHEN sma_days = 20 THEN above > below END) AS p20,\n         MAX(CASE WHEN sma_days = 50 THEN above > below END) AS p50,\n         MAX(CASE WHEN sma_days = 200 THEN above > below END) AS p200,\n         SUM(counted * 2 >= stocks) AS covered\n  FROM market_breadth\n  GROUP BY session_date\n),\nstates AS (\n  SELECT session_date, ts, CASE WHEN p10 AND p20 THEN 'both+' WHEN NOT p10 AND NOT p20 THEN 'both-' ELSE 'single' END AS short_term,\n       CASE WHEN p50 AND p200 THEN 'both+' WHEN NOT p50 AND NOT p200 THEN 'both-' ELSE 'single' END AS long_term\n  FROM breadth_days\n  WHERE covered = 4\n)\nSELECT ts AS time, CASE WHEN short_term = 'both+' AND long_term = 'both+' THEN 'Strong or overbought'\n            WHEN short_term = 'both-' AND long_term = 'both-' THEN 'Weak or oversold'\n            WHEN short_term = 'both+' OR long_term = 'both+' AND short_term = 'single'\n              THEN 'Improving or strong but weakening'\n            ELSE 'Worsening or weak but strengthening' END AS \"Market state\"\nFROM states\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "The whole market: the share of stocks above their 10, 20, 50 and 200-day averages",
+      "description": "A session at a time, the share of stocks that closed above their own average, out of those with enough sessions for it. A session is drawn for an average once at least half the stocks with a bar that day have that many sessions behind them. Above 50 the average is +, below it -.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 9
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 50
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Above 10-day"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Above 20-day"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Above 50-day"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Above 200-day"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MIN(ts_epoch) AS time,\n       MAX(CASE WHEN sma_days = 10 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 10-day\",\n       MAX(CASE WHEN sma_days = 20 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 20-day\",\n       MAX(CASE WHEN sma_days = 50 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 50-day\",\n       MAX(CASE WHEN sma_days = 200 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 200-day\"\nFROM market_breadth\nGROUP BY session_date\nORDER BY session_date",
+          "queryText": "SELECT MIN(ts_epoch) AS time,\n       MAX(CASE WHEN sma_days = 10 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 10-day\",\n       MAX(CASE WHEN sma_days = 20 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 20-day\",\n       MAX(CASE WHEN sma_days = 50 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 50-day\",\n       MAX(CASE WHEN sma_days = 200 AND counted * 2 >= stocks THEN ROUND(100.0 * above / counted, 1) END) AS \"Above 200-day\"\nFROM market_breadth\nGROUP BY session_date\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ]
     },
     {
       "id": 2,
@@ -256,7 +785,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 2,
+        "y": 23,
         "w": 24,
         "h": 7
       },
@@ -425,10 +954,25 @@
           },
           "refId": "A",
           "queryType": "table",
-          "rawQueryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name",
-          "queryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name"
+          "rawQueryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\",\n       (SELECT ROUND(x.rsi14, 1) FROM index_bar x WHERE x.index_name = s.index_name\n        ORDER BY x.session_date DESC LIMIT 1) AS \"Index RSI (14)\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name",
+          "queryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\",\n       (SELECT ROUND(x.rsi14, 1) FROM index_bar x WHERE x.index_name = s.index_name\n        ORDER BY x.session_date DESC LIMIT 1) AS \"Index RSI (14)\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name"
         }
       ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "$index",
+      "collapsed": false,
+      "repeat": "index",
+      "repeatDirection": "h",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
     },
     {
       "id": 3,
@@ -439,11 +983,9 @@
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"
       },
-      "repeat": "index",
-      "repeatDirection": "v",
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 31,
         "w": 24,
         "h": 9
       },
@@ -718,6 +1260,163 @@
       ]
     },
     {
+      "id": 9,
+      "type": "timeseries",
+      "title": "$index: the index's 14-day RSI",
+      "description": "The index's own relative strength index over 14 sessions, Wilder's (as TradingView's), from its daily closes at the broker, with the index itself on the right axis. Above 70 it is usually read as overbought, below 30 as oversold.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 7
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false,
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RSI (14)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "RSI"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 30
+                    },
+                    {
+                      "color": "green",
+                      "value": 70
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Index close"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Index"
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "off"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT ts_epoch AS time, ROUND(rsi14, 1) AS \"RSI (14)\", close AS \"Index close\"\nFROM index_bar\nWHERE index_name IN (${index:sqlstring}) AND rsi14 IS NOT NULL\nORDER BY session_date",
+          "queryText": "SELECT ts_epoch AS time, ROUND(rsi14, 1) AS \"RSI (14)\", close AS \"Index close\"\nFROM index_bar\nWHERE index_name IN (${index:sqlstring}) AND rsi14 IS NOT NULL\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "New 52-week highs and lows on the latest session",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
       "id": 4,
       "type": "table",
       "title": "New 52-week highs and lows on the latest session",
@@ -728,7 +1427,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 18,
+        "y": 48,
         "w": 24,
         "h": 12
       },

@@ -577,10 +577,11 @@ public final class AppContext implements AutoCloseable {
         CandleDataClient daily = new LazyCandleDataClient(memoize(this::wideRangeCandleDataClient));
         java.time.Clock utc = java.time.Clock.systemUTC();
         return new com.stockanalyzer.marketwatch.MarketWatchService(nse::members, nse::url,
-                (symbol, exchange, from) -> com.stockanalyzer.canslim.CompletedBars.of(daily.fetchCandles(symbol, exchange,
-                        config.segment(), from.atStartOfDay(), java.time.LocalDateTime.now(utc.withZone(clock.zone())),
+                (symbol, exchange, from, to) -> com.stockanalyzer.canslim.CompletedBars.of(daily.fetchCandles(symbol,
+                        exchange, config.segment(), from.atStartOfDay(), to == null
+                                ? java.time.LocalDateTime.now(utc.withZone(clock.zone())) : to.atTime(23, 59),
                         1440).candles(), clock, utc),
-                new com.stockanalyzer.store.jdbc.SqliteIndexMemberRepository(database), instrumentRepository,
+                new com.stockanalyzer.store.jdbc.SqliteMarketWatchRepository(database), instrumentRepository,
                 new SqliteDailyBarRepository(database), clock, utc, config.exchange(), config.segment(),
                 config.marketWatchHistoryDays());
     }

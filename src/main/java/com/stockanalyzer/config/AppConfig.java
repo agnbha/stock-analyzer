@@ -493,6 +493,19 @@ public final class AppConfig {
         return csvSet(key, "").stream().map(symbol -> symbol.toUpperCase(java.util.Locale.ROOT)).distinct().toList();
     }
 
+    /**
+     * An index's own symbol at the broker, as {@code EXCHANGE:SYMBOL} ({@code marketwatch.index.symbol.<NAME>}, its
+     * spaces as underscores), for its bars and RSI; null when none is set.
+     */
+    public String[] marketWatchIndexSymbol(String index) {
+        String value = get("marketwatch.index.symbol." + index.trim().replaceAll("\\s+", "_"), "").trim();
+        if (value.isEmpty()) {
+            return null;
+        }
+        String[] parts = value.split(":", 2);
+        return parts.length == 2 ? new String[]{parts[0].trim(), parts[1].trim()} : new String[]{"NSE", value};
+    }
+
     /** Where NSE keeps an index's list of members, with {@code %s} for the index's name as its file names spell it. */
     public String marketWatchNseListUrl() {
         return get("marketwatch.nse.list.url", "https://nsearchives.nseindia.com/content/indices/ind_%slist.csv");
