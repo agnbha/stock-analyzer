@@ -139,7 +139,8 @@ class ChartNotesDashboardTest {
     }
 
     private static final List<String> SAVED_NOTES_DASHBOARDS = List.of("01-overview.json", "02-candles-and-calls.json",
-            "03-decision-reasons.json", "04-stock-trend.json", "06-canslim.json", "08-markets.json", "09-institutional.json");
+            "03-decision-reasons.json", "04-stock-trend.json", "06-canslim.json", "08-markets.json", "09-institutional.json",
+            "10-market-watch.json");
 
     /** What the Saved notes layer of each dashboard draws, with {@code symbol} picked where there is a picker. */
     private Map<String, List<String>> drawn(String symbol) throws IOException {
@@ -161,6 +162,7 @@ class ChartNotesDashboardTest {
         expected.put("06-canslim.json", canslim);
         expected.put("08-markets.json", accountViews);
         expected.put("09-institutional.json", accountViews);
+        expected.put("10-market-watch.json", accountViews);
         return expected;
     }
 
