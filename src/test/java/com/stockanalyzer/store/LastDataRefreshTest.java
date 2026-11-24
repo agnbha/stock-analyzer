@@ -123,7 +123,7 @@ class LastDataRefreshTest {
     void empty() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
-                "09-institutional.json"}) {
+                "09-institutional.json", "10-market-watch.json"}) {
             assertNull(refreshedAt(dashboard), dashboard);
         }
     }
@@ -200,6 +200,20 @@ class LastDataRefreshTest {
     }
 
     @Test
+    @DisplayName("Market Watch reports when the indices' members were last read, and nothing of the other sources")
+    void marketWatch() throws IOException {
+        liveCandle(9_000);
+        tradingDay(8_000);
+        execute("INSERT INTO market_series (series, observed_on, value, fetched_at) VALUES ('US10Y', '2026-11-16', 5.1, 9500)");
+        execute("INSERT INTO index_member (index_name, symbol, exchange, index_position, source, fetched_at) "
+                + "VALUES ('NIFTY 50', 'WIPRO', 'NSE', 0, 'test', 6000)");
+        execute("INSERT INTO index_member (index_name, symbol, exchange, index_position, source, fetched_at) "
+                + "VALUES ('SENSEX', 'WIPRO', 'NSE', 1, 'settings', 6500)");
+
+        assertEquals(6_500_000L, refreshedAt("10-market-watch.json"));
+    }
+
+    @Test
     @DisplayName("Company Details reports the newest of the last company page read and the latest price")
     void companyDetails() throws IOException {
         tradingDay(1_000);
@@ -232,7 +246,7 @@ class LastDataRefreshTest {
                 checked++;
             }
         }
-        assertEquals(9, checked);
+        assertEquals(10, checked);
     }
 
     @Test
@@ -240,7 +254,7 @@ class LastDataRefreshTest {
     void isASmallLabelInTheTopRightCorner() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
-                "09-institutional.json"}) {
+                "09-institutional.json", "10-market-watch.json"}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
             JsonNode tile = tile(root, "Last data refresh");
             JsonNode at = tile.path("gridPos");

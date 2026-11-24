@@ -1,0 +1,858 @@
+{
+  "uid": "stockanalyzer-marketwatch",
+  "title": "Market Watch",
+  "description": "Net new 52-week highs for the main indices, with the runs of three sessions or more on one side of zero marked as a positive or negative bias. Linked from CAN SLIM and Stock Trend.",
+  "tags": [
+    "stock-analyzer",
+    "screening",
+    "markets"
+  ],
+  "timezone": "Asia/Kolkata",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1h",
+  "time": {
+    "from": "now-1y",
+    "to": "now"
+  },
+  "timepicker": {
+    "quick_ranges": [
+      {
+        "display": "Last 3 months",
+        "from": "now-3M",
+        "to": "now"
+      },
+      {
+        "display": "Last 6 months",
+        "from": "now-6M",
+        "to": "now"
+      },
+      {
+        "display": "Last 1 year",
+        "from": "now-1y",
+        "to": "now"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "CAN SLIM",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-canslim/can-slim",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The CAN SLIM screen"
+    },
+    {
+      "title": "Stock Trend",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-trend/stock-trend",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "A stock's daily candles and its trend"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard",
+        "target": {
+          "limit": 200,
+          "matchAny": true,
+          "tags": [
+            "BUY",
+            "SELL"
+          ],
+          "type": "tags"
+        }
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#8AB8FF",
+        "name": "Noted buys",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'BUY'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "iconColor": "#FF9830",
+        "name": "Noted sells",
+        "target": {
+          "queryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "rawQueryText": "SELECT MIN(t.executed_ts) AS time,\n       i.symbol || ' ' || t.side || ' ' || SUM(t.quantity) || ' @ '\n         || printf('%.2f', SUM(t.quantity * t.price) / SUM(t.quantity))\n         || CASE WHEN n.sentiment IS NULL THEN '' ELSE ' - ' || n.sentiment END\n         || CASE WHEN n.note IS NULL THEN '' ELSE ': ' || n.note END AS text,\n       t.side || COALESCE(',' || n.sentiment, '') AS tags\nFROM trade_note n\nJOIN trade t ON t.id = n.trade_id\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.side = 'SELL'\nGROUP BY i.symbol, t.session_date, t.side, COALESCE(t.order_id, 'at' || t.executed_ts), n.sentiment, n.note\nORDER BY MIN(t.executed_ts)\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        },
+        "hide": true
+      },
+      {
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Saved notes",
+        "target": {
+          "queryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "rawQueryText": "SELECT n.noted_at AS time,\n       n.symbol || COALESCE(' - ' || n.sentiment, '') || COALESCE(': ' || n.note, '') AS text,\n       n.sentiment AS tags\nFROM chart_note n\nWHERE n.deleted_at IS NULL AND n.symbol_source = 'MANUAL'\nORDER BY n.noted_at\nLIMIT 500",
+          "queryType": "table",
+          "refId": "Anno",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "index",
+        "label": "Index",
+        "type": "query",
+        "datasource": {
+          "type": "frser-sqlite-datasource",
+          "uid": "stock-analyzer-sqlite"
+        },
+        "query": "SELECT index_name FROM index_member GROUP BY index_name ORDER BY MIN(index_position), index_name",
+        "definition": "SELECT index_name FROM index_member GROUP BY index_name ORDER BY MIN(index_position), index_name",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "sort": 0,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "description": "The indices to show, in the order marketwatch.indices lists them: a chart each."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "description": "What the charts below count, and the two colours they mark a run with.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 18,
+        "h": 2
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display: flex; flex-wrap: wrap; gap: 8px; align-items: center;\">\n<span style=\"padding: 4px 4px;\"><span style=\"font-weight: 600;\">Net new highs</span> = new 52-week highs less new 52-week lows, a session.</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(115, 191, 105, 0.35); font-weight: 600;\">Positive bias</span>\n<span style=\"padding: 4px 4px;\">above zero 3 sessions in a row</span>\n<span style=\"padding: 4px 10px; border-radius: 4px; background-color: rgba(242, 73, 92, 0.35); font-weight: 600;\">Negative bias</span>\n<span style=\"padding: 4px 4px;\">below zero 3 in a row. The line is the 10-day average.</span>\n</div>"
+      }
+    },
+    {
+      "id": 90,
+      "type": "stat",
+      "title": "",
+      "description": "When the indices' members were last read: each evening, by `CanSlimMain marketwatch` in evening.sh, after the CAN SLIM scan has read the day's bars.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 1
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "center",
+        "wideLayout": true,
+        "text": {
+          "valueSize": 14,
+          "titleSize": 14
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeFromNow",
+          "displayName": "Last data refresh"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM index_member",
+          "queryText": "SELECT MAX(fetched_at) * 1000 AS \"Last data refresh\" FROM index_member"
+        }
+      ],
+      "transparent": true
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "The latest session: net new highs and the run each index is in",
+      "description": "For each index, on the latest session its members have bars for: the new 52-week highs and lows, their difference and its average over the last 10 sessions, and the run of sessions on the same side of zero it is in. Net new highs above zero 3 sessions in a row or more is a **positive bias**; below zero 3 in a row or more, a **negative bias**. Runs are counted over the last three months. *Members counted* are those with a year of bars behind the day.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 24,
+        "h": 7
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net new highs"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bias"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Positive bias": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "Negative bias": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "None": {
+                        "color": "transparent",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10-day average"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "text",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.05
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Index"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name",
+          "queryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\npositions AS (\n  SELECT index_name, MIN(index_position) AS position FROM index_member GROUP BY index_name\n),\nstocks AS (SELECT DISTINCT instrument_id FROM picked),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-460 days')\n),\nmarked AS (\n  SELECT y.instrument_id, y.session_date, y.high > y.year_high AS new_high, y.low < y.year_low AS new_low\n  FROM (SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n        FROM bars\n        WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)) y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  CROSS JOIN latest\n  WHERE y.day - l.first_day >= 364 AND y.session_date >= date(latest.last_day, '-96 days')\n),\ndays AS (\n  SELECT p.index_name, k.session_date, SUM(k.new_high) AS highs, SUM(k.new_low) AS lows, COUNT(*) AS counted\n  FROM marked k\n  JOIN picked p ON p.instrument_id = k.instrument_id\n  GROUP BY p.index_name, k.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (PARTITION BY index_name ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (PARTITION BY index_name ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY index_name, run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (PARTITION BY index_name ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT s.index_name AS \"Index\",\n       CAST(strftime('%d', s.session_date) AS INTEGER) || ' '\n         || substr('JanFebMarAprMayJunJulAugSepOctNovDec', (CAST(strftime('%m', s.session_date) AS INTEGER) - 1) * 3 + 1, 3)\n         || ' ' || strftime('%Y', s.session_date) AS \"As of\",\n       s.net AS \"Net new highs\",\n       CASE WHEN s.averaged = 10 THEN ROUND(s.average, 1) END AS \"10-day average\",\n       s.highs AS \"New 52-week highs\",\n       s.lows AS \"New 52-week lows\",\n       CASE WHEN s.side = 1 AND s.day_of_run >= 3 THEN 'Positive bias'\n            WHEN s.side = -1 AND s.day_of_run >= 3 THEN 'Negative bias'\n            ELSE 'None' END AS \"Bias\",\n       CASE WHEN s.side = 1 THEN s.day_of_run || ' with more highs'\n            WHEN s.side = -1 THEN s.day_of_run || ' with more lows'\n            ELSE s.day_of_run || ' even' END AS \"Sessions in a row\",\n       s.counted AS \"Members counted\"\nFROM streaks s\nJOIN positions p ON p.index_name = s.index_name\nWHERE s.session_date = (SELECT MAX(d.session_date) FROM days d WHERE d.index_name = s.index_name)\nORDER BY p.position, s.index_name"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "$index: net new 52-week highs a session",
+      "description": "Each session's **net new highs** for the index: how many of its members made a new 52-week high that day, less how many made a new 52-week low. Green bars are days with more highs, red bars days with more lows; the line is the average of the last 10 sessions.\n\n- A **new 52-week high** is a day's high above every high of the 52 weeks (364 days) before it; a **new low**, a day's low below every low of them. A member counts only once a whole year of its daily bars lies behind the day, so a stock listed within the year is left out rather than making a new high every day.\n- **Positive bias** (green background): net new highs above zero for 3 sessions in a row, shaded from the third of them for as long as the run lasts. **Negative bias** (red background): below zero 3 in a row. A bias is marked from the day it is confirmed, so a day never changes colour after the fact; a session with as many highs as lows ends a run.\n- Hover a day for the highs, the lows, net new highs as a share of the members counted, and how many were counted.\n\nThe definitions follow the *NSE Net New Highs* indicator on TradingView, counted here for each index's members rather than the whole exchange. The members are the index's today, read from NSE's list each evening (the SENSEX from the settings, as BSE publishes no such file), so a stock that has since joined or left changes the past a little. The bars are the daily ones CAN SLIM keeps, read two years back for the members by `CanSlimMain marketwatch`.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "repeat": "index",
+      "repeatDirection": "v",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "barWidthFactor": 0.7,
+            "barAlignment": 1,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisCenteredZero": true,
+            "axisLabel": "Net new highs",
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "text",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "More new highs"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "More new lows"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10-day average"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(Positive|Negative) bias$"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "line"
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "stepAfter"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 22
+              },
+              {
+                "id": "custom.spanNulls",
+                "value": true
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Bias"
+              },
+              {
+                "id": "custom.axisCenteredZero",
+                "value": false
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "off"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": false
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Positive bias"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Negative bias"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(Net new highs|New 52-week highs|New 52-week lows|Members with a year of bars|Net new highs, % of members)$"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Net new highs, % of members"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH members AS (\n  SELECT DISTINCT i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN members s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, b.ts_epoch, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN members m ON m.instrument_id = b.instrument_id\n  WHERE b.session_date >= date($__from/1000, 'unixepoch', '-400 days')\n),\nyear_before AS (\n  SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n  FROM bars\n  WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)\n),\ndays AS (\n  SELECT y.session_date, MIN(y.ts_epoch) AS ts,\n         SUM(y.high > y.year_high) AS highs, SUM(y.low < y.year_low) AS lows, COUNT(*) AS counted\n  FROM year_before y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  WHERE y.day - l.first_day >= 364\n    AND y.session_date >= date($__from/1000, 'unixepoch', '-36 days')\n  GROUP BY y.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT ts AS time,\n       CASE WHEN net > 0 THEN net END AS \"More new highs\",\n       CASE WHEN net < 0 THEN net END AS \"More new lows\",\n       CASE WHEN averaged = 10 THEN ROUND(average, 1) END AS \"10-day average\",\n       CASE WHEN side = 1 AND day_of_run >= 3 THEN 1 ELSE 0 END AS \"Positive bias\",\n       CASE WHEN side = -1 AND day_of_run >= 3 THEN 1 ELSE 0 END AS \"Negative bias\",\n       net AS \"Net new highs\",\n       ROUND(100.0 * net / counted, 1) AS \"Net new highs, % of members\",\n       highs AS \"New 52-week highs\", lows AS \"New 52-week lows\",\n       counted AS \"Members with a year of bars\"\nFROM streaks\nORDER BY session_date",
+          "queryText": "WITH members AS (\n  SELECT DISTINCT i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN members s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nbars AS (\n  SELECT b.instrument_id, b.session_date, b.ts_epoch, julianday(b.session_date) AS day, b.high, b.low\n  FROM daily_bar b\n  JOIN members m ON m.instrument_id = b.instrument_id\n  WHERE b.session_date >= date($__from/1000, 'unixepoch', '-400 days')\n),\nyear_before AS (\n  SELECT bars.*, MAX(high) OVER last_year AS year_high, MIN(low) OVER last_year AS year_low\n  FROM bars\n  WINDOW last_year AS (PARTITION BY instrument_id ORDER BY day RANGE BETWEEN 364 PRECEDING AND 1 PRECEDING)\n),\ndays AS (\n  SELECT y.session_date, MIN(y.ts_epoch) AS ts,\n         SUM(y.high > y.year_high) AS highs, SUM(y.low < y.year_low) AS lows, COUNT(*) AS counted\n  FROM year_before y\n  JOIN listed l ON l.instrument_id = y.instrument_id\n  WHERE y.day - l.first_day >= 364\n    AND y.session_date >= date($__from/1000, 'unixepoch', '-36 days')\n  GROUP BY y.session_date\n),\nsides AS (\n  SELECT d.*, highs - lows AS net,\n         CASE WHEN highs > lows THEN 1 WHEN highs < lows THEN -1 ELSE 0 END AS side\n  FROM days d\n),\nruns AS (\n  SELECT s.*, SUM(starts) OVER (ORDER BY session_date) AS run\n  FROM (SELECT sides.*,\n               CASE WHEN side = LAG(side) OVER (ORDER BY session_date) THEN 0 ELSE 1 END AS starts\n        FROM sides) s\n),\nstreaks AS (\n  SELECT runs.*, ROW_NUMBER() OVER (PARTITION BY run ORDER BY session_date) AS day_of_run,\n         AVG(net) OVER ten AS average, COUNT(*) OVER ten AS averaged\n  FROM runs\n  WINDOW ten AS (ORDER BY session_date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW)\n)\nSELECT ts AS time,\n       CASE WHEN net > 0 THEN net END AS \"More new highs\",\n       CASE WHEN net < 0 THEN net END AS \"More new lows\",\n       CASE WHEN averaged = 10 THEN ROUND(average, 1) END AS \"10-day average\",\n       CASE WHEN side = 1 AND day_of_run >= 3 THEN 1 ELSE 0 END AS \"Positive bias\",\n       CASE WHEN side = -1 AND day_of_run >= 3 THEN 1 ELSE 0 END AS \"Negative bias\",\n       net AS \"Net new highs\",\n       ROUND(100.0 * net / counted, 1) AS \"Net new highs, % of members\",\n       highs AS \"New 52-week highs\", lows AS \"New 52-week lows\",\n       counted AS \"Members with a year of bars\"\nFROM streaks\nORDER BY session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "New 52-week highs and lows on the latest session",
+      "description": "The members of the indices picked that made a new 52-week high or low on the latest session their indices have bars for, highs first: the day's high against the highest high of the 52 weeks before it, or its low against the lowest low. Only members with a year of bars behind the day. Click a symbol for it on CAN SLIM.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 12
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "locale"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Symbol"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "${__value.raw} on CAN SLIM",
+                    "url": "/d/stockanalyzer-canslim/can-slim?var-symbol=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "New 52-week"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "High": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "Low": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "High and low": {
+                        "color": "orange",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, m.index_position, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\nstocks AS (\n  SELECT instrument_id, group_concat(index_name, ', ') AS indices\n  FROM (SELECT * FROM picked ORDER BY index_position)\n  GROUP BY instrument_id\n),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nyear_before AS (\n  SELECT b.instrument_id, MAX(b.high) AS year_high, MIN(b.low) AS year_low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-364 days') AND b.session_date < latest.last_day\n  GROUP BY b.instrument_id\n),\ntoday AS (\n  SELECT b.*, y.year_high, y.year_low, s.indices,\n         b.high > y.year_high AS new_high, b.low < y.year_low AS new_low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  JOIN year_before y ON y.instrument_id = b.instrument_id\n  JOIN listed l ON l.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date = latest.last_day AND julianday(b.session_date) - l.first_day >= 364\n)\nSELECT i.symbol AS \"Symbol\",\n       CASE WHEN t.new_high AND t.new_low THEN 'High and low'\n            WHEN t.new_high THEN 'High' ELSE 'Low' END AS \"New 52-week\",\n       t.close AS \"Close\",\n       CASE WHEN t.new_high THEN t.high END AS \"Day's high\",\n       CASE WHEN t.new_high THEN t.year_high END AS \"Previous 52-week high\",\n       CASE WHEN t.new_low THEN t.low END AS \"Day's low\",\n       CASE WHEN t.new_low THEN t.year_low END AS \"Previous 52-week low\",\n       t.indices AS \"In\",\n       t.session_date AS \"Session\"\nFROM today t\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.new_high OR t.new_low\nORDER BY t.new_high DESC, i.symbol",
+          "queryText": "WITH picked AS (\n  SELECT DISTINCT m.index_name, m.index_position, i.id AS instrument_id\n  FROM index_member m\n  JOIN instrument i ON i.symbol = m.symbol AND i.exchange = m.exchange AND i.segment = 'CASH'\n  WHERE m.index_name IN (${index:sqlstring})\n),\nstocks AS (\n  SELECT instrument_id, group_concat(index_name, ', ') AS indices\n  FROM (SELECT * FROM picked ORDER BY index_position)\n  GROUP BY instrument_id\n),\nlisted AS (\n  SELECT b.instrument_id, julianday(MIN(b.session_date)) AS first_day\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  GROUP BY b.instrument_id\n),\nlatest AS (\n  SELECT MAX(b.session_date) AS last_day FROM daily_bar b JOIN stocks s ON s.instrument_id = b.instrument_id\n),\nyear_before AS (\n  SELECT b.instrument_id, MAX(b.high) AS year_high, MIN(b.low) AS year_low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date >= date(latest.last_day, '-364 days') AND b.session_date < latest.last_day\n  GROUP BY b.instrument_id\n),\ntoday AS (\n  SELECT b.*, y.year_high, y.year_low, s.indices,\n         b.high > y.year_high AS new_high, b.low < y.year_low AS new_low\n  FROM daily_bar b\n  JOIN stocks s ON s.instrument_id = b.instrument_id\n  JOIN year_before y ON y.instrument_id = b.instrument_id\n  JOIN listed l ON l.instrument_id = b.instrument_id\n  CROSS JOIN latest\n  WHERE b.session_date = latest.last_day AND julianday(b.session_date) - l.first_day >= 364\n)\nSELECT i.symbol AS \"Symbol\",\n       CASE WHEN t.new_high AND t.new_low THEN 'High and low'\n            WHEN t.new_high THEN 'High' ELSE 'Low' END AS \"New 52-week\",\n       t.close AS \"Close\",\n       CASE WHEN t.new_high THEN t.high END AS \"Day's high\",\n       CASE WHEN t.new_high THEN t.year_high END AS \"Previous 52-week high\",\n       CASE WHEN t.new_low THEN t.low END AS \"Day's low\",\n       CASE WHEN t.new_low THEN t.year_low END AS \"Previous 52-week low\",\n       t.indices AS \"In\",\n       t.session_date AS \"Session\"\nFROM today t\nJOIN instrument i ON i.id = t.instrument_id\nWHERE t.new_high OR t.new_low\nORDER BY t.new_high DESC, i.symbol"
+        }
+      ]
+    }
+  ]
+}

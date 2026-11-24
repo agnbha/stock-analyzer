@@ -95,6 +95,7 @@ public final class SchemaMigrator {
         all.put(27, v27());
         all.put(28, v28());
         all.put(29, v29());
+        all.put(30, v30());
         return all;
     }
 
@@ -109,6 +110,24 @@ public final class SchemaMigrator {
                   symbol TEXT PRIMARY KEY,
                   dashboards TEXT NOT NULL,
                   set_at INTEGER NOT NULL
+                ) WITHOUT ROWID""");
+    }
+
+    /**
+     * v30: the members of the indices Market Watch follows ({@code CanSlimMain marketwatch}), read from NSE's lists or,
+     * for an index NSE does not publish such as the SENSEX, from the settings. An index's members are replaced whenever
+     * its list is read; {@code index_position} is the order the page shows the indices in.
+     */
+    private List<String> v30() {
+        return List.of("""
+                CREATE TABLE index_member (
+                  index_name TEXT NOT NULL,
+                  symbol TEXT NOT NULL,
+                  exchange TEXT NOT NULL,
+                  index_position INTEGER NOT NULL,
+                  source TEXT NOT NULL,
+                  fetched_at INTEGER NOT NULL,
+                  PRIMARY KEY (index_name, symbol)
                 ) WITHOUT ROWID""");
     }
 

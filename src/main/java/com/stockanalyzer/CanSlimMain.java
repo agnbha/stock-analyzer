@@ -34,6 +34,10 @@ import java.util.Locale;
  *                              futures), for the Bonds and Commodities page; and NSDL's FPI flows, NSE's FII and DII
  *                              cash-market flows and its participant-wise index-futures positions, for the
  *                              Institutional Investment page. Both pages are linked from CAN SLIM's header
+ *   marketwatch                the members of the indices on the Market Watch page (marketwatch.indices), and the
+ *                              daily bars of those whose bars do not reach back marketwatch.history.days, so each day
+ *                              there has a year behind it to count 52-week highs and lows against
+ *   marketwatch --no-bars      the members only
  * </pre>
  *
  * Without a screener.in session the query is skipped (noted in the report), and
@@ -58,11 +62,15 @@ public final class CanSlimMain {
             summary(parsed);
             return;
         }
+        if (command.equals("marketwatch")) {
+            marketWatch(parsed);
+            return;
+        }
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
                     + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets"
-                    + " | summary --symbol S [--call YYYY-MM] [--again]");
+                    + " | summary --symbol S [--call YYYY-MM] [--again] | marketwatch [--no-bars]");
             System.exit(2);
         }
 
@@ -117,6 +125,45 @@ public final class CanSlimMain {
         } catch (com.stockanalyzer.canslim.ScreenerException e) {
             System.err.println(symbol + ": " + e.getMessage());
             System.exit(e.needsLogin() ? 3 : 1);
+        }
+    }
+
+    /**
+     * Reads the members of the indices Market Watch follows, then the daily bars they lack. An index whose list could
+     * not be read keeps the members it had; only a run that read no list at all, or tried bars and read none, leaves a
+     * failing status for the evening log.
+     */
+    private static void marketWatch(Args parsed) {
+        AppConfig config = AppConfig.load();
+        List<com.stockanalyzer.marketwatch.MarketWatchService.Index> indices = config.marketWatchIndices().stream()
+                .map(name -> new com.stockanalyzer.marketwatch.MarketWatchService.Index(name,
+                        config.marketWatchMembers(name)))
+                .toList();
+        try (AppContext context = new AppContext(config)) {
+            com.stockanalyzer.marketwatch.MarketWatchService.Report report =
+                    context.marketWatchService().refresh(indices, !parsed.flag("no-bars"));
+            for (com.stockanalyzer.marketwatch.MarketWatchService.IndexResult index : report.indices()) {
+                System.out.printf("%-20s %s%n", index.index(), index.error() == null
+                        ? index.members() + " members, from " + index.source()
+                        : "not read: " + index.error() + " (kept the " + index.members() + " held)");
+            }
+            if (report.dropped() > 0) {
+                System.out.printf("%d index(es) no longer in marketwatch.indices dropped%n", report.dropped());
+            }
+            var bars = report.bars();
+            if (bars != null) {
+                System.out.printf("Daily bars: %d stocks in the indices, %d read now (%d days back), %d could not be%s%n",
+                        bars.stocks(), bars.read(), config.marketWatchHistoryDays(), bars.failures().size(),
+                        bars.stopped() ? "; stopped after " + bars.failures().size()
+                                + " failures in a row, the rest are left for the next run" : "");
+                bars.failures().stream().limit(10).forEach(failure -> System.out.println("  " + failure));
+            }
+            boolean noList = !report.indices().isEmpty()
+                    && report.indices().stream().allMatch(index -> index.error() != null);
+            boolean noBars = bars != null && bars.read() == 0 && !bars.failures().isEmpty();
+            if (noList || noBars) {
+                System.exit(1);
+            }
         }
     }
 

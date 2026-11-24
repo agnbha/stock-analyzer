@@ -18,7 +18,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -617,20 +615,7 @@ public final class CanSlimService {
      * open: a half-formed day would read as a volume collapse.
      */
     private List<DailyBar> completedBars(List<Candle> candles) {
-        ZonedDateTime now = ZonedDateTime.now(clock.withZone(marketClock.zone()));
-        LocalDate today = now.toLocalDate();
-        boolean sessionOver = !now.toLocalTime().isBefore(marketClock.sessionClose());
-
-        TreeMap<LocalDate, DailyBar> byDate = new TreeMap<>();
-        for (Candle candle : candles) {
-            LocalDate date = marketClock.sessionDateOf(candle.epochSeconds());
-            if (date.equals(today) && !sessionOver) {
-                continue;
-            }
-            byDate.put(date, new DailyBar(date, candle.open(), candle.high(), candle.low(), candle.close(),
-                    candle.volume()));
-        }
-        return new ArrayList<>(byDate.values());
+        return CompletedBars.of(candles, marketClock, clock);
     }
 
     /** Average cost per held symbol, weighted by quantity across products. */

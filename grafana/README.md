@@ -116,6 +116,7 @@ What each tab needs:
 | CAN SLIM | a scan | `CanSlimMain scan` (or the nightly `evening.sh`) |
 | Bonds and Commodities | the yields and prices; Groww's login for the MCX ones | `CanSlimMain markets` (or the nightly `evening.sh`) |
 | Institutional Investment | the FPI, FII and DII flows and positions | `CanSlimMain markets` (or `evening.sh`) |
+| Market Watch | the indices' members, and two years of their daily bars | `CanSlimMain marketwatch` (or `evening.sh`) |
 | Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
@@ -386,6 +387,26 @@ up only until the next day's, so that chart starts on the first run and a weekda
 NSE's participant-wise open interest file for each trading day (a year back the first time,
 `markets.participant.oi.history.days`). NSDL's site refuses the default names HTTP libraries send, so these requests,
 like the other market reads, carry the app's own name.
+
+**Market Watch** — opened from CAN SLIM's and Stock Trend's headers (on the same range), for which way the market's
+leadership is turning: each index's **net new highs** a session, how many of its members made a new 52-week high less
+how many made a new 52-week low. A new high is a day's high above every high of the 52 weeks (364 days) before it, a new
+low a low below every low of them; a member counts only once a year of its daily bars lies behind the day, so a stock
+listed within the year is left out rather than making a new high every day. Net new highs above zero three sessions in
+a row is a **positive bias**, shaded green from the third of them for as long as the run lasts; below zero three in a row
+a **negative bias**, shaded red. A day with as many highs as lows ends a run, and a day is marked as it is confirmed, so
+none changes colour later. The definitions are those of the *NSE Net New Highs* indicator on TradingView, counted for
+each index's members rather than the whole exchange. At the top, each index's latest session: its highs, lows, net
+new highs and their 10-day average, its bias and the run it is in; then a chart for each index picked (green bars more
+highs, red more lows, the 10-day average as a line; hover a day for the counts and net new highs as a share of the
+members counted); and the members that made a new 52-week high or low on the latest session, each linking to CAN SLIM.
+The indices are `marketwatch.indices` (NIFTY 50, SENSEX, NIFTY 500, NIFTY MIDCAP 150 and NIFTY SMALLCAP 250).
+`CanSlimMain marketwatch` reads each one's members every evening from NSE's list for it; the SENSEX is BSE's, which
+publishes no such file, so its members are `marketwatch.members.SENSEX`, to be brought up to date when BSE reviews it in
+June and December. The members are today's, so a stock that joined or left an index since changes its past a little.
+The same step reads two years of daily bars (`marketwatch.history.days`) for the members whose bars do not reach that
+far: the CAN SLIM scan reads 400 days, enough to count only the last month or so of the year. The first run reads
+about 500 stocks, two requests each, some ten minutes; after that only the newly listed and any the scan missed.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.

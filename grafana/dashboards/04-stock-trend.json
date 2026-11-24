@@ -40,6 +40,20 @@
       }
     ]
   },
+  "links": [
+    {
+      "title": "Market Watch",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-marketwatch/market-watch",
+      "includeVars": false,
+      "keepTime": true,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "Net new 52-week highs for the main indices, and their positive and negative bias"
+    }
+  ],
   "annotations": {
     "list": [
       {

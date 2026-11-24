@@ -77,6 +77,8 @@ class GrafanaDashboardQueryTest {
                         .replace("$session", "2026-08-27")
                         // CAN SLIM's chart: the weekly path, the one with more to go wrong.
                         .replace("$frame", "weekly")
+                        // Market Watch: two indices picked (a repeated chart gets one).
+                        .replace("${index:sqlstring}", "'NIFTY 50','SENSEX'")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");
                 assertFalse(executable.contains("$"),
                         "unsubstituted variable in " + file.getFileName() + ": " + sql);
