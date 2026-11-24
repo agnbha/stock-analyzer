@@ -59,8 +59,8 @@ Grafana's own tags are never rewritten: a note tagged `UP` stays `UP` there and 
 
 **A note with no symbol tag** (one written before the symbol tag was needed) is not drawn, and cannot be edited from the
 chart. List them with `chartnotes list`, and give each a symbol with `chartnotes assign --id 3 --symbol RELIANCE`: it is
-then drawn on that symbol's charts, from the analyzer's copy, and on Account Overview, Decision Reasons, Bonds and
-Commodities and Institutional Investment whatever its tags. To keep a symbol's notes to some dashboards,
+then drawn on that symbol's charts, from the analyzer's copy, and on Account Overview and Decision Reasons whatever its
+tags. To keep a symbol's notes to some dashboards,
 `chartnotes draw --symbol RELIANCE --on candles,canslim` (the names are the dashboards' uids without `stockanalyzer-`);
 `--on all` draws them everywhere again. This governs only the notes given a symbol by hand: one tagged with its symbol
 is drawn by Grafana itself, wherever its tag matches.
@@ -435,9 +435,9 @@ span before the first bar held, once: one request a stock, about 2,800 the first
 since is noted and not asked again. It also brings any member the scan missed up to date, reads each index's own bars
 (two requests an index) and works the breadth out again from all the bars, a few seconds.
 
-Market Watch is about the market as a whole, so it draws none of the stock-specific markers the other pages do: no notes
-written on the charts, no noted buys or sells, and its built-in notes layer is switched off (so it does not offer *Add
-annotation* either).
+Market Watch, Bonds and Commodities and Institutional Investment are about the market as a whole, so they draw none
+of the stock-specific markers the other pages do: no notes written on the charts, no noted buys or sells, and their
+built-in notes layer is switched off (so they do not offer *Add annotation* either).
 
 **Liquidity and Float** — opened from Market Watch's header, two lists of the whole market, and first the stocks on
 both: low float yet liquid enough to get in and out, fewest free shares first, then the most traded. *High liquidity*: every

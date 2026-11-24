@@ -114,7 +114,8 @@ class GrafanaDashboardQueryTest {
      * The pages about the market as a whole: no stock's notes or calls belong on them, so they draw none and do not
      * offer to add one.
      */
-    private static final Set<String> MARKET_WIDE = Set.of("10-market-watch.json");
+    private static final Set<String> MARKET_WIDE = Set.of("08-markets.json", "09-institutional.json",
+            "10-market-watch.json");
 
     @Test
     @DisplayName("a market-wide page draws no notes or calls: its built-in layer is off and it has no other")
