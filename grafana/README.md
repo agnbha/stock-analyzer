@@ -435,7 +435,8 @@ span before the first bar held, once: one request a stock, about 2,800 the first
 since is noted and not asked again. It also brings any member the scan missed up to date, reads each index's own bars
 (two requests an index) and works the breadth out again from all the bars, a few seconds.
 
-**Liquidity and Float** — opened from Market Watch's header, two lists of the whole market. *High liquidity*: every
+**Liquidity and Float** — opened from Market Watch's header, two lists of the whole market, and first the stocks on
+both: low float yet liquid enough to get in and out, fewest free shares first, then the most traded. *High liquidity*: every
 stock trading on the latest session whose average daily value traded over the last three months (its average volume
 times its average close, to the latest session) is above the amount picked (₹8 crore by default; 5 to 100 offered),
 most traded first, with its market cap and free float where its company page has been read. Volume is the stock's own

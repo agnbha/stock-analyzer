@@ -203,6 +203,60 @@ class LiquidityFloatDashboardTest {
     }
 
     @Test
+    @DisplayName("both: the stocks on both lists, fewest free shares first, then the most traded")
+    void liquidAndLowFloat() throws IOException {
+        List<LocalDate> quarter = sessionsTo(LATEST, 60);
+        // 100,000 shares at 1,000: 10 crore a day, with 15% free.
+        long both = stock("BOTH", "NSE", quarter, 1_000, 100_000);
+        holding(both, "2026-09", 85.0, null, 5, 5, 5);
+        marketCap(both, 4_000);
+        // As free, and twice as traded: first of the two.
+        long busier = stock("BUSIER", "NSE", quarter, 2_000, 100_000);
+        holding(busier, "2026-09", 85.0, null, 5, 5, 5);
+        // Liquid, but widely held.
+        long wide = stock("WIDE", "NSE", quarter, 1_000, 100_000);
+        holding(wide, "2026-09", 40.0, 0.0, 30, 20, 10);
+        // Low float, but 1 lakh a day.
+        long thin = stock("THIN", "NSE", quarter, 100, 1_000);
+        holding(thin, "2026-09", 90.0, 0.0, 2, 2, 6);
+        // Low float and liquid, but its pattern is older than the latest quarter's.
+        long stale = stock("STALE", "NSE", quarter, 1_000, 100_000);
+        holding(stale, "2026-06", 90.0, 0.0, 2, 2, 6);
+        // Low float and once liquid, but no longer trading.
+        long gone = stock("GONE", "NSE", sessionsTo(LATEST.minusDays(7), 50), 1_000, 1_000_000);
+        holding(gone, "2026-09", 90.0, 0.0, 2, 2, 6);
+
+        List<Map<String, Object>> rows = panel(7, 8, 25);
+
+        assertEquals(List.of("BUSIER", "BOTH"), rows.stream().map(r -> r.get("Symbol")).toList());
+        Map<String, Object> second = rows.get(1);
+        assertEquals(Arrays.asList(15.0, 10.0, 600.0, 4_000.0, 85.0, null, "Sep 2026", 1_000.0, 60),
+                Arrays.asList(second.get("Free float %"), second.get("Avg daily value, \u20b9 crore"),
+                        second.get("Free-float market cap, \u20b9 crore"), second.get("Market cap, \u20b9 crore"),
+                        second.get("Promoters %"), second.get("Government %"), second.get("Quarter"),
+                        second.get("Latest close, \u20b9"), second.get("Sessions")));
+        for (int[] picked : new int[][]{{8, 25}, {5, 25}, {8, 40}, {20, 10}}) {
+            java.util.Set<Object> liquid = new java.util.HashSet<>(panel(5, picked[0], picked[1]).stream()
+                    .map(r -> r.get("Symbol")).toList());
+            java.util.Set<Object> lowFloat = new java.util.HashSet<>(panel(6, picked[0], picked[1]).stream()
+                    .map(r -> r.get("Symbol")).toList());
+            liquid.retainAll(lowFloat);
+            assertEquals(liquid, new java.util.HashSet<>(panel(7, picked[0], picked[1]).stream()
+                    .map(r -> r.get("Symbol")).toList()), "exactly the stocks on both lists, at " + Arrays.toString(picked));
+        }
+    }
+
+    @Test
+    @DisplayName("the stocks on both lists are the first table on the page, above the two lists")
+    void bothComesFirst() throws IOException {
+        List<Integer> tables = StreamSupport.stream(dashboard("11-liquidity-float.json").path("panels").spliterator(), false)
+                .filter(p -> p.path("type").asText().equals("table"))
+                .sorted(java.util.Comparator.comparingInt(p -> p.path("gridPos").path("y").asInt()))
+                .map(p -> p.path("id").asInt()).toList();
+        assertEquals(List.of(7, 5, 6), tables);
+    }
+
+    @Test
     @DisplayName("Market Watch links here, and this page back to it")
     void links() throws IOException {
         assertTrue(StreamSupport.stream(dashboard("10-market-watch.json").path("links").spliterator(), false)
