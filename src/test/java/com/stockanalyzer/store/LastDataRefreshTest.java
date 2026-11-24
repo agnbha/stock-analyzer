@@ -123,7 +123,7 @@ class LastDataRefreshTest {
     void empty() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
-                "09-institutional.json", "10-market-watch.json"}) {
+                "09-institutional.json", "10-market-watch.json", "11-liquidity-float.json"}) {
             assertNull(refreshedAt(dashboard), dashboard);
         }
     }
@@ -214,6 +214,16 @@ class LastDataRefreshTest {
     }
 
     @Test
+    @DisplayName("Liquidity and Float reports the newest of the last scan and the last company page read")
+    void liquidityAndFloat() throws IOException {
+        tradingDay(9_000);
+        scan(2_000);
+        assertEquals(2_000_000L, refreshedAt("11-liquidity-float.json"), "the scan, which reads the daily bars");
+        execute("INSERT INTO company_profile (instrument_id, fetched_at) VALUES (?, 3000)", instrument);
+        assertEquals(3_000_000L, refreshedAt("11-liquidity-float.json"), "then the page the shareholding comes from");
+    }
+
+    @Test
     @DisplayName("Company Details reports the newest of the last company page read and the latest price")
     void companyDetails() throws IOException {
         tradingDay(1_000);
@@ -246,7 +256,7 @@ class LastDataRefreshTest {
                 checked++;
             }
         }
-        assertEquals(10, checked);
+        assertEquals(11, checked);
     }
 
     @Test
@@ -254,7 +264,7 @@ class LastDataRefreshTest {
     void isASmallLabelInTheTopRightCorner() throws IOException {
         for (String dashboard : new String[]{"01-overview.json", "03-decision-reasons.json",
                 "04-stock-trend.json", "05-watchlist.json", "07-company-details.json", "08-markets.json",
-                "09-institutional.json", "10-market-watch.json"}) {
+                "09-institutional.json", "10-market-watch.json", "11-liquidity-float.json"}) {
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARDS.resolve(dashboard)));
             JsonNode tile = tile(root, "Last data refresh");
             JsonNode at = tile.path("gridPos");

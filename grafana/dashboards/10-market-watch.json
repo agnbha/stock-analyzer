@@ -60,6 +60,18 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": "A stock's daily candles and its trend"
+    },
+    {
+      "title": "Liquidity and Float",
+      "type": "link",
+      "icon": "dashboard",
+      "url": "/d/stockanalyzer-liquidity/liquidity-and-float",
+      "includeVars": false,
+      "keepTime": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": "The stocks with high liquidity, and the low-float ones"
     }
   ],
   "annotations": {

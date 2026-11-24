@@ -369,7 +369,8 @@ class MarketWatchDashboardTest {
         }
         List<String> back = StreamSupport.stream(root.path("links").spliterator(), false)
                 .map(link -> link.path("url").asText()).toList();
-        assertEquals(List.of("/d/stockanalyzer-canslim/can-slim", "/d/stockanalyzer-trend/stock-trend"), back);
+        assertEquals(List.of("/d/stockanalyzer-canslim/can-slim", "/d/stockanalyzer-trend/stock-trend",
+                "/d/stockanalyzer-liquidity/liquidity-and-float"), back);
     }
 
     // ----- the whole market's breadth -----

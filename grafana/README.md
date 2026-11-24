@@ -117,6 +117,7 @@ What each tab needs:
 | Bonds and Commodities | the yields and prices; Groww's login for the MCX ones | `CanSlimMain markets` (or the nightly `evening.sh`) |
 | Institutional Investment | the FPI, FII and DII flows and positions | `CanSlimMain markets` (or `evening.sh`) |
 | Market Watch | the indices' members and own bars, every stock's bars two years back, the breadth | `CanSlimMain marketwatch` (or `evening.sh`) |
+| Liquidity and Float | the daily bars; the companies' screener.in pages for the shareholding | `CanSlimMain scan --market`, `CanSlimMain profiles` (or `evening.sh`) |
 | Company Details | the companies' screener.in pages | `CanSlimMain profiles` (or the nightly `evening.sh`) |
 
 With a single session ingested and no trades, expect one candle in the daily
@@ -425,6 +426,19 @@ every member and every stock of the market whose bars do not reach back `marketw
 span before the first bar held, once: one request a stock, about 2,800 the first time (some 25 minutes); a stock listed
 since is noted and not asked again. It also brings any member the scan missed up to date, reads each index's own bars
 (two requests an index) and works the breadth out again from all the bars, a few seconds.
+
+**Liquidity and Float** — opened from Market Watch's header, two lists of the whole market. *High liquidity*: every
+stock trading on the latest session whose average daily value traded over the last three months (its average volume
+times its average close, to the latest session) is above the amount picked (₹8 crore by default; 5 to 100 offered),
+most traded first, with its market cap and free float where its company page has been read. Volume is the stock's own
+exchange's. *Low float*: companies whose free float, the shares neither the promoters nor the government hold, is at
+or below the share picked (25% by default, the least a listed company must keep in public hands; 10 to 40 offered) in
+their latest quarter's shareholding pattern (one up to about four months old, as a pattern is filed up to three weeks
+after its quarter ends), fewest free shares first, with who holds the rest, the free-float market cap and the value
+traded. The shareholding comes from screener.in's company pages, read for every tracked company each evening and a few
+dozen others a night, so the low-float list grows over the weeks; the tile on the right says how many companies it
+covers, and `CanSlimMain profiles --max-other-pages N` reads more in one go (12 seconds a page). Each symbol opens
+Stock Trend.
 
 **Watchlist** — market breadth, how many tracked stocks read bullish, a shortlist of the five highest trend scores,
 the shortlist's own scorecard, and the stocks sitting in the bottom decile of their range or of value traded.
