@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -109,6 +110,27 @@ class GrafanaDashboardQueryTest {
         }
     }
 
+    /**
+     * The pages about the market as a whole: no stock's notes or calls belong on them, so they draw none and do not
+     * offer to add one.
+     */
+    private static final Set<String> MARKET_WIDE = Set.of("10-market-watch.json");
+
+    @Test
+    @DisplayName("a market-wide page draws no notes or calls: its built-in layer is off and it has no other")
+    void marketWidePagesDrawNoNotes() throws Exception {
+        for (String name : MARKET_WIDE) {
+            String content = Files.readString(DASHBOARDS.resolve(name));
+            JsonNode layers = JsonMapper.INSTANCE.readTree(content).path("annotations").path("list");
+            assertEquals(1, layers.size(), name + ": only the built-in layer, kept so Grafana does not add its own");
+            assertEquals(1, layers.get(0).path("builtIn").asInt(), name);
+            assertFalse(layers.get(0).path("enable").asBoolean(true), name + ": switched off");
+            assertTrue(layers.get(0).path("hide").asBoolean(false), name + ": with no switch to turn it on");
+            assertFalse(content.contains("trade_note") || content.contains("chart_note"),
+                    name + ": reads neither the noted calls nor the notes written on the charts");
+        }
+    }
+
     @Test
     @DisplayName("every dashboard with a time chart lets you annotate, and draws the notes tagged for it at once")
     void chartsLetYouAnnotateAndShowTaggedNotes() throws Exception {
@@ -119,6 +141,9 @@ class GrafanaDashboardQueryTest {
         // saved but not drawn, which keeps another symbol's notes off the candles.
         int checked = 0;
         for (Path file : dashboardFiles()) {
+            if (MARKET_WIDE.contains(file.getFileName().toString())) {
+                continue;
+            }
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
             boolean hasTimeChart = false;
             for (JsonNode panel : root.path("panels")) {
@@ -170,6 +195,9 @@ class GrafanaDashboardQueryTest {
     void chartsShowNotedCalls() throws Exception {
         int checked = 0;
         for (Path file : dashboardFiles()) {
+            if (MARKET_WIDE.contains(file.getFileName().toString())) {
+                continue;
+            }
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
             if (!root.has("annotations")) {
                 continue;
@@ -211,6 +239,9 @@ class GrafanaDashboardQueryTest {
     void chartsDrawSavedNotes() throws Exception {
         int checked = 0;
         for (Path file : dashboardFiles()) {
+            if (MARKET_WIDE.contains(file.getFileName().toString())) {
+                continue;
+            }
             JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(file));
             if (!root.has("annotations")) {
                 continue;

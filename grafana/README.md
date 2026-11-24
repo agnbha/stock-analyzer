@@ -435,6 +435,10 @@ span before the first bar held, once: one request a stock, about 2,800 the first
 since is noted and not asked again. It also brings any member the scan missed up to date, reads each index's own bars
 (two requests an index) and works the breadth out again from all the bars, a few seconds.
 
+Market Watch is about the market as a whole, so it draws none of the stock-specific markers the other pages do: no notes
+written on the charts, no noted buys or sells, and its built-in notes layer is switched off (so it does not offer *Add
+annotation* either).
+
 **Liquidity and Float** — opened from Market Watch's header, two lists of the whole market, and first the stocks on
 both: low float yet liquid enough to get in and out, fewest free shares first, then the most traded. *High liquidity*: every
 stock trading on the latest session whose average daily value traded over the last three months (its average volume
