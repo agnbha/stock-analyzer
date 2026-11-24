@@ -15,9 +15,7 @@ public enum NoteDashboard {
     CANDLES("stockanalyzer-candles", "Candles and Calls"),
     REASONS("stockanalyzer-reasons", "Decision Reasons"),
     TREND("stockanalyzer-trend", "Stock Trend"),
-    CANSLIM("stockanalyzer-canslim", "CAN SLIM"),
-    MARKETS("stockanalyzer-markets", "Bonds and Commodities"),
-    INSTITUTIONAL("stockanalyzer-institutional", "Institutional Investment");
+    CANSLIM("stockanalyzer-canslim", "CAN SLIM");
 
     private final String uid;
     private final String title;
