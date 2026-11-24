@@ -323,6 +323,14 @@ beta. The trend, RSI and pivots are the same arithmetic as the Watchlist's. Mark
 the universe the Watchlist ranks. The time picker offers three months and longer only (3 and 6 months, 1 and 2 years),
 because a few weeks of daily candles say little about a trend.
 
+*Liquidity*, at the bottom: the screen from the liquidity slide for the stock - a close above ₹25 and at most ₹10,000, a
+market cap of at least ₹300 crore (from its screener.in page, once read) and at least ₹5 crore traded on the latest
+session - and its turnover, the average volume of the last 20 sessions times their average close, against your largest
+position: it should be 10 to 20 times that, so a position can be taken and left without moving the price. Beside it,
+the value traded each session, the turnover line, the ₹5 crore line and 10 and 20 times your largest position. That is
+the amount in the **Largest position** box at the top (kept only in the page's address, never in a file), or, left
+blank, your largest buy order of the last 90 days in the journal, an order's fills together, across the accounts.
+
 **CAN SLIM** — the market's direction and distribution-day count across the
 top, then two lists: breakouts and setups about to break out (stocks that passed
 the screener.in query), and rallies that have ended (stop losses, heavy-volume

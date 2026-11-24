@@ -99,6 +99,9 @@ class StockTrendTest {
         }
     }
 
+    /** The liquidity screen and its chart, at the bottom of the page. */
+    private static final Set<Integer> LIQUIDITY_PANELS = Set.of(16, 17);
+
     @Test
     @DisplayName("every tile and chart about the stock reads the daily bars, and fills for a stock with no minute history")
     void everyPanelAboutTheStockReadsTheDailyBars() throws IOException {
@@ -113,6 +116,10 @@ class StockTrendTest {
                     continue;
                 }
                 int id = panel.path("id").asInt();
+                if (LIQUIDITY_PANELS.contains(id)) {
+                    // A table of words, and lines drawn from the journal's buys: StockTrendLiquidityTest runs them.
+                    continue;
+                }
                 Matcher source = OTHER_SOURCE.matcher(sql);
                 assertFalse(source.find(), () -> id + " reads " + source.group());
                 assertTrue(sql.contains("FROM daily_bar"), id + "");
