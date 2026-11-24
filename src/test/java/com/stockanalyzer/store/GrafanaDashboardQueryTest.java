@@ -82,6 +82,8 @@ class GrafanaDashboardQueryTest {
                         // Liquidity and Float: the amount and the share picked.
                         .replace("$min_value_cr", "8")
                         .replace("$max_float_pct", "25")
+                        // Stock Trend's liquidity screen: the box left blank, so the journal stands in.
+                        .replace("$max_position", "")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");
                 assertFalse(executable.contains("$"),
                         "unsubstituted variable in " + file.getFileName() + ": " + sql);

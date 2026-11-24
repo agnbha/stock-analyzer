@@ -176,6 +176,19 @@
           "text": "",
           "value": ""
         }
+      },
+      {
+        "name": "max_position",
+        "label": "Largest position, ₹",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "options": [],
+        "description": "Your largest position in rupees, for the liquidity screen: a stock's turnover should be 10 to 20 times it. Left blank, your largest buy order of the last 90 days in the journal stands in."
       }
     ]
   },
@@ -1937,6 +1950,302 @@
         }
       ],
       "transparent": true
+    },
+    {
+      "id": 16,
+      "type": "table",
+      "title": "$symbol - liquidity screen",
+      "description": "The liquidity screen from the slide, for this stock: a close above ₹25 and at most ₹10,000, a market cap of at least ₹300 crore (from its screener.in page, once read), and at least ₹5 crore traded on the latest session (close × volume). Then its turnover, the average volume over the last 20 sessions times their average close, against your largest position: it should be 10 to 20 times that, so a position can be taken and left without moving the price. The largest position is the amount in the box at the top of the page, or, left blank, your largest buy order of the last 90 days in the journal (an order's fills together, across the accounts).",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 10,
+        "h": 8
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "position"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Result"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^Passes.*",
+                      "result": {
+                        "color": "green",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Fails": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "Unknown": {
+                        "color": "transparent",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 230
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH recent AS (\n  SELECT session_date, close, volume\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  ORDER BY session_date DESC\n  LIMIT 20\n),\nlatest AS (SELECT close, volume FROM recent ORDER BY session_date DESC LIMIT 1),\nturnover AS (SELECT AVG(volume) * AVG(close) AS rupees, COUNT(*) AS sessions FROM recent),\ncap AS (SELECT MAX(market_cap_cr) AS crore FROM company_profile WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')),\nlargest AS (\n  SELECT COALESCE(CAST(NULLIF(TRIM('$max_position'), '') AS REAL),\n                  (SELECT MAX(value) FROM (\n                     SELECT SUM(t.quantity * t.price) AS value\n                     FROM trade t\n                     WHERE t.side = 'BUY' AND t.session_date >= date('now', '-90 days')\n                     GROUP BY t.profile, t.session_date, COALESCE(t.order_id, 'at' || t.executed_ts)))) AS rupees\n)\nSELECT 1 AS position, 'Close above ₹25' AS \"Screen\", printf('₹%,.2f', l.close) AS \"Value\",\n       CASE WHEN l.close > 25 THEN 'Passes' ELSE 'Fails' END AS \"Result\"\nFROM latest l\nUNION ALL\nSELECT 2, 'Close at most ₹10,000', printf('₹%,.2f', l.close),\n       CASE WHEN l.close <= 10000 THEN 'Passes' ELSE 'Fails' END\nFROM latest l\nUNION ALL\nSELECT 3, 'Market cap at least ₹300 crore',\n       CASE WHEN c.crore IS NULL THEN 'not read yet' ELSE printf('₹%,d crore', CAST(ROUND(c.crore) AS INTEGER)) END,\n       CASE WHEN c.crore IS NULL THEN 'Unknown' WHEN c.crore >= 300 THEN 'Passes' ELSE 'Fails' END\nFROM cap c\nUNION ALL\nSELECT 4, 'Value traded on the latest session at least ₹5 crore', printf('₹%,.2f crore', l.close * l.volume / 1e7),\n       CASE WHEN l.close * l.volume >= 5e7 THEN 'Passes' ELSE 'Fails' END\nFROM latest l\nUNION ALL\nSELECT 5, 'Turnover (20-day average volume × average close) 10 to 20× your largest position',\n       printf('₹%,.2f crore', t.rupees / 1e7)\n         || CASE WHEN g.rupees > 0 THEN printf(', %.1f× ₹%,d', t.rupees / g.rupees, CAST(ROUND(g.rupees) AS INTEGER))\n                 ELSE '' END,\n       CASE WHEN g.rupees IS NULL OR g.rupees <= 0 THEN 'Unknown'\n            WHEN t.rupees >= 20 * g.rupees THEN 'Passes, 20×'\n            WHEN t.rupees >= 10 * g.rupees THEN 'Passes, 10×'\n            ELSE 'Fails' END\nFROM turnover t CROSS JOIN largest g\nWHERE t.sessions > 0\nORDER BY position",
+          "queryText": "WITH recent AS (\n  SELECT session_date, close, volume\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  ORDER BY session_date DESC\n  LIMIT 20\n),\nlatest AS (SELECT close, volume FROM recent ORDER BY session_date DESC LIMIT 1),\nturnover AS (SELECT AVG(volume) * AVG(close) AS rupees, COUNT(*) AS sessions FROM recent),\ncap AS (SELECT MAX(market_cap_cr) AS crore FROM company_profile WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')),\nlargest AS (\n  SELECT COALESCE(CAST(NULLIF(TRIM('$max_position'), '') AS REAL),\n                  (SELECT MAX(value) FROM (\n                     SELECT SUM(t.quantity * t.price) AS value\n                     FROM trade t\n                     WHERE t.side = 'BUY' AND t.session_date >= date('now', '-90 days')\n                     GROUP BY t.profile, t.session_date, COALESCE(t.order_id, 'at' || t.executed_ts)))) AS rupees\n)\nSELECT 1 AS position, 'Close above ₹25' AS \"Screen\", printf('₹%,.2f', l.close) AS \"Value\",\n       CASE WHEN l.close > 25 THEN 'Passes' ELSE 'Fails' END AS \"Result\"\nFROM latest l\nUNION ALL\nSELECT 2, 'Close at most ₹10,000', printf('₹%,.2f', l.close),\n       CASE WHEN l.close <= 10000 THEN 'Passes' ELSE 'Fails' END\nFROM latest l\nUNION ALL\nSELECT 3, 'Market cap at least ₹300 crore',\n       CASE WHEN c.crore IS NULL THEN 'not read yet' ELSE printf('₹%,d crore', CAST(ROUND(c.crore) AS INTEGER)) END,\n       CASE WHEN c.crore IS NULL THEN 'Unknown' WHEN c.crore >= 300 THEN 'Passes' ELSE 'Fails' END\nFROM cap c\nUNION ALL\nSELECT 4, 'Value traded on the latest session at least ₹5 crore', printf('₹%,.2f crore', l.close * l.volume / 1e7),\n       CASE WHEN l.close * l.volume >= 5e7 THEN 'Passes' ELSE 'Fails' END\nFROM latest l\nUNION ALL\nSELECT 5, 'Turnover (20-day average volume × average close) 10 to 20× your largest position',\n       printf('₹%,.2f crore', t.rupees / 1e7)\n         || CASE WHEN g.rupees > 0 THEN printf(', %.1f× ₹%,d', t.rupees / g.rupees, CAST(ROUND(g.rupees) AS INTEGER))\n                 ELSE '' END,\n       CASE WHEN g.rupees IS NULL OR g.rupees <= 0 THEN 'Unknown'\n            WHEN t.rupees >= 20 * g.rupees THEN 'Passes, 20×'\n            WHEN t.rupees >= 10 * g.rupees THEN 'Passes, 10×'\n            ELSE 'Fails' END\nFROM turnover t CROSS JOIN largest g\nWHERE t.sessions > 0\nORDER BY position"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "$symbol - value traded and turnover (₹ crore)",
+      "description": "The value traded each session (close × volume) as bars; the turnover, the average volume over 20 sessions times their average close, as a line; the screen's ₹5 crore; and 10 and 20 times your largest position (the box at the top of the page, or your largest buy order of the last 90 days). The turnover line should stay above the 10× line, better the 20×.",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 43,
+        "w": 14,
+        "h": 8
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "decimals": 2,
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value traded, ₹ crore"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 40
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8AB8FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Turnover: 20-day average volume × average close"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Screen: ₹5 crore"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(10|20)× your largest position$"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    4,
+                    6
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "10× your largest position"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "20× your largest position"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "WITH bars AS (\n  SELECT session_date, ts_epoch, close, volume,\n         AVG(volume) OVER twenty AS avg_volume, AVG(close) OVER twenty AS avg_close, COUNT(*) OVER twenty AS sessions\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW twenty AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)\n),\nlargest AS (\n  SELECT COALESCE(CAST(NULLIF(TRIM('$max_position'), '') AS REAL),\n                  (SELECT MAX(value) FROM (\n                     SELECT SUM(t.quantity * t.price) AS value\n                     FROM trade t\n                     WHERE t.side = 'BUY' AND t.session_date >= date('now', '-90 days')\n                     GROUP BY t.profile, t.session_date, COALESCE(t.order_id, 'at' || t.executed_ts)))) AS rupees\n)\nSELECT b.ts_epoch AS time,\n       ROUND(b.close * b.volume / 1e7, 2) AS \"Value traded, ₹ crore\",\n       CASE WHEN b.sessions = 20 THEN ROUND(b.avg_volume * b.avg_close / 1e7, 2) END\n         AS \"Turnover: 20-day average volume × average close\",\n       5 AS \"Screen: ₹5 crore\",\n       ROUND(10 * g.rupees / 1e7, 2) AS \"10× your largest position\",\n       ROUND(20 * g.rupees / 1e7, 2) AS \"20× your largest position\"\nFROM bars b\nCROSS JOIN largest g\nORDER BY b.session_date",
+          "queryText": "WITH bars AS (\n  SELECT session_date, ts_epoch, close, volume,\n         AVG(volume) OVER twenty AS avg_volume, AVG(close) OVER twenty AS avg_close, COUNT(*) OVER twenty AS sessions\n  FROM daily_bar\n  WHERE instrument_id = (SELECT id FROM instrument WHERE symbol = '$symbol')\n  WINDOW twenty AS (ORDER BY session_date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW)\n),\nlargest AS (\n  SELECT COALESCE(CAST(NULLIF(TRIM('$max_position'), '') AS REAL),\n                  (SELECT MAX(value) FROM (\n                     SELECT SUM(t.quantity * t.price) AS value\n                     FROM trade t\n                     WHERE t.side = 'BUY' AND t.session_date >= date('now', '-90 days')\n                     GROUP BY t.profile, t.session_date, COALESCE(t.order_id, 'at' || t.executed_ts)))) AS rupees\n)\nSELECT b.ts_epoch AS time,\n       ROUND(b.close * b.volume / 1e7, 2) AS \"Value traded, ₹ crore\",\n       CASE WHEN b.sessions = 20 THEN ROUND(b.avg_volume * b.avg_close / 1e7, 2) END\n         AS \"Turnover: 20-day average volume × average close\",\n       5 AS \"Screen: ₹5 crore\",\n       ROUND(10 * g.rupees / 1e7, 2) AS \"10× your largest position\",\n       ROUND(20 * g.rupees / 1e7, 2) AS \"20× your largest position\"\nFROM bars b\nCROSS JOIN largest g\nORDER BY b.session_date",
+          "timeColumns": [
+            "time"
+          ]
+        }
+      ]
     }
   ]
 }
