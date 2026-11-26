@@ -111,4 +111,83 @@ class PriceActionAnalyzerTest {
         assertFalse(pa.exhaustionDay());
         assertTrue(pa.advanceFromLowPct() > 0);
     }
+
+    @Test
+    @DisplayName("a base a breakout cleared is marked from its pivot's bar to the breakout day, between the pivot and its lowest low")
+    void breakoutBaseIsMarked() {
+        List<DailyBar> bars = baseUnder150().add(152, 2000).build();
+
+        List<BaseMark> marks = analyzer.basesIn(bars);
+
+        assertEquals(1, marks.size());
+        BaseMark mark = marks.getFirst();
+        assertEquals(BaseMark.Kind.BREAKOUT, mark.kind());
+        assertEquals(150.0, mark.pivot(), 1e-9);
+        assertEquals(138.0, mark.low(), 1e-9, "the lowest low inside the box");
+        assertEquals(8.0, mark.depthPct(), 1e-9);
+        assertEquals(bars.getLast().date(), mark.endDate(), "it ends on the breakout day");
+        int pivotIndex = 70;
+        assertEquals(bars.get(pivotIndex).date(), mark.pivotDate(), "and starts on the bar of the pivot");
+        assertEquals(bars.size() - pivotIndex, mark.sessions());
+    }
+
+    @Test
+    @DisplayName("the base the stock is in now is marked to its latest bar, and is not a breakout")
+    void currentBaseIsMarked() {
+        List<DailyBar> bars = baseUnder150().add(144, 1000).build();
+
+        List<BaseMark> marks = analyzer.basesIn(bars);
+
+        assertEquals(1, marks.size());
+        assertEquals(BaseMark.Kind.CURRENT, marks.getFirst().kind());
+        assertEquals(bars.getLast().date(), marks.getFirst().endDate());
+        PriceAction pa = analyzer.analyze(bars);
+        assertEquals(pa.base().pivot(), marks.getFirst().pivot(), 1e-9, "the scan's own base, not another reading");
+        assertEquals(pa.base().pivotDate(), marks.getFirst().pivotDate());
+    }
+
+    @Test
+    @DisplayName("a close through the pivot on ordinary volume is no breakout: the base is still the current one")
+    void noBreakoutNoBreakoutBase() {
+        List<BaseMark> marks = analyzer.basesIn(baseUnder150().add(152, 1100).build());
+
+        assertEquals(List.of(BaseMark.Kind.CURRENT), marks.stream().map(BaseMark::kind).toList());
+    }
+
+    @Test
+    @DisplayName("a stock with no base, broken or still rising, has none marked")
+    void noBase() {
+        assertEquals(List.of(), analyzer.basesIn(TestBars.from(100).trend(150, 70).range(90, 140, 38).build()));
+        assertEquals(List.of(), analyzer.basesIn(TestBars.from(100).trend(200, 120).build()));
+        assertEquals(List.of(), analyzer.basesIn(List.of()));
+        assertEquals(List.of(), analyzer.basesIn(TestBars.from(100).build()));
+    }
+
+    @Test
+    @DisplayName("each base that led to a breakout is marked once, oldest first, the latest breakout's too")
+    void severalBases() {
+        // A base under 150, broken out of on heavy volume; a run to 200; a second base under 200, broken out of too.
+        List<DailyBar> bars = baseUnder150().add(152, 2000).trend(200, 40).range(186, 194, 38).add(202, 2400).build();
+
+        List<BaseMark> marks = analyzer.basesIn(bars);
+
+        assertEquals(2, marks.size());
+        assertEquals(List.of(BaseMark.Kind.BREAKOUT, BaseMark.Kind.BREAKOUT), marks.stream().map(BaseMark::kind).toList());
+        assertEquals(150.0, marks.get(0).pivot(), 1e-9);
+        assertTrue(marks.get(1).pivot() > 190 && marks.get(1).pivot() <= 200, "" + marks.get(1).pivot());
+        assertTrue(marks.get(0).endDate().isBefore(marks.get(1).pivotDate()) || marks.get(0).endDate().equals(marks.get(1).pivotDate()),
+                "the first ended where the second starts or before");
+        assertEquals(bars.getLast().date(), marks.get(1).endDate());
+    }
+
+    @Test
+    @DisplayName("a base that stands today and one that led to a breakout earlier are both marked")
+    void breakoutAndCurrent() {
+        List<DailyBar> bars = baseUnder150().add(152, 2000).trend(200, 40).range(186, 194, 38).add(190, 1000).build();
+
+        List<BaseMark> marks = analyzer.basesIn(bars);
+
+        assertEquals(List.of(BaseMark.Kind.BREAKOUT, BaseMark.Kind.CURRENT), marks.stream().map(BaseMark::kind).toList());
+        assertEquals(bars.getLast().date(), marks.get(1).endDate());
+    }
 }

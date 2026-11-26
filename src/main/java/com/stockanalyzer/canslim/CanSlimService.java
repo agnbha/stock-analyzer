@@ -87,6 +87,7 @@ public final class CanSlimService {
     private final Settings settings;
     private final MarketDirectionAnalyzer marketAnalyzer;
     private final PriceActionAnalyzer priceActionAnalyzer;
+    private final BaseMarker baseMarker;
     private final CanSlimEvaluator evaluator;
 
     public CanSlimService(ScreenerClient screener, CompanyFundamentalsClient companyFundamentals,
@@ -112,6 +113,7 @@ public final class CanSlimService {
         this.settings = settings;
         this.marketAnalyzer = new MarketDirectionAnalyzer(criteria);
         this.priceActionAnalyzer = new PriceActionAnalyzer(criteria);
+        this.baseMarker = new BaseMarker(dailyBars, runs, criteria);
         this.evaluator = new CanSlimEvaluator(criteria);
     }
 
@@ -332,6 +334,7 @@ public final class CanSlimService {
         }
 
         long runId = runs.saveRun(clock.instant().getEpochSecond(), query, screenedCount, market, scores);
+        baseMarker.refresh(scores.keySet());
         MarketSummary summary = null;
         if (wide != null) {
             runs.pruneMarketScores(wide.keepRuns());
@@ -532,6 +535,11 @@ public final class CanSlimService {
             .thenComparing(s -> -s.letters().passed())
             .thenComparing(s -> s.rsRating() == null ? 0 : -s.rsRating())
             .thenComparing(CanSlimScore::symbol);
+
+    /** The bases of every stock the latest scan scored, again, from the bars held: no broker, no screener. */
+    public int refreshBases() {
+        return baseMarker.refreshLatest();
+    }
 
     /**
      * One priced symbol. The bars are kept only for the market proxy, whose chart the market's direction

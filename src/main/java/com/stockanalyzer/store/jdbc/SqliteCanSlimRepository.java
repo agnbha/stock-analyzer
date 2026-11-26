@@ -1,6 +1,7 @@
 package com.stockanalyzer.store.jdbc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.stockanalyzer.canslim.BaseMark;
 import com.stockanalyzer.canslim.CanSlimScore;
 import com.stockanalyzer.canslim.MarketAssessment;
 import com.stockanalyzer.canslim.PriceAction;
@@ -13,6 +14,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public final class SqliteCanSlimRepository implements CanSlimRepository {
@@ -81,6 +84,53 @@ public final class SqliteCanSlimRepository implements CanSlimRepository {
                                          WHERE source = 'MARKET' ORDER BY run_id DESC LIMIT ?)""")) {
                 prune.setInt(1, Math.max(keepRuns, 1));
                 prune.executeUpdate();
+            }
+        });
+    }
+
+    @Override
+    public void saveBases(Map<Long, List<BaseMark>> bases) {
+        if (bases.isEmpty()) {
+            return;
+        }
+        database.inTransaction(connection -> {
+            try (PreparedStatement delete = connection.prepareStatement("DELETE FROM canslim_base WHERE instrument_id = ?");
+                 PreparedStatement insert = connection.prepareStatement("""
+                         INSERT INTO canslim_base
+                           (instrument_id, pivot_date, end_date, kind, pivot, low, depth_pct, sessions, seq)
+                         VALUES (?,?,?,?,?,?,?,?,?)""")) {
+                for (Map.Entry<Long, List<BaseMark>> entry : bases.entrySet()) {
+                    delete.setLong(1, entry.getKey());
+                    delete.executeUpdate();
+                    int seq = 0;
+                    for (BaseMark mark : entry.getValue()) {
+                        insert.setLong(1, entry.getKey());
+                        insert.setString(2, mark.pivotDate().toString());
+                        insert.setString(3, mark.endDate().toString());
+                        insert.setString(4, mark.kind().name());
+                        insert.setDouble(5, mark.pivot());
+                        insert.setDouble(6, mark.low());
+                        insert.setDouble(7, mark.depthPct());
+                        insert.setInt(8, mark.sessions());
+                        insert.setInt(9, seq++);
+                        insert.executeUpdate();
+                    }
+                }
+            }
+        });
+    }
+
+    @Override
+    public List<Long> latestScoredInstruments() {
+        return database.read(connection -> {
+            try (Statement select = connection.createStatement();
+                 ResultSet rs = select.executeQuery(
+                         "SELECT instrument_id FROM canslim_score WHERE run_id = (SELECT MAX(id) FROM canslim_run)")) {
+                List<Long> ids = new ArrayList<>();
+                while (rs.next()) {
+                    ids.add(rs.getLong(1));
+                }
+                return ids;
             }
         });
     }

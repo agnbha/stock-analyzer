@@ -1,6 +1,10 @@
 package com.stockanalyzer.canslim;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Turns a stock's daily bars into the readings the CAN SLIM rules need: where
@@ -125,12 +129,10 @@ public final class PriceActionAnalyzer {
                 continue;
             }
             double pivot = base.pivot();
-            boolean crossed = bars.get(b).close() > pivot && bars.get(b - 1).close() <= pivot;
-            Double average = Bars.averageVolumeBefore(bars, b, 50);
-            if (!crossed || average == null || average == 0) {
+            Double ratio = crossingVolumeRatio(bars, b, pivot);
+            if (ratio == null) {
                 continue;
             }
-            double ratio = bars.get(b).volume() / average;
             if (ratio >= criteria.breakoutVolumeRatio()) {
                 return new PriceAction.Breakout(bars.get(b).date(), pivot, ratio, t - b,
                         Bars.pctChange(pivot, bars.get(t).close()),
@@ -138,6 +140,58 @@ public final class PriceActionAnalyzer {
             }
         }
         return null;
+    }
+
+    /**
+     * The volume of session {@code b} over the 50-day average before it, when that session closed through
+     * {@code pivot} from at or below it; null when it did not, or there is no average to measure the volume by.
+     */
+    private static Double crossingVolumeRatio(List<DailyBar> bars, int b, double pivot) {
+        boolean crossed = bars.get(b).close() > pivot && bars.get(b - 1).close() <= pivot;
+        Double average = Bars.averageVolumeBefore(bars, b, 50);
+        if (!crossed || average == null || average == 0) {
+            return null;
+        }
+        return bars.get(b).volume() / average;
+    }
+
+    /**
+     * Every base worth drawing on a stock's chart, oldest first: the base standing on the day of each breakout from
+     * one (the same rule {@link #analyze} uses for the latest), from the pivot's bar to the breakout day, and the base
+     * the stock is in now, to its latest bar. Judged session by session with {@link #baseAsOf}, so a base here is a
+     * base the scan would have called one on that day, and a pivot appears once: the base standing before it was
+     * cleared. Not every day's snapshot is drawn: as the pivot gives way to a lower one, the snapshots overlap and
+     * only the ones that led to a breakout, or stand today, mean anything.
+     */
+    public List<BaseMark> basesIn(List<DailyBar> bars) {
+        List<BaseMark> marks = new ArrayList<>();
+        Set<LocalDate> seen = new HashSet<>();
+        for (int b = 1; b < bars.size(); b++) {
+            PriceAction.Base base = baseAsOf(bars, b);
+            if (base == null || seen.contains(base.pivotDate())) {
+                continue;
+            }
+            Double ratio = crossingVolumeRatio(bars, b, base.pivot());
+            if (ratio != null && ratio >= criteria.breakoutVolumeRatio()) {
+                seen.add(base.pivotDate());
+                marks.add(mark(BaseMark.Kind.BREAKOUT, bars, b - base.sessions(), b, base.pivot()));
+            }
+        }
+        if (bars.size() >= 2) {
+            int last = bars.size() - 1;
+            PriceAction.Base now = baseAsOf(bars, last);
+            if (now != null && !seen.contains(now.pivotDate())) {
+                marks.add(mark(BaseMark.Kind.CURRENT, bars, last - now.sessions(), last, now.pivot()));
+            }
+        }
+        marks.sort(java.util.Comparator.comparing(BaseMark::pivotDate));
+        return marks;
+    }
+
+    /** The box's bottom is the lowest low up to the session before its end: the depth {@link #baseAsOf} judged it by. */
+    private static BaseMark mark(BaseMark.Kind kind, List<DailyBar> bars, int pivotIndex, int endIndex, double pivot) {
+        return new BaseMark(kind, bars.get(pivotIndex).date(), bars.get(endIndex).date(), pivot,
+                Bars.minLow(bars, pivotIndex, endIndex - 1), endIndex - pivotIndex + 1);
     }
 
     /** A close below the 50-day average within the last few sessions, while still below it. */

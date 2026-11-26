@@ -96,7 +96,35 @@ public final class SchemaMigrator {
         all.put(28, v28());
         all.put(29, v29());
         all.put(30, v30());
+        all.put(31, v31());
         return all;
+    }
+
+    /**
+     * v31: the bases the CAN SLIM chart draws as boxes, kept by the scan ({@code CanSlimMain bases} writes them again from
+     * the bars held). One row a base: from the bar of its pivot to the day it ended, between the pivot and the lowest low
+     * inside it. {@code kind} is BREAKOUT for a base a breakout cleared and CURRENT for the one the stock is in now;
+     * {@code seq} numbers a stock's bases from the oldest, so neighbours can be drawn apart. A stock's rows are replaced
+     * together each time its bases are worked out. {@code v_canslim_base} adds the symbol.
+     */
+    private List<String> v31() {
+        return List.of("""
+                CREATE TABLE canslim_base (
+                  instrument_id INTEGER NOT NULL REFERENCES instrument(id),
+                  pivot_date TEXT NOT NULL,
+                  end_date TEXT NOT NULL,
+                  kind TEXT NOT NULL,
+                  pivot REAL NOT NULL,
+                  low REAL NOT NULL,
+                  depth_pct REAL NOT NULL,
+                  sessions INTEGER NOT NULL,
+                  seq INTEGER NOT NULL,
+                  PRIMARY KEY (instrument_id, pivot_date)
+                ) WITHOUT ROWID""", """
+                CREATE VIEW v_canslim_base AS
+                SELECT i.symbol AS symbol, b.pivot_date, b.end_date, b.kind, b.pivot, b.low, b.depth_pct, b.sessions, b.seq
+                FROM canslim_base b
+                JOIN instrument i ON i.id = b.instrument_id""");
     }
 
     /**

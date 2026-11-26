@@ -22,6 +22,9 @@ import java.util.Locale;
  *                              does this on every scan; --no-market skips it for one)
  *   ... --limit N              with --market, only about N listings spread through the list: a trial run
  *   ... --top N                list the N strongest stocks by RS rating (50 for a market scan)
+ *   bases                      mark the bases of every stock the latest scan scored, for the boxes on CAN SLIM's chart,
+ *                              from the daily bars held (a scan does this for the stocks it scores; this is for the
+ *                              ones scanned before the boxes existed, or after the bars were mended). No broker
  *   profiles                   read the tracked symbols' screener.in pages for the Candles and Calls page's
  *                              company details: the stalest first, at most company.profile.max.pages.per.run
  *   profiles --symbol S        one company, now, whatever its copy's age
@@ -51,6 +54,13 @@ public final class CanSlimMain {
     public static void main(String[] args) {
         Args parsed = Args.parse(args);
         String command = parsed.command("scan");
+        if (command.equals("bases")) {
+            try (AppContext context = new AppContext(AppConfig.load())) {
+                int marked = context.baseMarker().refreshLatest();
+                System.out.printf("Marked %d bases on the chart of the stocks the latest scan scored.%n", marked);
+            }
+            return;
+        }
         if (command.equals("profiles")) {
             profiles(parsed);
             return;
@@ -70,7 +80,7 @@ public final class CanSlimMain {
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
-                    + " | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets"
+                    + " | bases | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets"
                     + " | summary --symbol S [--call YYYY-MM] [--again] | marketwatch [--no-bars]");
             System.exit(2);
         }

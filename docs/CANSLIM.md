@@ -132,6 +132,15 @@ qualifies. This covers flat bases, cups and saucers by their shared shape
 without classifying patterns. The pivot used is the base's high, which is
 slightly stricter than O'Neil's handle-high pivot for a cup with handle.
 
+**Marking bases on the chart.** The chart on the dashboard draws each base as a box: from the bar of the pivot to the day
+the base ended, between the pivot and the lowest low before that day (the depth the scan reports). It marks the base the
+stock is in now, and the base that stood on the day of each breakout (a close through the pivot from at or below it, on
+at least `breakout.volume.ratio` times the 50-day average volume: the same test as the signals). The base is judged
+session by session as of that day, so a box is a base the scan would have called one then; the days between, when a
+pivot gives way to a lower one, are not boxed. A pivot is boxed once. The boxes are stored in `canslim_base` with each
+scan, for the stocks it scores, from the bars held in `daily_bar`; `CanSlimMain bases` marks them again for the stocks
+the latest scan scored, with no broker or screener.
+
 ## Signals
 
 Sell signals are checked first and win: protecting capital comes before a new

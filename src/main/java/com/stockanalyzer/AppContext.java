@@ -11,6 +11,7 @@ import com.stockanalyzer.alert.SellTargetAlerts;
 import com.stockanalyzer.auth.GrowwAuthenticator;
 import com.stockanalyzer.auth.FileTokenCache;
 import com.stockanalyzer.auth.GrowwAuthenticators;
+import com.stockanalyzer.canslim.BaseMarker;
 import com.stockanalyzer.canslim.CanSlimCriteria;
 import com.stockanalyzer.canslim.CanSlimService;
 import com.stockanalyzer.canslim.GrowwInstrumentCatalog;
@@ -624,8 +625,32 @@ public final class AppContext implements AutoCloseable {
      * when a query is actually run, and daily bars through the wide-range client.
      */
     public CanSlimService canSlimService() {
+        CanSlimCriteria criteria = canSlimCriteria();
+        CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
+                config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
+                config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
+                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays(),
+                config.canSlimFundamentalsMaxPagesPerRun());
+        return new CanSlimService(
+                new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
+                new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
+                        config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
+                new SqliteFundamentalsCacheRepository(database), new SqliteMarketRejectRepository(database),
+                wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
+                new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
+                executor, criteria, settings);
+    }
+
+    /** The boxes on CAN SLIM's chart, from the bars held: no broker, no screener, so no credentials either. */
+    public BaseMarker baseMarker() {
+        return new BaseMarker(new SqliteDailyBarRepository(database), new SqliteCanSlimRepository(database),
+                canSlimCriteria());
+    }
+
+    /** The CAN SLIM thresholds: the defaults, as the {@code canslim.*} settings change them. */
+    private CanSlimCriteria canSlimCriteria() {
         CanSlimCriteria d = CanSlimCriteria.defaults();
-        CanSlimCriteria criteria = new CanSlimCriteria(
+        return new CanSlimCriteria(
                 config.canSlim("min.qtr.profit.growth.pct", d.minQtrProfitGrowthPct()),
                 config.canSlim("min.qtr.sales.growth.pct", d.minQtrSalesGrowthPct()),
                 config.canSlim("min.profit.growth.3y.pct", d.minProfitGrowth3yPct()),
@@ -650,19 +675,6 @@ public final class AppContext implements AutoCloseable {
                 config.canSlim("distribution.drop.pct", d.distributionDropPct()),
                 (int) config.canSlim("distribution.under.pressure", d.distributionUnderPressure()),
                 (int) config.canSlim("distribution.correction", d.distributionCorrection()));
-        CanSlimService.Settings settings = new CanSlimService.Settings(config.exchange(), config.segment(),
-                config.canSlimIndexSymbol(), config.canSlimHistoryDays(), config.canSlimMaxCandidates(),
-                config.canSlimIncludeUniverse() ? config.stockSymbols() : List.of(),
-                config.canSlimFundamentalsCacheDays(), config.canSlimFundamentalsSeasonCheckDays(),
-                config.canSlimFundamentalsMaxPagesPerRun());
-        return new CanSlimService(
-                new ScreenerInClient(httpClient, config.screenerBaseUrl(), config.screenerSessionIdOrNull()),
-                new ScreenerCompanyClient(httpClient, config.screenerBaseUrl(),
-                        config.screenerRequestIntervalMillis(), config.screenerRateLimitBackoffMillis()),
-                new SqliteFundamentalsCacheRepository(database), new SqliteMarketRejectRepository(database),
-                wideRangeCandleDataClient(), instrumentRepository, new SqliteDailyBarRepository(database),
-                new SqliteCanSlimRepository(database), realizedLotRepository, clock, java.time.Clock.systemUTC(),
-                executor, criteria, settings);
     }
 
     /**
