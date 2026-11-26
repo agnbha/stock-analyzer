@@ -202,7 +202,7 @@ The minute chart draws exactly the sessions ticked in the **Session** box, and t
 the time range at the top. A session ticked by hand stays ticked when the range changes, as long as it is still in
 the range, so after picking one, set the box back to *All* to see the whole range again.
 
-The minute chart's **Candle size** box picks 1M, 2M, 5M or 10M candles, 1M to begin with. Candles are cut on the clock
+The minute chart's **Candle size** box picks 1M, 2M, 5M or 10M candles, 5M to begin with. Candles are cut on the clock
 from the 09:15 open, so a 5-minute candle is 09:15-09:19, then 09:20-09:24. A candle opens where its first minute
 opened, closes where its last closed, and spans the highest high, lowest low and total volume of its minutes; VWAP and
 the EMAs are read as they stand at its end, and your buys, sells and the detector's windows sit on the candle they fall

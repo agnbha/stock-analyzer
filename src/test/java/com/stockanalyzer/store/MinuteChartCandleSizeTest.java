@@ -273,18 +273,19 @@ class MinuteChartCandleSizeTest {
     }
 
     @Test
-    @DisplayName("anything but 1, 2, 5 or 10 is 1M, never an error, and nothing typed can touch the data")
-    void badInputFallsBackToOneMinute() throws Exception {
+    @DisplayName("anything but 1, 2, 5 or 10 is 5M, the box's default, never an error, and nothing typed can touch the data")
+    void badInputFallsBackToTheDefault() throws Exception {
         candles(LATER, 50);
 
-        for (String typed : new String[]{"", "abc", "0", "-5", "7", "  ", "20", "5; DROP TABLE live_candle"}) {
-            assertEquals(50, draw(typed, LATER).size(), "typed: '" + typed + "'");
+        for (String typed : new String[]{"", "abc", "0", "-5", "7", "  ", "20", "5; DROP TABLE live_candle", "1; DROP TABLE live_candle"}) {
+            assertEquals(10, draw(typed, LATER).size(), "typed: '" + typed + "': five-minute candles");
         }
+        assertEquals(50, draw("1", LATER).size(), "1 is still one minute");
         assertEquals(50, count("live_candle"));
     }
 
     @Test
-    @DisplayName("the page has the Candle size dropdown, defaulting to 1M, and no Max candles box")
+    @DisplayName("the page has the Candle size dropdown, defaulting to 5M, and no Max candles box")
     void dashboardHasTheBox() throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD));
         List<JsonNode> variables = new ArrayList<>();
@@ -303,9 +304,15 @@ class MinuteChartCandleSizeTest {
         });
         assertEquals(List.of("1", "2", "5", "10"), values);
         assertEquals(List.of("1M", "2M", "5M", "10M"), texts);
-        assertEquals("1", box.path("current").path("value").asText(), "the default");
-        assertEquals("1M", box.path("current").path("text").asText());
-        assertTrue(box.path("options").get(0).path("selected").asBoolean());
+        assertEquals("5", box.path("current").path("value").asText(), "the default");
+        assertEquals("5M", box.path("current").path("text").asText());
+        List<String> selected = new ArrayList<>();
+        box.path("options").forEach(o -> {
+            if (o.path("selected").asBoolean()) {
+                selected.add(o.path("value").asText());
+            }
+        });
+        assertEquals(List.of("5"), selected, "only 5M is selected to begin with");
         assertTrue(!box.path("description").asText().isBlank(), "the box says what it does when hovered");
 
         assertEquals(0, variables.stream().filter(v -> v.path("name").asText().equals("candles")).count(),
