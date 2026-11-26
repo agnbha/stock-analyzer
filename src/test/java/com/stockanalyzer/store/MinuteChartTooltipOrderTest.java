@@ -54,7 +54,8 @@ class MinuteChartTooltipOrderTest {
                 .replace("${candles:sqlstring}", "'200'")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "WIPRO")
-                .replace("$cpr", "all")
+                .replace("$cpr_levels", "all")
+                .replace("$cpr_next", "on")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
 
         List<String> columns = database.read(connection -> {

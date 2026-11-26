@@ -165,7 +165,7 @@ class CprLevelsTest {
         // High 120, Low 90, Close 108 (the last minute's): Pivot 106, BC 105, TC = (106-105)+106 = 107.
         aSessionOf120And90Closing108(test, D2);
 
-        Map<String, Double> next = points("0", D2).getFirst().next();
+        Map<String, Double> next = pointsWithPredicted("0", "on", D2).getFirst().next();
 
         assertEquals(Map.of("Next day TC", 107.0, "Next day Pivot", 106.0, "Next day BC", 105.0), next,
                 "there is no session before D2, so no CPR of its own, and tomorrow's is there all the same");
@@ -175,13 +175,13 @@ class CprLevelsTest {
     @DisplayName("on the fly: each new minute moves them, as the day's high, low and last price do")
     void tomorrowsPivotsMoveWithTheDay() throws Exception {
         aSessionOf120And90Closing108(test, D2);
-        assertEquals(106.0, points("0", D2).getFirst().next().get("Next day Pivot"));
+        assertEquals(106.0, pointsWithPredicted("0", "on", D2).getFirst().next().get("Next day Pivot"));
 
         // A new high of 126 and a last price of 114, the low still 90: Pivot (126+90+114)/3 = 110, BC 108, TC 112.
         candle(test, D2, 3, 126, 96, 114);
 
         assertEquals(Map.of("Next day TC", 112.0, "Next day Pivot", 110.0, "Next day BC", 108.0),
-                points("0", D2).getFirst().next());
+                pointsWithPredicted("0", "on", D2).getFirst().next());
     }
 
     @Test
@@ -190,7 +190,7 @@ class CprLevelsTest {
         aSessionOf120And90Closing108(test, D2);
         aSessionOf120And90Closing108(test, D3);
 
-        List<Point> points = points("0", D2, D3);
+        List<Point> points = pointsWithPredicted("0", "on", D2, D3);
 
         assertEquals(java.util.Arrays.asList(null, null, null, null, 106.0, 106.0),
                 points.stream().map(p -> p.next().get("Next day Pivot")).toList(),
@@ -204,7 +204,7 @@ class CprLevelsTest {
         aSessionOf120And90Closing108(test, D1);
         candles(test, D2);
 
-        Map<String, Double> tomorrows = points("0", D1).getFirst().next();
+        Map<String, Double> tomorrows = pointsWithPredicted("0", "on", D1).getFirst().next();
         Point next = points("0", D2).getFirst();
 
         assertEquals(tomorrows.get("Next day TC"), next.levels().get("TC"));
@@ -227,21 +227,60 @@ class CprLevelsTest {
             candle(test, D2, 0, 120, 100, 110);
             candle(test, D2, 1, Math.max(115, close), 90, close);
 
-            for (double level : points("0", D2).getFirst().next().values()) {
+            for (double level : pointsWithPredicted("0", "on", D2).getFirst().next().values()) {
                 assertTrue(level >= 90.0 && level <= 120.0, "close " + close + ": " + level);
             }
         }
     }
 
     @Test
-    @DisplayName("Off draws none of the CPR lines, tomorrow's too; every other setting draws them")
-    void offDrawsNoneOfThem() throws Exception {
+    @DisplayName("tomorrow's pivots are off to begin with, whatever the CPR levels box says")
+    void predictedCprIsOffByDefault() throws Exception {
         aSessionOf120And90Closing108(test, D2);
 
-        for (String box : List.of("0", "1", "2", "3", "all", "junk")) {
-            assertTrue(points(box, D2).getFirst().next().values().stream().allMatch(java.util.Objects::nonNull), box);
+        for (String box : List.of("0", "1", "2", "3", "all", "off", "junk")) {
+            for (String predicted : List.of("off", "junk", "")) {
+                assertTrue(pointsWithPredicted(box, predicted, D2).getFirst().next().values().stream()
+                                .allMatch(java.util.Objects::isNull),
+                        "levels " + box + ", predicted '" + predicted + "': anything but On is Off");
+            }
         }
-        assertTrue(points("off", D2).getFirst().next().values().stream().allMatch(java.util.Objects::isNull));
+    }
+
+    @Test
+    @DisplayName("the Predicted CPR box alone draws them: with the levels on any setting, or none")
+    void predictedCprHasABoxOfItsOwn() throws Exception {
+        aSessionOf120And90Closing108(test, D2);
+
+        for (String box : List.of("0", "1", "2", "3", "all", "off")) {
+            assertTrue(pointsWithPredicted(box, "on", D2).getFirst().next().values().stream()
+                            .allMatch(java.util.Objects::nonNull),
+                    "levels " + box + ": tomorrow's pivots are drawn once Predicted CPR is On");
+        }
+        assertTrue(pointsWithPredicted("off", "on", D2).getFirst().levels().values().stream()
+                        .allMatch(java.util.Objects::isNull),
+                "and the levels' own Off still draws none of them");
+    }
+
+    @Test
+    @DisplayName("the Predicted CPR box offers Off and On, starts Off, and the levels box has a new name")
+    void thePredictedBox() throws IOException {
+        List<JsonNode> variables = new ArrayList<>();
+        JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD)).path("templating").path("list").forEach(variables::add);
+        JsonNode box = variables.stream().filter(v -> v.path("name").asText().equals("cpr_next")).findFirst().orElseThrow();
+
+        List<String> values = new ArrayList<>();
+        box.path("options").forEach(o -> values.add(o.path("value").asText()));
+
+        assertEquals(List.of("off", "on"), values);
+        assertEquals("off", box.path("current").path("value").asText());
+        assertTrue(box.path("options").get(0).path("selected").asBoolean());
+        assertEquals("custom", box.path("type").asText());
+        assertFalse(box.path("multi").asBoolean());
+        assertEquals(1, variables.stream().filter(v -> v.path("name").asText().equals("cpr_levels")).count());
+        assertEquals(0, variables.stream().filter(v -> v.path("name").asText().equals("cpr")).count(),
+                "an address still carrying var-cpr=all, from before the box started on the central pivots, "
+                        + "must not be read as this box's choice");
     }
 
     @Test
@@ -294,7 +333,7 @@ class CprLevelsTest {
     void theBox() throws IOException {
         JsonNode box = StreamSupport.stream(JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD))
                 .path("templating").path("list").spliterator(), false)
-                .filter(v -> v.path("name").asText().equals("cpr")).findFirst().orElseThrow();
+                .filter(v -> v.path("name").asText().equals("cpr_levels")).findFirst().orElseThrow();
 
         List<String> values = new ArrayList<>();
         box.path("options").forEach(o -> values.add(o.path("value").asText()));
@@ -324,13 +363,19 @@ class CprLevelsTest {
 
     /** The panel's own query, with Grafana's variables filled in, run over the seeded sessions, in time order. */
     private List<Point> points(String box, String... sessions) throws Exception {
+        return pointsWithPredicted(box, "off", sessions);
+    }
+
+    /** As {@link #points}, with the Predicted CPR box set too: {@code "on"} draws tomorrow's pivots. */
+    private List<Point> pointsWithPredicted(String box, String predicted, String... sessions) throws Exception {
         String list = String.join("','", sessions);
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + list + "'")
                 .replace("${candles:sqlstring}", "'200'")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
-                .replace("$cpr", box)
+                .replace("$cpr_levels", box)
+                .replace("$cpr_next", predicted)
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {
