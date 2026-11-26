@@ -86,8 +86,7 @@ class GrafanaDashboardQueryTest {
                         // Stock Trend's liquidity screen: the box left blank, so the journal stands in.
                         .replace("$max_position", "")
                         // Candles and Calls: every CPR level drawn.
-                        .replace("$cpr_levels", "all")
-                        .replace("$cpr_next", "on")
+                        .replace("${cpr_lines:csv}", "r1,r2,r3,pivots,predicted,hl")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");
                 assertFalse(executable.contains("$"),
                         "unsubstituted variable in " + file.getFileName() + ": " + sql);

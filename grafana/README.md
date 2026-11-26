@@ -220,7 +220,6 @@ there are none where the session before is missing for the symbol (or has no hig
 
 | Level | Formula |
 |---|---|
-| R4 | R3 + (R2 − R1) |
 | R3 | R1 + (High − Low) |
 | R2 | Pivot + (High − Low) |
 | R1 | 2 × Pivot − Low |
@@ -230,28 +229,40 @@ there are none where the session before is missing for the symbol (or has no hig
 | S1 | 2 × Pivot − High |
 | S2 | Pivot − (High − Low) |
 | S3 | S1 − (High − Low) |
-| S4 | S3 − (S1 − S2) |
 
 The three central pivots are dashed blue, the resistances (R) thin green and the supports (S) thin red. When the
 session before closed in the lower half of its range, TC falls below BC: the two simply swap places.
 
-Out in the open the chart shows only the *Previous close* and the three central pivots, and the **CPR levels** box at
-the top starts on *Central pivots only*. Set it to R1/S1, R2/S2, R3/S3 or R4/S4 to add the supports and resistances out
-to there (they are not named in the legend; hover a candle to read them), or to *Off* to draw none of them. A
-support or resistance is drawn only on a session whose price reached it, between that session's highest high and lowest
-low: Grafana scales the price axis to every line drawn, and the far levels (R2 and R3, S2 and S3 and beyond, on a quiet
-day) would otherwise push the candles into a sliver. So none of them stretches the chart; they appear as the price gets
-to them, and on an older session only the ones it touched are there. The *Previous close* and the central pivots
-are drawn whatever the range. The *Yesterday's trading hours* button keeps whatever the box is set to. Grafana keeps
-each box's last value in the address bar, so a tab or bookmark keeps its choice until the box is set again.
+Out in the open the chart shows only the *Previous close*, which is always drawn, and the three central pivots. The
+**CPR levels** box at the top is a multi-select with a switch for each set of lines, and starts with *Central Pivots*
+alone ticked:
 
-**Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), have a box of their own, **Predicted
-CPR**, which starts *Off* and which the *CPR levels* box does not govern. Switched *On*, they are worked out on the fly
-from the newest session drawn, by the same formulas: its highest high, its lowest low and the close of its latest
-minute. Today they move with the market, as the page reads again every minute; once the session is over they are final,
-and they are the lines the next session draws as its own. Only the newest session drawn has them (an earlier one's are
-already what the session after it shows), and they always fall within that session's own range, so they never stretch
-the chart. The *Yesterday's trading hours* button keeps this box too.
+| Tick | Draws |
+|---|---|
+| R1 and S1 | R1 and S1 |
+| R2 and S2 | R2 and S2 |
+| R3 and S3 | R3 and S3 |
+| Central Pivots | TC, Pivot and BC |
+| Predicted CPR | tomorrow's TC, Pivot and BC, in orange (below) |
+| Last Day's High and Low | the highest and lowest prices of the session before, in gold dashes |
+
+Each is its own switch: untick *Central Pivots* to take the pivots off, or tick *Predicted CPR* without any other.
+Grafana will not leave a multi-select empty, though: unticking the last choice puts the first, *R1 and S1*, back (and an
+address with no valid choice opens on it too), so one choice is always ticked. R1 and S1 and the rest are not named in the legend; hover a candle to
+read them. A support or resistance, and the last day's high and low, are drawn only on a session whose price reached them,
+between that session's highest high and lowest low: Grafana scales the price axis to every line drawn, and the far levels
+(R2 and R3, S2 and S3, or yesterday's extremes, on a quiet day) would otherwise push the candles into a sliver. So none of
+them stretches the chart; they appear as the price gets to them, and on an older session only the ones it touched are
+there. The *Previous close*, the central pivots and tomorrow's are drawn whatever the range. The
+*Yesterday's trading hours* button keeps whatever the box is set to. R4 and S4 are not drawn. Grafana keeps the
+box's last value in the address bar, so a tab or bookmark keeps its choice until the box is set again.
+
+**Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), are drawn when *Predicted CPR* is ticked.
+They are worked out on the fly from the newest session drawn, by the same formulas: its highest high, its lowest low and
+the close of its latest minute. Today they move with the market, as the page reads again every minute; once the session
+is over they are final, and they are the lines the next session draws as its own. Only the newest session drawn has them
+(an earlier one's are already what the session after it shows), and they always fall within that session's own range, so
+they never stretch the chart.
 
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and

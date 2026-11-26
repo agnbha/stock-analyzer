@@ -44,7 +44,7 @@ class MinuteChartTooltipOrderTest {
     }
 
     @Test
-    @DisplayName("the tooltip reads open, close, high, low, volume, VWAP, the averages, previous close, the CPR levels, tomorrow's central pivots, then your marks")
+    @DisplayName("the tooltip reads open, close, high, low, volume, VWAP, the averages, previous close, last day's high and low, the CPR levels, tomorrow's central pivots, then your marks")
     void tooltipOrder() throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD));
         JsonNode panel = StreamSupport.stream(root.path("panels").spliterator(), false)
@@ -54,8 +54,7 @@ class MinuteChartTooltipOrderTest {
                 .replace("${candles:sqlstring}", "'200'")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "WIPRO")
-                .replace("$cpr_levels", "all")
-                .replace("$cpr_next", "on")
+                .replace("${cpr_lines:csv}", "r1,r2,r3,pivots,predicted,hl")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
 
         List<String> columns = database.read(connection -> {
@@ -70,7 +69,7 @@ class MinuteChartTooltipOrderTest {
         });
 
         assertEquals(List.of("time", "open", "close", "high", "low", "volume", "VWAP", "SMA 10m", "SMA 60m",
-                "Previous close", "R4", "R3", "R2", "R1", "TC", "Pivot", "BC", "S1", "S2", "S3", "S4",
+                "Previous close", "Last day high", "Last day low", "R3", "R2", "R1", "TC", "Pivot", "BC", "S1", "S2", "S3",
                 "Next day TC", "Next day Pivot", "Next day BC", "Window entry", "Window exit", "Your buy", "Your sell"), columns);
     }
 }
