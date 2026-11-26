@@ -245,7 +245,8 @@ Calls**, **CAN SLIM**, **Company Details**), and CAN SLIM under its chart of the
 takes the symbol along, and the detector between Candles and Calls and Stock Trend, which both have that box. It does
 not take the time range: each page opens on its own, because today's minutes would be a single candle on a page of
 daily ones. CAN SLIM lists only the stocks in its last scan, and Company Details only the companies whose page has been
-read. Every tracked and every traded stock is in both, but a stock outside them opens as itself with empty panels.
+read. Every tracked and every traded stock is in both, but a stock outside them opens as itself with empty panels. On
+Stock Trend the **CAN SLIM** tile at the top says whether the stock is in that scan before you click.
 
 **Why F&O stocks have no candles after 15:15.** Since 3 August 2026 NSE runs a closing auction for stocks in the F&O
 segment: continuous trading stops at 15:15 and there is one more print, at the close (15:28 or 15:29), carrying the
@@ -343,7 +344,12 @@ Groww's daily chart. The CAN SLIM scan fetches the bars each market evening, so 
 is the previous session's. Each reading starts once its window is full: the 50-day average after 50 sessions, the
 52-week range after 252 (the year CAN SLIM measures the distance from the high over). Beta is measured against the
 market CAN SLIM reads (NIFTYBEES, a NIFTY 50 fund) over the last year of sessions, so it compares with a published NIFTY
-beta. The trend, RSI and pivots are the same arithmetic as the Watchlist's. Market breadth is still the tracked stocks',
+beta. The **CAN SLIM** tile, beside Beta, is the one thing there that comes from the scan and not the daily bars: the stock's
+CAN SLIM letters (a dash for each it fails) and RS rating (green from 80, as on CAN SLIM) from the last scan, or *Not scanned*
+for a stock that scan did not read, which is most of the market, because the scan keeps to the stocks that rank high enough
+for a company page to be read, plus the tracked and traded ones. It is the same list as CAN SLIM's own symbol picker, so
+*Not scanned* is also what you would find there: a stock missing from the picker has nothing to show. Click either value, or
+the link beside the title, to open the stock on CAN SLIM. The trend, RSI and pivots are the same arithmetic as the Watchlist's. Market breadth is still the tracked stocks',
 the universe the Watchlist ranks. The time picker offers three months and longer only (3 and 6 months, 1 and 2 years),
 because a few weeks of daily candles say little about a trend.
 

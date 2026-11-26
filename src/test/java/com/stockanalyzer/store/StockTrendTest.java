@@ -102,6 +102,9 @@ class StockTrendTest {
     /** The liquidity screen and its chart, at the bottom of the page. */
     private static final Set<Integer> LIQUIDITY_PANELS = Set.of(16, 17);
 
+    /** The CAN SLIM tile: it reads the last scan, not the daily bars. */
+    private static final int CAN_SLIM_TILE = 18;
+
     @Test
     @DisplayName("every tile and chart about the stock reads the daily bars, and fills for a stock with no minute history")
     void everyPanelAboutTheStockReadsTheDailyBars() throws IOException {
@@ -116,6 +119,10 @@ class StockTrendTest {
                     continue;
                 }
                 int id = panel.path("id").asInt();
+                if (id == CAN_SLIM_TILE) {
+                    // The last scan's letters and RS rating, and "Not scanned": StockTrendCanSlimTileTest runs it.
+                    continue;
+                }
                 if (LIQUIDITY_PANELS.contains(id)) {
                     // A table of words, and lines drawn from the journal's buys: StockTrendLiquidityTest runs them.
                     continue;
