@@ -44,7 +44,7 @@ class MinuteChartTooltipOrderTest {
     }
 
     @Test
-    @DisplayName("the tooltip reads open, close, high, low, volume, VWAP, the averages, previous close, the CPR levels, then your marks")
+    @DisplayName("the tooltip reads open, close, high, low, volume, VWAP, the averages, previous close, the CPR levels, tomorrow's central pivots, then your marks")
     void tooltipOrder() throws IOException {
         JsonNode root = JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD));
         JsonNode panel = StreamSupport.stream(root.path("panels").spliterator(), false)
@@ -70,6 +70,6 @@ class MinuteChartTooltipOrderTest {
 
         assertEquals(List.of("time", "open", "close", "high", "low", "volume", "VWAP", "SMA 10m", "SMA 60m",
                 "Previous close", "R4", "R3", "R2", "R1", "TC", "Pivot", "BC", "S1", "S2", "S3", "S4",
-                "Window entry", "Window exit", "Your buy", "Your sell"), columns);
+                "Next day TC", "Next day Pivot", "Next day BC", "Window entry", "Window exit", "Your buy", "Your sell"), columns);
     }
 }

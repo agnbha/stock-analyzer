@@ -232,11 +232,21 @@ there are none where the session before is missing for the symbol (or has no hig
 | S3 | S1 − (High − Low) |
 | S4 | S3 − (S1 − S2) |
 
-The resistances (R) are thin green lines, the supports (S) thin red, and the three central pivots dashed blue. When the
-session before closed in the lower half of its range, TC falls below BC: the two simply swap places. R3, R4, S3 and
-S4 lie well away from the day's price and stretch the chart's price axis, so the **CPR levels** box at the top draws
-fewer: out to R3/S3, R2/S2 or R1/S1, the central pivots alone, or none. It starts on every level, and the
-*Yesterday's trading hours* button keeps whatever it is set to.
+The three central pivots are dashed blue, the resistances (R) thin green and the supports (S) thin red. When the
+session before closed in the lower half of its range, TC falls below BC: the two simply swap places.
+
+Out in the open the chart shows only the *Previous close* and the three central pivots. R1 to R4 and S1 to S4 lie well
+away from the day's price and stretch the chart's price axis (Grafana scales it to every line drawn), so the **CPR
+levels** box at the top starts on *Central pivots only*: set it to R1/S1, R2/S2, R3/S3 or R4/S4 to add them (they are
+not named in the legend; hover a candle to read them), or to *Off* to draw none of the CPR lines. The *Yesterday's
+trading hours* button keeps whatever it is set to.
+
+**Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), are worked out on the fly from the newest
+session drawn, by the same formulas: its highest high, its lowest low and the close of its latest minute. Today they
+move with the market, as the page reads again every minute; once the session is over they are final, and they are the
+lines the next session draws as its own. Only the newest session drawn has them (an earlier one's are already what the
+session after it shows), and they always fall within that session's own range, so they never stretch the chart. *Off*
+hides them too.
 
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and
