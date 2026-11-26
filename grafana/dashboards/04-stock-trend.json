@@ -204,7 +204,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -284,9 +284,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 6,
+        "x": 4,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -355,9 +355,9 @@
         "uid": "stock-analyzer-sqlite"
       },
       "gridPos": {
-        "x": 12,
+        "x": 8,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -414,6 +414,143 @@
         "overrides": []
       },
       "description": "How much this stock moves with the market.\n\n- **Beta** — 1.0 moves with the market, above 1.0 amplifies it, below 1.0 damps it.\n\nMeasured against the market CAN SLIM reads (NIFTYBEES, a NIFTY 50 fund), over the last year of daily changes, 252 sessions at most, on days both traded. So it is comparable with a published NIFTY beta. Blank until there are 60 such days."
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "CAN SLIM - $symbol",
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "stock-analyzer-sqlite"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "stock-analyzer-sqlite"
+          },
+          "refId": "A",
+          "queryType": "table",
+          "rawQueryText": "SELECT letters AS \"Letters\", rs_rating AS \"RS rating\"\nFROM v_canslim_latest\nWHERE symbol = '$symbol'\nUNION ALL\nSELECT 'Not scanned', NULL\nWHERE NOT EXISTS (SELECT 1 FROM v_canslim_latest WHERE symbol = '$symbol')",
+          "queryText": "SELECT letters AS \"Letters\", rs_rating AS \"RS rating\"\nFROM v_canslim_latest\nWHERE symbol = '$symbol'\nUNION ALL\nSELECT 'Not scanned', NULL\nWHERE NOT EXISTS (SELECT 1 FROM v_canslim_latest WHERE symbol = '$symbol')",
+          "timeColumns": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "-",
+          "links": [
+            {
+              "title": "$symbol on CAN SLIM",
+              "url": "/d/stockanalyzer-canslim/can-slim?${symbol:queryparam}",
+              "targetBlank": false
+            }
+          ],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Letters"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Not scanned": {
+                        "text": "Not scanned",
+                        "color": "gray",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RS rating"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 80
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": "Whether the stock is in the last CAN SLIM scan, and what that reading is. **Letters**: the CAN SLIM letters (C, A, N, S, L, I, M) the stock passes, with a dash for each one it fails. **RS rating**: its relative strength, 1 to 99, as a percentile of the stocks the scan ranked; green from 80, the bar CAN SLIM uses. **Not scanned**: the scan has not read this stock (it keeps to the ones that rank high enough, plus the tracked and traded ones), so CAN SLIM has nothing for it. Click a value to open the stock on CAN SLIM.",
+      "links": [
+        {
+          "title": "$symbol on CAN SLIM",
+          "url": "/d/stockanalyzer-canslim/can-slim?${symbol:queryparam}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "id": 4,
