@@ -308,7 +308,8 @@ class MinuteChartCandleCapTest {
                 .replace("${candles:sqlstring}", box)
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
-                .replace("$cpr", "all")
+                .replace("$cpr_levels", "all")
+                .replace("$cpr_next", "on")
                 .replace("$detector", DETECTOR);
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {
