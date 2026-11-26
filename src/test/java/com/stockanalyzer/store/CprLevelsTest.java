@@ -39,6 +39,7 @@ class CprLevelsTest {
     private static final String D2 = "2026-08-27";
     private static final String D3 = "2026-08-28";
     private static final List<String> LEVELS = List.of("R4", "R3", "R2", "R1", "TC", "Pivot", "BC", "S1", "S2", "S3", "S4");
+    private static final List<String> NEXT = List.of("Next day TC", "Next day Pivot", "Next day BC");
 
     @TempDir
     Path directory;
@@ -143,18 +144,104 @@ class CprLevelsTest {
     }
 
     @Test
-    @DisplayName("the CPR levels box draws the levels out to R3/S3, R2/S2, R1/S1, the central pivots alone, or none")
+    @DisplayName("the CPR levels box draws the central pivots alone, or out to R1/S1, R2/S2, R3/S3 or R4/S4, or none")
     void theBoxNarrowsThem() throws Exception {
         session(test, D1, 120.0, 90.0, 108.0);
         candles(test, D2);
 
         assertEquals(LEVELS, drawn("all"));
-        assertEquals(LEVELS, drawn("junk"), "anything the box does not offer, as in a hand-edited address, is every level");
+        assertEquals(List.of("TC", "Pivot", "BC"), drawn("junk"),
+                "anything the box does not offer, as in a hand-edited address, is the box's own default");
         assertEquals(List.of("R3", "R2", "R1", "TC", "Pivot", "BC", "S1", "S2", "S3"), drawn("3"));
         assertEquals(List.of("R2", "R1", "TC", "Pivot", "BC", "S1", "S2"), drawn("2"));
         assertEquals(List.of("R1", "TC", "Pivot", "BC", "S1"), drawn("1"));
         assertEquals(List.of("TC", "Pivot", "BC"), drawn("0"));
         assertEquals(List.of(), drawn("off"));
+    }
+
+    @Test
+    @DisplayName("tomorrow's central pivots come from the newest session's own prices: its highest high, lowest low, latest close")
+    void tomorrowsPivotsFromTodaysPrices() throws Exception {
+        // High 120, Low 90, Close 108 (the last minute's): Pivot 106, BC 105, TC = (106-105)+106 = 107.
+        aSessionOf120And90Closing108(test, D2);
+
+        Map<String, Double> next = points("0", D2).getFirst().next();
+
+        assertEquals(Map.of("Next day TC", 107.0, "Next day Pivot", 106.0, "Next day BC", 105.0), next,
+                "there is no session before D2, so no CPR of its own, and tomorrow's is there all the same");
+    }
+
+    @Test
+    @DisplayName("on the fly: each new minute moves them, as the day's high, low and last price do")
+    void tomorrowsPivotsMoveWithTheDay() throws Exception {
+        aSessionOf120And90Closing108(test, D2);
+        assertEquals(106.0, points("0", D2).getFirst().next().get("Next day Pivot"));
+
+        // A new high of 126 and a last price of 114, the low still 90: Pivot (126+90+114)/3 = 110, BC 108, TC 112.
+        candle(test, D2, 3, 126, 96, 114);
+
+        assertEquals(Map.of("Next day TC", 112.0, "Next day Pivot", 110.0, "Next day BC", 108.0),
+                points("0", D2).getFirst().next());
+    }
+
+    @Test
+    @DisplayName("only the newest selected session has them, flat across it and blank on its first candle like every line")
+    void onlyTheNewestSessionHasThem() throws Exception {
+        aSessionOf120And90Closing108(test, D2);
+        aSessionOf120And90Closing108(test, D3);
+
+        List<Point> points = points("0", D2, D3);
+
+        assertEquals(java.util.Arrays.asList(null, null, null, null, 106.0, 106.0),
+                points.stream().map(p -> p.next().get("Next day Pivot")).toList(),
+                "D2's are the lines D3 already draws; D3's first candle is blank, as every line's is");
+    }
+
+    @Test
+    @DisplayName("they are the lines the next session draws as its own: tomorrow's from today's prices are tomorrow's CPR")
+    void theNextSessionDrawsThem() throws Exception {
+        session(test, D1, 120.0, 90.0, 108.0);
+        aSessionOf120And90Closing108(test, D1);
+        candles(test, D2);
+
+        Map<String, Double> tomorrows = points("0", D1).getFirst().next();
+        Point next = points("0", D2).getFirst();
+
+        assertEquals(tomorrows.get("Next day TC"), next.levels().get("TC"));
+        assertEquals(tomorrows.get("Next day Pivot"), next.levels().get("Pivot"));
+        assertEquals(tomorrows.get("Next day BC"), next.levels().get("BC"));
+    }
+
+    @Test
+    @DisplayName("they stay within the session's own range, so they never stretch the chart")
+    void withinTheSessionsRange() throws Exception {
+        // Closes at the very high, and at the very low: the extremes of where TC and BC can fall.
+        for (double close : new double[]{120.0, 90.0, 105.0}) {
+            database.inTransaction(connection -> {
+                try (Statement statement = connection.createStatement()) {
+                    statement.executeUpdate("DELETE FROM live_candle");
+                } catch (java.sql.SQLException e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+            candle(test, D2, 0, 120, 100, 110);
+            candle(test, D2, 1, Math.max(115, close), 90, close);
+
+            for (double level : points("0", D2).getFirst().next().values()) {
+                assertTrue(level >= 90.0 && level <= 120.0, "close " + close + ": " + level);
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Off draws none of the CPR lines, tomorrow's too; every other setting draws them")
+    void offDrawsNoneOfThem() throws Exception {
+        aSessionOf120And90Closing108(test, D2);
+
+        for (String box : List.of("0", "1", "2", "3", "all", "junk")) {
+            assertTrue(points(box, D2).getFirst().next().values().stream().allMatch(java.util.Objects::nonNull), box);
+        }
+        assertTrue(points("off", D2).getFirst().next().values().stream().allMatch(java.util.Objects::isNull));
     }
 
     @Test
@@ -186,12 +273,24 @@ class CprLevelsTest {
                     name + ": only the central pivots are dashed");
             assertFalse(properties.containsKey("custom.lineInterpolation"),
                     name + ": stepping would draw a riser wherever a session's level changes");
+            assertEquals(!List.of("TC", "Pivot", "BC").contains(name),
+                    properties.containsKey("custom.hideFrom") && properties.get("custom.hideFrom").path("legend").asBoolean(),
+                    name + ": the legend names the central pivots; the supports and resistances are there to add, not on show");
         });
+        for (String name : NEXT) {
+            Map<String, JsonNode> properties = byName.get(name);
+            assertTrue(properties != null, name + " has a style");
+            assertEquals("line", properties.get("custom.drawStyle").asText(), name);
+            assertEquals(1, properties.get("custom.lineWidth").asInt(), name);
+            assertEquals("orange", properties.get("color").path("fixedColor").asText(), name + ": apart from today's");
+            assertTrue(properties.containsKey("custom.lineStyle"), name + ": dashed, as the central pivots are");
+            assertFalse(properties.containsKey("custom.hideFrom"), name + ": named in the legend");
+        }
         assertTrue(panel().path("description").asText().contains("CPR levels"));
     }
 
     @Test
-    @DisplayName("the CPR levels box offers every level, to none, and starts on every level")
+    @DisplayName("the CPR levels box offers the central pivots out to every level, and none, and starts on the central pivots")
     void theBox() throws IOException {
         JsonNode box = StreamSupport.stream(JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD))
                 .path("templating").path("list").spliterator(), false)
@@ -200,8 +299,10 @@ class CprLevelsTest {
         List<String> values = new ArrayList<>();
         box.path("options").forEach(o -> values.add(o.path("value").asText()));
 
-        assertEquals(List.of("all", "3", "2", "1", "0", "off"), values);
-        assertEquals("all", box.path("current").path("value").asText(), "the slide has every level");
+        assertEquals(List.of("0", "1", "2", "3", "all", "off"), values);
+        assertEquals("0", box.path("current").path("value").asText(),
+                "the previous close and the three central pivots are what is wanted out in the open");
+        assertTrue(box.path("options").get(0).path("selected").asBoolean());
         assertEquals("custom", box.path("type").asText());
         assertFalse(box.path("multi").asBoolean());
     }
@@ -212,7 +313,7 @@ class CprLevelsTest {
                 .filter(p -> p.path("id").asInt() == 20).findFirst().orElseThrow();
     }
 
-    private record Point(long time, Map<String, Double> levels) {
+    private record Point(long time, Map<String, Double> levels, Map<String, Double> next) {
     }
 
     /** The levels the box lets through on the first candle, top to bottom, ignoring the blank ones. */
@@ -241,7 +342,12 @@ class CprLevelsTest {
                         double value = rs.getDouble(name);
                         levels.put(name, rs.wasNull() ? null : value);
                     }
-                    points.add(new Point(rs.getLong("time"), levels));
+                    Map<String, Double> next = new LinkedHashMap<>();
+                    for (String name : NEXT) {
+                        double value = rs.getDouble(name);
+                        next.put(name, rs.wasNull() ? null : value);
+                    }
+                    points.add(new Point(rs.getLong("time"), levels, next));
                 }
             }
             return points;
@@ -262,6 +368,33 @@ class CprLevelsTest {
                 insert.executeUpdate();
             }
         });
+    }
+
+    /** One candle of the session at its minute: open at the close, the high, low and close given. */
+    private void candle(long instrument, String date, int minute, double high, double low, double close) {
+        long at = java.time.LocalDate.parse(date).toEpochDay() * 86_400L + 4 * 3_600L + minute * 60L;
+        database.inTransaction(connection -> {
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO live_candle (instrument_id, interval_minutes, ts_epoch, session_date, open, high,
+                                             low, close, volume, provisional, updated_at)
+                    VALUES (?,1,?,?,?,?,?,?,1000,0,0)""")) {
+                insert.setLong(1, instrument);
+                insert.setLong(2, at);
+                insert.setString(3, date);
+                insert.setDouble(4, close);
+                insert.setDouble(5, high);
+                insert.setDouble(6, low);
+                insert.setDouble(7, close);
+                insert.executeUpdate();
+            }
+        });
+    }
+
+    /** A session whose prices run to a high of 120 and a low of 90, closing at 108: the numbers of the slide's example. */
+    private void aSessionOf120And90Closing108(long instrument, String date) {
+        candle(instrument, date, 0, 120, 100, 110);
+        candle(instrument, date, 1, 115, 95, 100);
+        candle(instrument, date, 2, 112, 90, 108);
     }
 
     /** Three one-minute candles in the session, stamped within its own UTC day so the test can tell sessions apart. */
