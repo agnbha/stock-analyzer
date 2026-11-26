@@ -122,6 +122,43 @@ class CanSlimServiceTest {
     }
 
     @Test
+    @DisplayName("a scan marks the bases of the stocks it scores, and they can be marked again from the bars held")
+    void marksBases() {
+        Map<String, List<DailyBar>> prices = Map.of(
+                "IDX", TestBars.from(100).trend(130, 112).build(),
+                "GROW", TestBars.from(100).trend(150, 70).range(138, 146, 38).add(152, 2000).build(),
+                "LAG", TestBars.from(100).trend(95, 112).build());
+        ScreenedStock grow = new ScreenedStock("GROW", "Grower", Map.of(
+                ScreenerRatios.QTR_PROFIT_GROWTH, 40.0, ScreenerRatios.PROFIT_GROWTH_3Y, 30.0));
+        CanSlimService service = service(query -> new ScreenerClient.Result(List.of(grow), false), prices, List.of(), List.of("LAG"));
+
+        service.scan("Return on equity > 17");
+
+        assertEquals(1, count("SELECT COUNT(*) FROM v_canslim_base WHERE symbol = 'GROW'"));
+        assertEquals("BREAKOUT", text("SELECT kind FROM v_canslim_base WHERE symbol = 'GROW'"));
+        assertEquals(150.0, Double.parseDouble(text("SELECT pivot FROM v_canslim_base WHERE symbol = 'GROW'")));
+        assertEquals(138.0, Double.parseDouble(text("SELECT low FROM v_canslim_base WHERE symbol = 'GROW'")));
+        assertEquals(prices.get("GROW").getLast().date().toString(), text("SELECT end_date FROM v_canslim_base WHERE symbol = 'GROW'"));
+        int marked = count("SELECT COUNT(*) FROM v_canslim_base");
+        assertEquals(0, count("SELECT COUNT(*) FROM v_canslim_base WHERE symbol = 'IDX'"),
+                "the market proxy is priced, not scored: it has no boxes");
+
+        database.inTransaction(connection -> {
+            try (Statement statement = connection.createStatement()) {
+                statement.executeUpdate("DELETE FROM canslim_base");
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        pricedOn.clear();
+
+        assertEquals(marked, service.refreshBases(), "from the bars held, for every stock the latest scan scored");
+        assertEquals(marked, count("SELECT COUNT(*) FROM v_canslim_base"));
+        assertEquals(1, count("SELECT COUNT(*) FROM v_canslim_base WHERE symbol = 'GROW'"));
+        assertEquals(List.of(), pricedOn, "the broker is not asked");
+    }
+
+    @Test
     @DisplayName("without a query only holdings and the universe are scored")
     void noScreener() {
         CanSlimService service = service(query -> {

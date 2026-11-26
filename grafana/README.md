@@ -413,6 +413,14 @@ lowest low, the last close and the week's volume. The averages stay the 50- and
 200-day ones, as they stood at the week's last session, and a buy or sell signal
 marks the week it fell in.
 
+The chart boxes the **bases**: a translucent yellow rectangle from the bar of a base's high (its pivot) to the day the base
+ended, between the pivot and the lowest low inside it, so its height is the depth the scan reports. A box is drawn for the
+base the stock is in now (to the latest bar) and for each base a breakout cleared (to the breakout day), so a stock that
+has not broken out shows one box and one that has shows the bases behind its breakouts. Hovering a bar inside a box reads
+its pivot and low. Two boxes that meet or overlap are drawn as two pairs of lines. The scan stores them with each run (for
+the stocks it scores), from the daily bars held; `CanSlimMain bases` marks them again for the stocks the latest scan scored,
+from the bars alone, with no broker or screener session. The rules are the scan's own (docs/CANSLIM.md, *Bases and pivots*).
+
 **Volume colors**: the volume bars under Stock Trend's and CAN SLIM's candles are colored by how each day's volume
 compares with the stock's own; the candles keep their colors.
 
