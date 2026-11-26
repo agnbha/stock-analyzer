@@ -471,7 +471,8 @@ day with its 20-day sum; FPI debt a month; and, from the index futures each grou
 held long (above 50, net long) for FIIs, DIIs, proprietary traders and clients. `CanSlimMain markets` reads them in the
 same step as the yields and prices: NSDL's daily FPI figures from its archive a month at a time (two years back the
 first time; a reporting day covers the trading day before it); NSE's provisional FII and DII figures, which NSE keeps
-up only until the next day's, so that chart starts on the first run and a weekday the run misses stays empty; and
+up only until the next day's, so that chart starts on the first run and a weekday the run misses stays empty (NSE posts
+them in the evening, so `flows.sh` reads them again at 19:30 and 22:00, and a day's figures are on the page that evening); and
 NSE's participant-wise open interest file for each trading day (a year back the first time,
 `markets.participant.oi.history.days`). NSDL's site refuses the default names HTTP libraries send, so these requests,
 like the other market reads, carry the app's own name.

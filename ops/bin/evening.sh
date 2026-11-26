@@ -83,7 +83,8 @@ run_step "day P&L" com.stockanalyzer.TradeJournalMain pnl --period day --date "$
 # figures, NSE's FII and DII cash-market figures and its participant-wise open interest, for the Institutional
 # Investment page. Both are linked from CAN SLIM's header. A dozen or so small requests a night; the first run reads
 # two years of NSDL months and a year of NSE's daily files, a few minutes. NSE keeps the FII/DII figures up only
-# until the next day's, so a missed day is not read later.
+# until the next day's, so a missed day is not read later. They come out in the evening, after this batch has run:
+# flows.sh (19:30 and 22:00) reads them the same evening, and this step then finds the day already held.
 run_step "read bonds, commodities and institutional flows" com.stockanalyzer.CanSlimMain markets
 run_step "refresh company profiles" com.stockanalyzer.CanSlimMain profiles
 run_step "CAN SLIM scan" com.stockanalyzer.CanSlimMain scan --market

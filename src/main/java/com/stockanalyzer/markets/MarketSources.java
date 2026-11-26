@@ -48,6 +48,15 @@ public final class MarketSources implements BiFunction<String, LocalDate, List<O
     public static final List<String> INSTITUTIONAL = institutional();
     public static final List<String> ALL = concat(BONDS_AND_COMMODITIES, INSTITUTIONAL);
 
+    /**
+     * The series one run reads: everything, or only the institutional flows, which need no broker login. The flows come
+     * out in the evening, after the close; a run that wants only those (see {@code ops/bin/flows.sh}) does not touch the
+     * yields and prices, nor Groww for the MCX ones.
+     */
+    public static List<String> selection(boolean institutionalOnly) {
+        return institutionalOnly ? INSTITUTIONAL : ALL;
+    }
+
     private final TreasuryYieldClient treasury;
     private final OilPricesClient oil;
     private final McxFuturesClient mcx;
