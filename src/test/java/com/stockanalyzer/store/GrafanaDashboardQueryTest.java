@@ -69,7 +69,7 @@ class GrafanaDashboardQueryTest {
                         // Multi-value variables are interpolated by Grafana with a
                         // format suffix; the SQL form yields a quoted list.
                         .replace("${session:sqlstring}", "'2026-08-27','2026-08-28'")
-                        .replace("${candles:sqlstring}", "'200'")
+                        .replace("$candle_size", "1")
                         .replace("$__from/1000", String.valueOf(FROM_EPOCH_SECONDS))
                         .replace("$__to/1000", String.valueOf(TO_EPOCH_SECONDS))
                         // Two accounts ticked: the multi-value form a dashboard sends.
@@ -86,8 +86,7 @@ class GrafanaDashboardQueryTest {
                         // Stock Trend's liquidity screen: the box left blank, so the journal stands in.
                         .replace("$max_position", "")
                         // Candles and Calls: every CPR level drawn.
-                        .replace("$cpr_levels", "all")
-                        .replace("$cpr_next", "on")
+                        .replace("${levels:csv}", "r1,r2,r3,pivots,predicted,hl,prevclose,ema10,ema35,ema60,vwap")
                         .replace("$detector", "topk-nonoverlap/highlow/v1");
                 assertFalse(executable.contains("$"),
                         "unsubstituted variable in " + file.getFileName() + ": " + sql);
