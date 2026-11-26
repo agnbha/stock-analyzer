@@ -145,6 +145,7 @@ class PreviousCloseBaselineTest {
                 .replace("${candles:sqlstring}", "'200'")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
+                .replace("$cpr", "all")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {

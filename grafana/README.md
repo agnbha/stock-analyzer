@@ -214,6 +214,30 @@ a pause of three minutes or more with no trades, and the total never exceeds the
 zero or negative entry means 200. The weekly chart is not capped: it draws one candle a week over the last six months,
 whatever time range is picked at the top.
 
+**CPR levels.** The minute chart also draws the CPR (central pivot range) levels, worked out from the High, Low and
+Close of the session before each one drawn. As with the *Previous close* line, every session has its own flat lines, and
+there are none where the session before is missing for the symbol (or has no high or low). The levels, top to bottom:
+
+| Level | Formula |
+|---|---|
+| R4 | R3 + (R2 − R1) |
+| R3 | R1 + (High − Low) |
+| R2 | Pivot + (High − Low) |
+| R1 | 2 × Pivot − Low |
+| TC (top central pivot) | (Pivot − BC) + Pivot |
+| Pivot | (High + Low + Close) / 3 |
+| BC (bottom central pivot) | (High + Low) / 2 |
+| S1 | 2 × Pivot − High |
+| S2 | Pivot − (High − Low) |
+| S3 | S1 − (High − Low) |
+| S4 | S3 − (S1 − S2) |
+
+The resistances (R) are thin green lines, the supports (S) thin red, and the three central pivots dashed blue. When the
+session before closed in the lower half of its range, TC falls below BC: the two simply swap places. R3, R4, S3 and
+S4 lie well away from the day's price and stretch the chart's price axis, so the **CPR levels** box at the top draws
+fewer: out to R3/S3, R2/S2 or R1/S1, the central pivots alone, or none. It starts on every level, and the
+*Yesterday's trading hours* button keeps whatever it is set to.
+
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and
 Calls**, **CAN SLIM**, **Company Details**), and CAN SLIM under its chart of the symbol (**Candles and Calls**,
