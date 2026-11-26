@@ -109,7 +109,7 @@
       "id": 90,
       "type": "stat",
       "title": "",
-      "description": "When the flows were last read: each afternoon after the close, by `CanSlimMain markets` in evening.sh. Each source is a day behind: NSE publishes a day's FII and DII figures that evening and its open interest file the same evening, and NSDL's figures for a day's trades are reported the next day. The buttons beside open the latest on each site.",
+      "description": "When the flows were last read: by `CanSlimMain markets` in evening.sh each afternoon after the close, and by `flows.sh` at 19:30 and 22:00 for the flows NSE publishes that evening. NSE posts a day's FII and DII figures and its open interest file in the evening, so they are on this page that evening (not the next afternoon); NSDL's figures for a day's trades are reported the next day, so they are a day behind. The buttons beside open the latest on each site.",
       "datasource": {
         "type": "frser-sqlite-datasource",
         "uid": "stock-analyzer-sqlite"

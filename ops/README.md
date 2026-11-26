@@ -12,6 +12,7 @@ shift the hours in the plists to match a 09:15–15:30 session.
 | 09:15–15:30 | — | the daemon scans every 3 minutes, and every 10 seconds for a symbol you have traded today | Nothing manual. Poll → re-run the top-3 detector on the partial day → detect events → score → check purchases against their sell targets → redraw. Every symbol is scanned every 3 minutes (`monitor.poll.interval.seconds`); a symbol with a fill today, a buy or a sell, is scanned every 10 seconds (`monitor.active.poll.interval.seconds`) so a position is watched closely and its sell targets are announced within seconds. Every minute (`trades.live.import.interval.minutes`, 0 = off) it pulls the day's fills from the broker, so your buys and sells show on Candles and Calls while you trade, and a symbol moves to the faster scan within a minute of its first fill. The daemon logs how many traded symbols the day's request budget (`ingest.rate.limit.per.day`) has room for at that speed. |
 | ~15:32 | — | the daemon reconciles, clears its staging, and exits | Re-fetches the authoritative tape, writes the canonical rows through the same path the nightly job uses, and drops the staged rows it superseded. After this the day is consolidated. |
 | **15:35** Mon–Fri | `evening.sh` | ingest → log watchlist shortlist → evaluate → import fills → sync chart notes → capture → broker balance → day P&L → company profiles → CAN SLIM scan → Market Watch | Right after the close. The daemon has reconciled the session and exited by about 15:33 (the script waits for it if not), and the day's fills are all in the broker's order list, which serves only the current day. |
+| **19:30, 22:00** Mon–Fri | `flows.sh` | `CanSlimMain markets --institutional` | NSE publishes the day's FII/DII figures and its open interest file in the evening, after the 15:35 batch has read what was out. Without this the Institutional Investment page is a trading day behind, and a missed batch would lose a day (NSE keeps only the latest day's FII/DII). Reads only the institutional series: no broker login, a dozen small requests. |
 | **Sat 10:00** | `weekly.sh` | hot-windows, 14-day gap backfill, 52-week ranges, week P&L | The prior has to be current before Monday's open, because the daemon's baseline entry signal reads it. |
 | **1st, 10:00** | `monthly.sh` | month P&L, capture, reasons, statement export | The books for the month just closed. |
 
@@ -78,7 +79,7 @@ chmod 600 ~/.stock-analyzer.env
 # and a test fails the build if a real value is put back there.
 
 cp ops/launchd/*.plist ~/Library/LaunchAgents/
-for job in marketday evening weekly monthly; do
+for job in marketday evening flows weekly monthly; do
   launchctl unload ~/Library/LaunchAgents/com.stockanalyzer.$job.plist 2>/dev/null
   launchctl load  ~/Library/LaunchAgents/com.stockanalyzer.$job.plist
 done

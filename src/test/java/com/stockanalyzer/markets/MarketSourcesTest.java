@@ -46,4 +46,13 @@ class MarketSourcesTest {
         assertThrows(MarketDataException.class, () -> sources.apply("FPI_SOMETHING", LocalDate.of(2026, 11, 1)));
         assertThrows(MarketDataException.class, () -> sources.apply("NIFTY", LocalDate.of(2026, 11, 1)));
     }
+
+    @Test
+    @DisplayName("a run can read only the institutional flows, which are the ones that need no broker login")
+    void institutionalOnlySelection() {
+        assertEquals(MarketSources.ALL, MarketSources.selection(false));
+        assertEquals(MarketSources.INSTITUTIONAL, MarketSources.selection(true));
+        assertTrue(MarketSources.selection(true).stream().noneMatch(MarketSources.BONDS_AND_COMMODITIES::contains),
+                "no yields, no oil, no MCX: nothing that asks Groww");
+    }
 }

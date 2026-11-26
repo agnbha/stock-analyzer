@@ -32,6 +32,8 @@ import java.util.Locale;
  *   summary --symbol S         read screener.in's AI summary of S's latest earnings call into Company Details, with
  *                              the signed-in session (SCREENER_SESSION_ID); --call 2026-10 for another listed call,
  *                              --again to read one already held. A free account may open 10 in 30 days.
+ *   markets --institutional    only the institutional flows below, with no broker login: what ops/bin/flows.sh runs in
+ *                              the evening, once NSE has published the day's figures
  *   markets                    read the US 10- and 2-year yields (the Treasury), Brent and WTI (the EIA's, via the
  *                              open oil-prices dataset) and MCX crude oil, gold and silver (Groww's candles of their
  *                              futures), for the Bonds and Commodities page; and NSDL's FPI flows, NSE's FII and DII
@@ -66,7 +68,7 @@ public final class CanSlimMain {
             return;
         }
         if (command.equals("markets")) {
-            markets();
+            markets(parsed);
             return;
         }
         if (command.equals("summary")) {
@@ -80,7 +82,7 @@ public final class CanSlimMain {
         if (!command.equals("scan")) {
             System.err.println("Unknown command: " + command);
             System.err.println("Try: scan [--query \"...\"] [--no-screener] [--market] [--limit N] [--top N] [--all]"
-                    + " | bases | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets"
+                    + " | bases | profiles [--symbol S] [--max-pages N] [--max-other-pages N] | markets [--institutional]"
                     + " | summary --symbol S [--call YYYY-MM] [--again] | marketwatch [--no-bars]");
             System.exit(2);
         }
@@ -190,14 +192,17 @@ public final class CanSlimMain {
     }
 
     /**
-     * Reads the bond yields and commodity prices. A series that could not be read is reported and the others are
-     * still read; only a run that read none of them leaves a failing status for the evening log.
+     * Reads the bond yields, commodity prices and institutional flows, or with {@code --institutional} only the flows
+     * (no broker login: the later evening runs that catch NSE's figures once published). A series that could not be read
+     * is reported and the others are still read; only a run that read none of them leaves a failing status for the
+     * evening log.
      */
-    private static void markets() {
+    private static void markets(Args parsed) {
         AppConfig config = AppConfig.load();
         try (AppContext context = new AppContext(config)) {
             List<com.stockanalyzer.markets.MarketSeriesService.Result> results = context.marketSeriesService()
-                    .refresh(com.stockanalyzer.markets.MarketSources.ALL, config.marketsHistoryDays());
+                    .refresh(com.stockanalyzer.markets.MarketSources.selection(parsed.flag("institutional")),
+                            config.marketsHistoryDays());
             for (com.stockanalyzer.markets.MarketSeriesService.Result result : results) {
                 System.out.printf("%-14s %s%n", result.series(), result.error() != null ? "not read: " + result.error()
                         : result.stored() + " readings, newest " + result.latest());
