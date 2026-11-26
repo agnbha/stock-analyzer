@@ -44,6 +44,7 @@ class CprLevelsTest {
     private static final List<String> LAST = List.of("Last day high", "Last day low");
     /** The box's picks that draw every support, resistance and central pivot, and nothing else. */
     private static final String EVERY = "r1,r2,r3,pivots";
+    private static final String ALL_ON = "r1,r2,r3,pivots,predicted,hl,prevclose,ema10,ema35,ema60,vwap";
 
     @TempDir
     Path directory;
@@ -339,13 +340,16 @@ class CprLevelsTest {
     }
 
     @Test
-    @DisplayName("the previous close is not in the box: it is drawn whatever is picked, or nothing")
-    void thePreviousCloseIsAlwaysThere() throws Exception {
+    @DisplayName("Previous day's close is a switch of its own: drawn when picked, whatever else is, and not when not")
+    void thePreviousCloseIsASwitch() throws Exception {
         session(test, D1, 120.0, 90.0, 108.0);
         candles(test, D2);
 
-        for (String picks : List.of("", "pivots", "hl", "r1,r2,r3,pivots,predicted,hl")) {
+        for (String picks : List.of("prevclose", "prevclose,pivots", ALL_ON)) {
             assertEquals(108.0, points(picks, D2).getFirst().previousClose(), "picks '" + picks + "'");
+        }
+        for (String picks : List.of("", "pivots", "hl,vwap,ema10", "prevclosex", "close")) {
+            assertNull(points(picks, D2).getFirst().previousClose(), "picks '" + picks + "'");
         }
     }
 
@@ -391,12 +395,12 @@ class CprLevelsTest {
     }
 
     @Test
-    @DisplayName("the previous close and the central pivots are drawn whatever the range: they are wanted in view")
+    @DisplayName("the previous close and the central pivots are drawn whatever the range, once picked: they are wanted in view")
     void thePreviousCloseAndCentralPivotsAreAlwaysDrawn() throws Exception {
         session(test, D1, 120.0, 90.0, 108.0);                  // pivots 105 to 107, previous close 108
         candlesRanging(test, D2, 150.0, 140.0);                 // a gap up: all of them are below the day's range
 
-        Point first = points(EVERY, D2).getFirst();
+        Point first = points(EVERY + ",prevclose", D2).getFirst();
 
         assertEquals(List.of(), LEVELS.stream().filter(n -> first.levels().get(n) != null && !List.of("TC", "Pivot", "BC").contains(n)).toList(),
                 "no support or resistance is in 140 to 150 (R2 is 136, R3 152)");
@@ -469,14 +473,14 @@ class CprLevelsTest {
             assertFalse(properties.containsKey("custom.hideFrom"), name + ": named in the legend");
         }
         assertFalse(byName.containsKey("R4") || byName.containsKey("S4"), "the box has no switch for them");
-        assertTrue(panel().path("description").asText().contains("CPR levels"));
+        assertTrue(panel().path("description").asText().contains("Levels"));
         assertTrue(panel().path("description").asText().contains("Last Day's High and Low"));
     }
 
     @Test
-    @DisplayName("the CPR levels box is a multi-select of the six choices, in order, and starts on Central Pivots alone")
+    @DisplayName("the Levels box is a multi-select of eleven choices, in order, and starts with five of them ticked")
     void theBox() throws IOException {
-        JsonNode box = variable("cpr_lines");
+        JsonNode box = variable("levels");
 
         List<String> values = new ArrayList<>();
         List<String> texts = new ArrayList<>();
@@ -489,36 +493,39 @@ class CprLevelsTest {
             }
         });
 
-        assertEquals(List.of("r1", "r2", "r3", "pivots", "predicted", "hl"), values);
-        assertEquals(List.of("R1 and S1", "R2 and S2", "R3 and S3", "Central Pivots", "Predicted CPR", "Last Day's High and Low"), texts);
-        assertEquals("CPR levels", box.path("label").asText());
+        assertEquals(List.of("r1", "r2", "r3", "pivots", "predicted", "hl", "prevclose", "ema10", "ema35", "ema60", "vwap"), values);
+        assertEquals(List.of("R1 and S1", "R2 and S2", "R3 and S3", "Central Pivots", "Predicted CPR", "Last Day's High and Low",
+                "Previous day's close", "10 EMA", "35 EMA", "60 EMA", "VWAP"), texts);
+        assertEquals("Levels", box.path("label").asText());
         assertEquals("custom", box.path("type").asText());
         assertTrue(box.path("multi").asBoolean(), "a multi-select dropdown");
-        assertFalse(box.path("includeAll").asBoolean(), "no All: it would tick the predicted and last-day lines too");
-        assertEquals(List.of("pivots"), selected, "only the central pivots are ticked to begin with");
+        assertFalse(box.path("includeAll").asBoolean(), "no All: it would tick the predicted and last-day lines and the 60 EMA too");
+        List<String> on = List.of("pivots", "prevclose", "ema10", "ema35", "vwap");
+        assertEquals(on, selected, "central pivots, previous day's close, 10 EMA, 35 EMA and VWAP are ticked; the rest are not");
         List<String> current = new ArrayList<>();
         box.path("current").path("value").forEach(v -> current.add(v.asText()));
-        assertEquals(List.of("pivots"), current);
-        assertEquals(List.of("Central Pivots"), StreamSupport.stream(box.path("current").path("text").spliterator(), false)
-                .map(JsonNode::asText).toList());
+        assertEquals(on, current);
+        assertEquals(List.of("Central Pivots", "Previous day's close", "10 EMA", "35 EMA", "VWAP"),
+                StreamSupport.stream(box.path("current").path("text").spliterator(), false).map(JsonNode::asText).toList());
         assertEquals("R1 and S1 : r1, R2 and S2 : r2, R3 and S3 : r3, Central Pivots : pivots, Predicted CPR : predicted, "
-                + "Last Day's High and Low : hl", box.path("query").asText(), "the options Grafana rebuilds from the query agree");
-        assertTrue(panel().path("targets").get(0).path("queryText").asText().contains("${cpr_lines:csv}"),
+                + "Last Day's High and Low : hl, Previous day's close : prevclose, 10 EMA : ema10, 35 EMA : ema35, "
+                + "60 EMA : ema60, VWAP : vwap", box.path("query").asText(), "the options Grafana rebuilds from the query agree");
+        assertTrue(panel().path("targets").get(0).path("queryText").asText().contains("${levels:csv}"),
                 "the query reads the box as a comma list");
     }
 
     @Test
-    @DisplayName("the single-select boxes it replaces are gone, so a stale address cannot override its default")
+    @DisplayName("the boxes it replaces are gone, so a stale address cannot override its defaults")
     void theOldBoxesAreGone() throws IOException {
         List<String> names = StreamSupport.stream(JsonMapper.INSTANCE.readTree(Files.readString(DASHBOARD))
                 .path("templating").path("list").spliterator(), false).map(v -> v.path("name").asText()).toList();
 
-        assertEquals(1, names.stream().filter("cpr_lines"::equals).count());
-        for (String old : List.of("cpr", "cpr_levels", "cpr_next")) {
+        assertEquals(1, names.stream().filter("levels"::equals).count());
+        for (String old : List.of("cpr", "cpr_levels", "cpr_next", "cpr_lines", "candles")) {
             assertFalse(names.contains(old), old + ": an address carrying var-" + old + "=... must be ignored, not read as a pick");
         }
         String sql = panel().path("targets").get(0).path("queryText").asText();
-        assertFalse(sql.contains("$cpr_levels") || sql.contains("$cpr_next"));
+        assertFalse(sql.contains("$cpr") || sql.contains("$candles") || sql.contains("${candles"));
     }
 
     private static JsonNode panel() throws IOException {
@@ -562,10 +569,10 @@ class CprLevelsTest {
         String list = String.join("','", sessions);
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + list + "'")
-                .replace("${candles:sqlstring}", "'200'")
+                .replace("$candle_size", "1")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
-                .replace("${cpr_lines:csv}", picks)
+                .replace("${levels:csv}", picks)
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {
@@ -587,8 +594,9 @@ class CprLevelsTest {
                         double value = rs.getDouble(name);
                         last.put(name, rs.wasNull() ? null : value);
                     }
+                    long time = rs.getLong("time");
                     double previous = rs.getDouble("Previous close");
-                    points.add(new Point(rs.getLong("time"), levels, next, last, rs.wasNull() ? null : previous));
+                    points.add(new Point(time, levels, next, last, rs.wasNull() ? null : previous));
                 }
             }
             return points;

@@ -202,17 +202,15 @@ The minute chart draws exactly the sessions ticked in the **Session** box, and t
 the time range at the top. A session ticked by hand stays ticked when the range changes, as long as it is still in
 the range, so after picking one, set the box back to *All* to see the whole range again.
 
-The minute-candle chart on this page draws at most **200** candles unless you change the **Max candles** box at the
-top (type a number, press Enter). When the sessions you pick hold more minutes than that, minutes are combined into
-longer candles so the chart still covers all of them: 4- to 6-minute candles for two or three days, 2-minute for a
-single session, and about three candles a day (a couple of hours each) across three months. With room to spare it is
-one candle per minute.
-A candle opens where its first minute opened, closes where its last closed, and spans the highest high, lowest low
-and total volume of its minutes; VWAP and the averages are read as they stand at its end, and your buys, sells and the
-detector's windows sit on the candle they fall in (an average, if several do). A candle never spans two sessions, nor
-a pause of three minutes or more with no trades, and the total never exceeds the number typed. A blank, non-numeric,
-zero or negative entry means 200. The weekly chart is not capped: it draws one candle a week over the last six months,
-whatever time range is picked at the top.
+The minute chart's **Candle size** box picks 1M, 2M, 5M or 10M candles, 1M to begin with. Candles are cut on the clock
+from the 09:15 open, so a 5-minute candle is 09:15-09:19, then 09:20-09:24. A candle opens where its first minute
+opened, closes where its last closed, and spans the highest high, lowest low and total volume of its minutes; VWAP and
+the EMAs are read as they stand at its end, and your buys, sells and the detector's windows sit on the candle they fall
+in (an average, if several do). A candle never spans two sessions, and a stretch with no trades (a thin stock's quiet
+minutes, the pause before the closing auction) leaves a gap in the chart, not a longer candle; since August 2026 the
+auction's single print, at 15:28 or 15:29, is a candle of its own at the end of the day. Nothing caps the number of
+candles, so several sessions at 1M draw a great many: pick longer candles for a wide range. The weekly chart is not
+capped: it draws one candle a week over the last six months, whatever time range is picked at the top.
 
 **CPR levels.** The minute chart also draws the CPR (central pivot range) levels, worked out from the High, Low and
 Close of the session before each one drawn. As with the *Previous close* line, every session has its own flat lines, and
@@ -233,36 +231,51 @@ there are none where the session before is missing for the symbol (or has no hig
 The three central pivots are dashed blue, the resistances (R) thin green and the supports (S) thin red. When the
 session before closed in the lower half of its range, TC falls below BC: the two simply swap places.
 
-Out in the open the chart shows only the *Previous close*, which is always drawn, and the three central pivots. The
-**CPR levels** box at the top is a multi-select with a switch for each set of lines, and starts with *Central Pivots*
-alone ticked:
+Out in the open the chart shows the *Previous close*, VWAP, the 10 and 35 EMAs and the three central pivots, and
+nothing else. The **Levels** box at the top is a multi-select with a switch for each line or set of lines:
 
-| Tick | Draws |
-|---|---|
-| R1 and S1 | R1 and S1 |
-| R2 and S2 | R2 and S2 |
-| R3 and S3 | R3 and S3 |
-| Central Pivots | TC, Pivot and BC |
-| Predicted CPR | tomorrow's TC, Pivot and BC, in orange (below) |
-| Last Day's High and Low | the highest and lowest prices of the session before, in gold dashes |
+| Tick | Ticked to begin with | Draws |
+|---|---|---|
+| R1 and S1 | | R1 and S1 |
+| R2 and S2 | | R2 and S2 |
+| R3 and S3 | | R3 and S3 |
+| Central Pivots | yes | TC, Pivot and BC |
+| Predicted CPR | | tomorrow's TC, Pivot and BC, in orange (below) |
+| Last Day's High and Low | | the highest and lowest prices of the session before, in gold dashes |
+| Previous day's close | yes | the dotted *Previous close* line |
+| 10 EMA | yes | EMA 10 (below) |
+| 35 EMA | yes | EMA 35 |
+| 60 EMA | | EMA 60 |
+| VWAP | yes | the day's volume-weighted average price |
 
-Each is its own switch: untick *Central Pivots* to take the pivots off, or tick *Predicted CPR* without any other.
+Each is its own switch: untick *VWAP* or *Central Pivots* to take them off, or tick *Predicted CPR* without any other.
 Grafana will not leave a multi-select empty, though: unticking the last choice puts the first, *R1 and S1*, back (and an
-address with no valid choice opens on it too), so one choice is always ticked. R1 and S1 and the rest are not named in the legend; hover a candle to
-read them. A support or resistance, and the last day's high and low, are drawn only on a session whose price reached them,
-between that session's highest high and lowest low: Grafana scales the price axis to every line drawn, and the far levels
-(R2 and R3, S2 and S3, or yesterday's extremes, on a quiet day) would otherwise push the candles into a sliver. So none of
-them stretches the chart; they appear as the price gets to them, and on an older session only the ones it touched are
-there. The *Previous close*, the central pivots and tomorrow's are drawn whatever the range. The
-*Yesterday's trading hours* button keeps whatever the box is set to. R4 and S4 are not drawn. Grafana keeps the
-box's last value in the address bar, so a tab or bookmark keeps its choice until the box is set again.
+address with no valid choice opens on it too), so one choice is always ticked. R1 and S1 and the rest are not named in
+the legend; hover a candle to read them. A support or resistance, and the last day's high and low, are drawn only on a
+session whose price reached them, between that session's highest high and lowest low: Grafana scales the price axis to
+every line drawn, and the far levels (R2 and R3, S2 and S3, or yesterday's extremes, on a quiet day) would otherwise
+push the candles into a sliver. So none of them stretches the chart; they appear as the price gets to them, and on an
+older session only the ones it touched are there. The *Previous close*, the central pivots and tomorrow's are drawn
+whatever the range. The *Yesterday's trading hours* button keeps whatever both boxes are set to. R4 and S4 are not
+drawn. Grafana keeps the box's last value in the address bar, so a tab or bookmark keeps its choice until the box is set
+again.
 
-**Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), are drawn when *Predicted CPR* is ticked.
+**Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), are drawn when *Predicted CPR* is ticked in the **Levels** box.
 They are worked out on the fly from the newest session drawn, by the same formulas: its highest high, its lowest low and
 the close of its latest minute. Today they move with the market, as the page reads again every minute; once the session
 is over they are final, and they are the lines the next session draws as its own. Only the newest session drawn has them
 (an earlier one's are already what the session after it shows), and they always fall within that session's own range, so
 they never stretch the chart.
+
+**Moving averages.** The EMA 10, EMA 35 and EMA 60 lines are exponential averages of the closes of the candles drawn, so
+what they span follows the **Candle size** box: ten 5-minute candles are 50 minutes. Each new close counts for
+2 / (N + 1) of the new value (2/11, 2/36, 2/61) and the average before it for the rest; the first value is the plain
+average of the first N closes. They do not restart each session. The chart runs the averages through the six sessions
+stored before the first one drawn (which are not drawn), so a day's first candles are measured against the lines the
+day before ended on. Six sessions are long enough for the start of that run to fade out: against an average run from
+the very first stored session the difference is about a hundred-thousandth of the price at worst (the 60 EMA of
+10-minute candles). Only for the earliest sessions stored is there no line until N candles exist. The EMAs weigh each
+candle's close alone, volume does not enter them; VWAP, which weighs prices by volume, restarts every session.
 
 **The same stock on the other pages.** Under the minute chart, a row of buttons opens the symbol picked on **CAN
 SLIM**, **Stock Trend** and **Company Details**. Stock Trend has the same row under its daily candles (**Candles and

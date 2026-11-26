@@ -142,10 +142,10 @@ class PreviousCloseBaselineTest {
         String list = String.join("','", sessions);
         String sql = panel().path("targets").get(0).path("queryText").asText()
                 .replace("${session:sqlstring}", "'" + list + "'")
-                .replace("${candles:sqlstring}", "'200'")
+                .replace("$candle_size", "1")
                 .replace("${profile:sqlstring}", "'" + AccountProfileRepository.DEFAULT_PROFILE + "'")
                 .replace("$symbol", "TEST")
-                .replace("${cpr_lines:csv}", "r1,r2,r3,pivots,predicted,hl")
+                .replace("${levels:csv}", "r1,r2,r3,pivots,predicted,hl,prevclose,ema10,ema35,ema60,vwap")
                 .replace("$detector", "topk-nonoverlap/highlow/v1");
         assertTrue(!sql.contains("$"), "an unfilled variable would make this prove nothing: " + sql);
         return database.read(connection -> {

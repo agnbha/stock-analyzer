@@ -194,7 +194,7 @@ class TradingRangesTest {
                 assertFalse(url.contains("${" + name + ":queryparam}"), name + " is not for the URL as a variable");
             }
         }
-        assertEquals(Set.of("symbol", "session", "detector", "candles", "cpr_lines", "profile"), shown,
+        assertEquals(Set.of("symbol", "session", "detector", "candle_size", "levels", "profile"), shown,
                 "the lookups are hidden: no extra boxes on the page (Account is one, and the button carries it)");
         Matcher used = Pattern.compile("\\$\\{(\\w+)(?::\\w+)?}").matcher(url);
         while (used.find()) {
