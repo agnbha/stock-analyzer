@@ -235,11 +235,15 @@ there are none where the session before is missing for the symbol (or has no hig
 The three central pivots are dashed blue, the resistances (R) thin green and the supports (S) thin red. When the
 session before closed in the lower half of its range, TC falls below BC: the two simply swap places.
 
-Out in the open the chart shows only the *Previous close* and the three central pivots. R1 to R4 and S1 to S4 lie well
-away from the day's price and stretch the chart's price axis (Grafana scales it to every line drawn), so the **CPR
-levels** box at the top starts on *Central pivots only*: set it to R1/S1, R2/S2, R3/S3 or R4/S4 to add them (they are
-not named in the legend; hover a candle to read them), or to *Off* to draw none of them. The *Yesterday's
-trading hours* button keeps whatever it is set to.
+Out in the open the chart shows only the *Previous close* and the three central pivots, and the **CPR levels** box at
+the top starts on *Central pivots only*. Set it to R1/S1, R2/S2, R3/S3 or R4/S4 to add the supports and resistances out
+to there (they are not named in the legend; hover a candle to read them), or to *Off* to draw none of them. A
+support or resistance is drawn only on a session whose price reached it, between that session's highest high and lowest
+low: Grafana scales the price axis to every line drawn, and the far levels (R2 and R3, S2 and S3 and beyond, on a quiet
+day) would otherwise push the candles into a sliver. So none of them stretches the chart; they appear as the price gets
+to them, and on an older session only the ones it touched are there. The *Previous close* and the central pivots
+are drawn whatever the range. The *Yesterday's trading hours* button keeps whatever the box is set to. Grafana keeps
+each box's last value in the address bar, so a tab or bookmark keeps its choice until the box is set again.
 
 **Tomorrow's central pivots**, in orange dashes (*Next day TC*, *Pivot*, *BC*), have a box of their own, **Predicted
 CPR**, which starts *Off* and which the *CPR levels* box does not govern. Switched *On*, they are worked out on the fly

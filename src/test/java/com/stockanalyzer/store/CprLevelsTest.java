@@ -284,6 +284,74 @@ class CprLevelsTest {
     }
 
     @Test
+    @DisplayName("a support or resistance the price did not reach is not drawn, so it cannot stretch the chart")
+    void aLevelThePriceDidNotReachIsNotDrawn() throws Exception {
+        // From 120 / 90 / 108: R1 122, R2 136, R3 152, R4 166 and S1 92, S2 76, S3 62, S4 46; the pivots 105 to 107.
+        session(test, D1, 120.0, 90.0, 108.0);
+        candlesRanging(test, D2, 125.0, 80.0);
+
+        assertEquals(List.of("R1", "TC", "Pivot", "BC", "S1"), drawnOnTheFirstCandle("all", D2),
+                "R1 (122) and S1 (92) are inside 80 to 125; R2 (136), S2 (76) and the rest are outside it");
+        for (Point point : points("all", D2)) {
+            for (Map.Entry<String, Double> level : point.levels().entrySet()) {
+                assertTrue(level.getValue() == null || (level.getValue() >= 80.0 && level.getValue() <= 125.0),
+                        level.getKey() + " would be outside the candles: " + level.getValue());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a level exactly at the day's high or low is drawn, one a hair beyond it is not")
+    void theEdgesOfTheRange() throws Exception {
+        session(test, D1, 120.0, 90.0, 108.0);                  // R1 = 122, S1 = 92
+        candlesRanging(test, D2, 122.0, 92.0);
+        assertEquals(List.of("R1", "TC", "Pivot", "BC", "S1"), drawnOnTheFirstCandle("1", D2), "on the edge");
+
+        candlesRanging(test, D3, 121.99, 92.01);
+        session(test, D2, 120.0, 90.0, 108.0);                  // D3's levels are the same: R1 = 122, S1 = 92
+        assertEquals(List.of("TC", "Pivot", "BC"), drawnOnTheFirstCandle("1", D3), "a hair inside it");
+    }
+
+    @Test
+    @DisplayName("they appear as the day goes: a new high that reaches R2 draws it from the next read")
+    void theyAppearAsThePriceGetsToThem() throws Exception {
+        session(test, D1, 120.0, 90.0, 108.0);                  // R1 = 122, R2 = 136, R3 = 152
+        candle(test, D2, 0, 125, 90, 110);
+        assertEquals(List.of("R1", "TC", "Pivot", "BC", "S1"), drawnOnTheFirstCandle("all", D2));
+
+        candle(test, D2, 1, 140, 105, 138);                     // the price gets past R2
+
+        assertEquals(List.of("R2", "R1", "TC", "Pivot", "BC", "S1"), drawnOnTheFirstCandle("all", D2));
+    }
+
+    @Test
+    @DisplayName("the previous close and the central pivots are drawn whatever the range: they are wanted in view")
+    void thePreviousCloseAndCentralPivotsAreAlwaysDrawn() throws Exception {
+        session(test, D1, 120.0, 90.0, 108.0);                  // pivots 105 to 107, previous close 108
+        candlesRanging(test, D2, 150.0, 140.0);                 // a gap up: all of them are below the day's range
+
+        Point first = points("all", D2).getFirst();
+
+        assertEquals(List.of(), LEVELS.stream().filter(n -> first.levels().get(n) != null && !List.of("TC", "Pivot", "BC").contains(n)).toList(),
+                "no support or resistance is in 140 to 150 (R2 is 136, R3 152)");
+        assertEquals(Map.of("TC", 107.0, "Pivot", 106.0, "BC", 105.0),
+                Map.of("TC", first.levels().get("TC"), "Pivot", first.levels().get("Pivot"), "BC", first.levels().get("BC")));
+        assertEquals(108.0, first.previousClose());
+    }
+
+    @Test
+    @DisplayName("each session is judged by its own range, not the range of the sessions drawn with it")
+    void eachSessionByItsOwnRange() throws Exception {
+        session(test, D1, 120.0, 90.0, 108.0);                  // D2's R1 = 122
+        session(test, D2, 130.0, 100.0, 112.0);                 // D3's Pivot 114, R1 = 128
+        candlesRanging(test, D2, 121.0, 80.0);                  // D2 does not reach its R1 (122)...
+        candlesRanging(test, D3, 130.0, 100.0);                 // ...though D3's range holds 122; D3 does reach its own 128
+
+        assertEquals(java.util.Arrays.asList(null, null, null, null, 128.0, 128.0),
+                points("1", D2, D3).stream().map(p -> p.levels().get("R1")).toList());
+    }
+
+    @Test
     @DisplayName("drawn as the slide has it: thin green resistances, thin red supports, dashed blue central pivots")
     void drawnAsOnTheSlide() throws IOException {
         Map<String, Map<String, JsonNode>> byName = new LinkedHashMap<>();
@@ -352,7 +420,7 @@ class CprLevelsTest {
                 .filter(p -> p.path("id").asInt() == 20).findFirst().orElseThrow();
     }
 
-    private record Point(long time, Map<String, Double> levels, Map<String, Double> next) {
+    private record Point(long time, Map<String, Double> levels, Map<String, Double> next, Double previousClose) {
     }
 
     /** The levels the box lets through on the first candle, top to bottom, ignoring the blank ones. */
@@ -392,7 +460,8 @@ class CprLevelsTest {
                         double value = rs.getDouble(name);
                         next.put(name, rs.wasNull() ? null : value);
                     }
-                    points.add(new Point(rs.getLong("time"), levels, next));
+                    double previous = rs.getDouble("Previous close");
+                    points.add(new Point(rs.getLong("time"), levels, next, rs.wasNull() ? null : previous));
                 }
             }
             return points;
@@ -435,6 +504,19 @@ class CprLevelsTest {
         });
     }
 
+    /** Three candles in the session, each from {@code low} to {@code high}, closing midway. */
+    private void candlesRanging(long instrument, String date, double high, double low) {
+        for (int minute = 0; minute < 3; minute++) {
+            candle(instrument, date, minute, high, low, (high + low) / 2);
+        }
+    }
+
+    /** The levels of the first candle that are drawn, top to bottom. */
+    private List<String> drawnOnTheFirstCandle(String box, String... sessions) throws Exception {
+        Map<String, Double> levels = points(box, sessions).getFirst().levels();
+        return LEVELS.stream().filter(name -> levels.get(name) != null).toList();
+    }
+
     /** A session whose prices run to a high of 120 and a low of 90, closing at 108: the numbers of the slide's example. */
     private void aSessionOf120And90Closing108(long instrument, String date) {
         candle(instrument, date, 0, 120, 100, 110);
@@ -442,14 +524,17 @@ class CprLevelsTest {
         candle(instrument, date, 2, 112, 90, 108);
     }
 
-    /** Three one-minute candles in the session, stamped within its own UTC day so the test can tell sessions apart. */
+    /**
+     * Three one-minute candles in the session, stamped within its own UTC day so the test can tell sessions apart, and
+     * over a range of 20 to 200: wide enough to take every level, which are drawn only where the price reached them.
+     */
     private void candles(long instrument, String date) {
         long base = java.time.LocalDate.parse(date).toEpochDay() * 86_400L + 4 * 3_600L;
         database.inTransaction(connection -> {
             try (PreparedStatement insert = connection.prepareStatement("""
                     INSERT INTO live_candle (instrument_id, interval_minutes, ts_epoch, session_date, open, high,
                                              low, close, volume, provisional, updated_at)
-                    VALUES (?,1,?,?,100,101,99,100,1000,0,0)""")) {
+                    VALUES (?,1,?,?,100,200,20,100,1000,0,0)""")) {
                 for (int minute = 0; minute < 3; minute++) {
                     insert.setLong(1, instrument);
                     insert.setLong(2, base + minute * 60L);
