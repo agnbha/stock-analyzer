@@ -25,14 +25,17 @@ public interface GrowwAuthenticator {
      */
     record Cooldown(java.time.Instant until, String reason, String remedy) {
 
+        /** Hours, minutes and seconds always: {@code LocalTime.toString()} would drop the seconds on a whole minute. */
+        private static final java.time.format.DateTimeFormatter CLOCK =
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
+
         public boolean isActive() {
             return java.time.Instant.now().isBefore(until);
         }
 
-        /** The wait in local time, which is how a person reads a clock. */
+        /** The wait in local time, which is how a person reads a clock: {@code HH:mm:ss}, whole seconds. */
         public String untilLocalTime() {
-            return until.atZone(java.time.ZoneId.systemDefault())
-                    .toLocalTime().withNano(0).toString();
+            return CLOCK.format(until.atZone(java.time.ZoneId.systemDefault()));
         }
     }
 }
