@@ -42,7 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * day's close, else green (the candles compare the close with the day's open, and keep their colors); light blue at or
  * above the 90th percentile of the last 20 sessions, yellow at or below the 10th; white on a bull snort (on 3 times the
  * average volume of the 50 sessions before), over any other color. The highest or lowest volume of the last 3 months
- * gets a Q dot above its bar, of the last 12 months a Y dot; over 1 million shares on a close 4.95% or more above the
+ * gets a Q dot above its bar, of the last 12 months a Y dot; a bull snort that is also one of them keeps its white bar and
+ * shows the extreme too, as a narrow core in the extreme's color and a line of its own in the tooltip; over 1 million
+ * shares on a close 4.95% or more above the
  * previous one (a 5% upper circuit, rounded to the tick), a glow behind it. The volumes and prices are invented.
  */
 class VolumeColorsTest {
@@ -73,6 +75,16 @@ class VolumeColorsTest {
             Kind.DOWN, "red", Kind.UP, "green", Kind.HEAVY, "light-blue", Kind.LIGHT, "yellow",
             Kind.BULL_SNORT, "white", Kind.QUARTER_HIGH, "light-blue", Kind.QUARTER_LOW, "yellow",
             Kind.YEAR_HIGH, "light-blue", Kind.YEAR_LOW, "yellow"));
+
+    /**
+     * The series that name a bull snort's 3- or 12-month extreme as well: the white bar is the day's one bar, so the
+     * extreme is drawn as a narrow core on it, in the extreme's color, and is a line in the tooltip.
+     */
+    private static final Map<Kind, String> ALSO = new EnumMap<>(Map.of(
+            Kind.QUARTER_HIGH, "Also the highest volume in 3 months",
+            Kind.QUARTER_LOW, "Also the lowest volume in 3 months",
+            Kind.YEAR_HIGH, "Also the highest volume in 12 months",
+            Kind.YEAR_LOW, "Also the lowest volume in 12 months"));
 
     private record Session(LocalDate date, double open, double high, double low, double close, long volume) {
     }
@@ -344,6 +356,37 @@ class VolumeColorsTest {
     }
 
     @Test
+    @DisplayName("a bull snort that is also the highest volume in 3 or 12 months shows both, not the bull snort alone")
+    void bullSnortOnAnExtremeShowsBoth() {
+        LocalDate year = weekdays(300).get(280);
+        List<Session> days = new ArrayList<>();
+        for (Session day : flat(300)) {
+            days.add(day.date().equals(year) ? new Session(day.date(), 101, 107, 101, 106.5, 9500) : day);
+        }
+        store("YEAR", days);
+        LocalDate quarter = LocalDate.of(2026, 4, 6);
+        List<Session> shorter = new ArrayList<>();
+        for (Session day : flat(80)) {
+            shorter.add(day.date().equals(quarter) ? new Session(day.date(), 101, 107, 101, 106.5, 9500) : day);
+        }
+        store("QUARTER", shorter);
+
+        for (Path chart : CHARTS.keySet()) {
+            Map<String, Double> twelve = byDate(days, rows(chart, "YEAR")).get(year);
+            assertDrawn(new Drawn(Kind.BULL_SNORT, Kind.YEAR_HIGH, false), 9500, twelve, chart + " 12 months");
+            assertEquals(9500.0, twelve.get(BAR.get(Kind.BULL_SNORT)), "the white bar stays");
+            assertEquals(9500.0, twelve.get(ALSO.get(Kind.YEAR_HIGH)), "and the 12-month high is named beside it");
+            assertNull(twelve.get(ALSO.get(Kind.QUARTER_HIGH)), "a 12-month high is not also named a 3-month one");
+
+            Map<String, Double> three = byDate(shorter, rows(chart, "QUARTER")).get(quarter);
+            assertDrawn(new Drawn(Kind.BULL_SNORT, Kind.QUARTER_HIGH, false), 9500, three, chart + " 3 months");
+            assertEquals(9500.0, three.get(BAR.get(Kind.BULL_SNORT)), "the white bar stays");
+            assertEquals(9500.0, three.get(ALSO.get(Kind.QUARTER_HIGH)), "and the 3-month high is named beside it");
+            assertNull(three.get(ALSO.get(Kind.YEAR_HIGH)), "bars do not go back a year: no Y");
+        }
+    }
+
+    @Test
     @DisplayName("over 1 million shares and a close at least 4.95% above the previous close glow, whatever the bar")
     void heavyFivePercentUpDaysGlow() {
         List<LocalDate> dates = weekdays(60);
@@ -392,6 +435,7 @@ class VolumeColorsTest {
             List<String> columns = new ArrayList<>(rows(chart.getKey(), "STOCK").getFirst().keySet());
             List<String> series = new ArrayList<>(List.of(GLOW));
             series.addAll(BAR.values());
+            series.addAll(ALSO.values());
             series.add(Q);
             series.add(Y);
             for (String name : series) {
@@ -418,6 +462,20 @@ class VolumeColorsTest {
                         bar.getValue() + ": the legend names the dots instead");
                 assertTrue(columns.indexOf(GLOW) < columns.indexOf(bar.getValue()),
                         where + ": the glow is drawn first, behind the bars");
+            }
+            for (Map.Entry<Kind, String> also : ALSO.entrySet()) {
+                Map<String, JsonNode> properties = overrides.get(also.getValue());
+                assertEquals("bars", properties.get("custom.drawStyle").asText(), also.getValue());
+                assertEquals(COLOR.get(also.getKey()), properties.get("color").path("fixedColor").asText(),
+                        also.getValue() + ": the extreme's own color");
+                assertTrue(properties.get("custom.barWidthFactor").asDouble() < 0.6,
+                        also.getValue() + ": a core, narrower than the bars (0.6) it sits on");
+                assertTrue(properties.get("custom.hideFrom").path("legend").asBoolean(),
+                        also.getValue() + ": the legend names the dots instead");
+                assertFalse(properties.get("custom.hideFrom").path("tooltip").asBoolean(),
+                        also.getValue() + ": its line in the tooltip is the point");
+                assertTrue(columns.indexOf(BAR.get(Kind.BULL_SNORT)) < columns.indexOf(also.getValue()),
+                        where + ": " + also.getValue() + " is drawn after the white bar, so on it");
             }
             for (String marker : List.of(Q, Y)) {
                 assertEquals("points", overrides.get(marker).get("custom.drawStyle").asText(), marker);
@@ -543,6 +601,15 @@ class VolumeColorsTest {
             }
         }
         Kind extreme = drawn.extreme();
+        for (Map.Entry<Kind, String> also : ALSO.entrySet()) {
+            Double value = row.get(also.getValue());
+            if (drawn.bar() == Kind.BULL_SNORT && extreme == also.getKey()) {
+                assertNotNull(value, message + ": a bull snort on an extreme should also be " + also.getValue());
+                assertEquals(volume, value, 1e-9, message + ": " + also.getValue());
+            } else {
+                assertNull(value, message + ": not " + also.getValue() + ", the day is a " + BAR.get(drawn.bar()));
+            }
+        }
         boolean quarter = extreme == Kind.QUARTER_HIGH || extreme == Kind.QUARTER_LOW;
         boolean year = extreme == Kind.YEAR_HIGH || extreme == Kind.YEAR_LOW;
         for (Map.Entry<String, Boolean> above : Map.of(Q, quarter, Y, year, GLOW, drawn.glow()).entrySet()) {

@@ -377,9 +377,11 @@ compares with the stock's own; the candles keep their colors.
 - **Yellow**: at or below the 10th percentile (one of the two lightest).
 - **White**: a bull snort. The day's range (high to low) is at least 5% of the previous close, and the close is in the
   top third of that range and above the previous close, on at least 3 times the average volume of the 50 sessions
-  before it (so a stock needs 50 sessions of history first). White wins over the other colors.
+  before it (so a stock needs 50 sessions of history first). White wins over the other colors, but a bull snort that is
+  also the highest volume of the last three or twelve months shows both: its white bar has a narrow light-blue core, and
+  hovering the day names both (*Bull snort* and *Also the highest volume in 3 months* or *in 12 months*).
 - **Q** (a light dot above the bar): the highest or lowest volume since the same date three months back.
-- **Y** (an orange dot): the same over twelve months. Y wins over Q. On a white bar, a dot can mean either.
+- **Y** (an orange dot): the same over twelve months. Y wins over Q. On a white bar, hovering says which.
 - **Magenta glow** behind the bar: over 1 million shares traded, and a close at least 4.95% above the previous close.
   The bar is 4.95% rather than 5% so that a 5% upper circuit counts: the limit price is rounded to the tick, so such a
   day can close 4.99% up.
